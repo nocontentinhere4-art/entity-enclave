@@ -35,6 +35,8 @@ const rentZatsPerHour = num(process.env.RENT_ZATS_PER_HOUR, 1_000_000);
 export const config = {
   tickMinutes: minutes('TICK_MS', 'TICK_MINUTES', 15),
   hungerTickMinutes: minutes('HUNGER_TICK_MS', 'HUNGER_TICK_MINUTES', 60),
+  // Wallet re-sync cadence: the entity only sees incoming ZEC after a sync, so it keeps syncing in the background.
+  syncMinutes: minutes('SYNC_MS', 'SYNC_MINUTES', 10),
   initialTreasuryZats: num(process.env.INITIAL_TREASURY_ZATS, 100_000_000),
   hungerThreshold: 0.2,
   hungerRecover: 0.3,

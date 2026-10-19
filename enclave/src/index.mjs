@@ -80,11 +80,21 @@ try {
   ledger.append('wallet-error', digestError('wallet', e));
 }
 
-// Online sync can take minutes over the mixnet, so it runs in the background and never delays the service.
+// Online sync can take a long time over the mixnet, so it runs in the background and never delays the service.
+// It repeats forever: incoming ZEC (the birth gift, every later payment) is only visible after a sync. A sync that
+// hits its timeout keeps the progress zingo saved, so the next round continues from there.
+// The ledger records failures and height changes, not every quiet round.
 async function syncWallet() {
   if (!address) return;
-  try { await wallet.sync(); ledger.append('wallet-sync', { ok: true }); }
-  catch (e) { ledger.append('sync-skipped', digestError('sync', e)); }
+  let lastHeight = null;
+  for (;;) {
+    try {
+      const h = await wallet.sync();
+      const height = Number.isFinite(h) ? h : null;
+      if (height !== lastHeight) { ledger.append('wallet-sync', { ok: true, height }); lastHeight = height; }
+    } catch (e) { ledger.append('sync-skipped', digestError('sync', e)); }
+    await new Promise((r) => setTimeout(r, Math.max(1, config.syncMinutes) * 60_000));
+  }
 }
 
 const pricing = new Pricing({ ledger });
