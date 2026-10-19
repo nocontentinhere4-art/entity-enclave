@@ -47,13 +47,15 @@ function parseBalance(out) {
   return b;
 }
 
-function run(bin, argv) {
+/** Run zingo-cli with a hard timeout: a hung child must never stall the life loop. Online syncs get longer. */
+function run(bin, argv, timeoutMs = argv.includes('--online') ? 45 * 60_000 : 60_000) {
   return new Promise((resolve, reject) => {
     const p = spawn(bin, argv, { stdio: ['ignore', 'pipe', 'pipe'] });
-    let out = '', err = '';
+    let out = '', err = '', done = false;
+    const timer = setTimeout(() => { if (!done) { p.kill('SIGKILL'); reject(new Error(`${bin} ${argv.at(-1)} timed out after ${timeoutMs} ms`)); } }, timeoutMs);
     p.stdout.on('data', (d) => (out += d));
     p.stderr.on('data', (d) => (err += d));
-    p.on('close', (code) => (code === 0 ? resolve(out) : reject(new Error(`${bin} ${argv.at(-1)} exit ${code}: ${(err || out).slice(-500)}`))));
-    p.on('error', reject);
+    p.on('close', (code) => { done = true; clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error(`${bin} ${argv.at(-1)} exit ${code}: ${(err || out).slice(-500)}`)); });
+    p.on('error', (e) => { done = true; clearTimeout(timer); reject(e); });
   });
 }
