@@ -3,11 +3,12 @@
 FROM rust:1.90-bookworm AS zingo
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev protobuf-compiler git && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
-# zingo-cli v6 built WITHOUT the Nym mixnet (`clearnet-test-mode`): the wallet talks to the indexer directly over TLS.
-# Reason: from a 1-vCPU CVM the mixnet never proves an exit (every birth fails), so no sync was ever possible.
-# Cost: the indexer sees the CVM's IP. Treasury privacy still rests on shielded ZEC. Revisit when the mixnet works here.
-RUN git clone --depth 1 --branch zingolib_v6.0.0 https://github.com/zingolabs/zingolib . \
- && cargo build --release -p zingo-cli --no-default-features --features clearnet-test-mode
+# zingo-cli v7 (NU7-capable) built WITHOUT the Nym mixnet (`nakednet-test-mode`): the wallet talks to the indexer
+# directly over TLS. Reason: from a 1-vCPU CVM the mixnet never proves an exit, so no sync was ever possible; v6
+# would avoid the mixnet too but rejects NU7 transactions. Cost: the indexer sees the CVM's IP. Treasury privacy
+# still rests on shielded ZEC. Revisit when the mixnet works from here.
+RUN git clone --depth 1 --branch zingolib_v7.0.0 https://github.com/zingolabs/zingolib . \
+ && cargo build --release -p zingo-cli --no-default-features --features nakednet-test-mode
 
 FROM node:22-bookworm-slim
 WORKDIR /app

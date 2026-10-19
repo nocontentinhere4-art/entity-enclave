@@ -25,7 +25,7 @@ In locale l'attestazione risponde `mode: "dev"`: è dichiaratamente **non attest
    Verifica: Phala offre il verificatore in dashboard; in fase 2 pubblichiamo il nostro, offline.
 
 ## Zcash
-- L'immagine usa zingo-cli v6 **senza mixnet** (`clearnet-test-mode`): dalla CVM il Nym mixnet non apre un'uscita.
+- L'immagine usa zingo-cli v7 **senza mixnet** (`nakednet-test-mode`): dalla CVM il Nym mixnet non apre un'uscita.
   L'indexer vede l'IP della CVM; gli importi e i destinatari restano shielded.
 - Testnet: faucet da chiedere a mano (es. canali community Zcash) all'indirizzo che `/` mostra. Mainnet: cambia
   `ZCASH_CHAIN=mainnet` e `ZCASH_SERVER` (es. `https://zec.rocks:443`).
