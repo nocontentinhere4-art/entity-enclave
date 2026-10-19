@@ -87,8 +87,11 @@ function run(bin, argv, { timeoutMs, env, secret } = {}) {
     // what kind of failure happened without exposing the message.
     const fail = (code, msg) => Object.assign(new Error(msg), { code });
     const timer = setTimeout(() => { if (!done) { p.kill('SIGKILL'); reject(fail('timeout', `${bin} ${argv.at(-1)} timed out after ${timeoutMs} ms`)); } }, timeoutMs);
-    p.stdout.on('data', (d) => (out += d));
-    p.stderr.on('data', (d) => (err += d));
+    // Child output also goes to the container log (seed redacted) so a stalled sync can be diagnosed from outside;
+    // the public ledger never carries it.
+    const echo = (d) => { for (const l of String(d).split('\n')) if (l.trim()) console.error(`[zingo ${argv.at(-1)}] ${redact(l, secret)}`); };
+    p.stdout.on('data', (d) => { out += d; echo(d); });
+    p.stderr.on('data', (d) => { err += d; echo(d); });
     p.on('close', (code, signal) => { done = true; clearTimeout(timer); code === 0 ? resolve(out) : reject(fail(`exit_${code ?? signal}`, `${bin} ${argv.at(-1)} exit ${code ?? signal}: ${redact((err || out).slice(-500), secret)}`)); });
     p.on('error', (e) => { done = true; clearTimeout(timer); reject(e); });
   });
