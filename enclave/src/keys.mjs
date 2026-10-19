@@ -30,6 +30,8 @@ function fromSeed(seed, mode) {
     signPublicKey: Buffer.from(sign.publicKey).toString('hex'),
     boxPublicKey: Buffer.from(box.publicKey).toString('hex'),
     sign: (msg) => Buffer.from(nacl.sign.detached(Buffer.from(msg), sign.secretKey)).toString('hex'),
+    /** Independent 32-byte subkey from the same seed: sha256(label || seed). Same label, same key on redeploy. */
+    deriveSubkey: (label) => new Uint8Array(createHash('sha256').update(Buffer.concat([Buffer.from(String(label)), Buffer.from(seed)])).digest()),
     /** Encrypt a private entry to the archive public key (hex, x25519). */
     sealPrivate: (archivePubHex, plaintext) => {
       const nonce = nacl.randomBytes(24);

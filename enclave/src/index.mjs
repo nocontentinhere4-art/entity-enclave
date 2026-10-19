@@ -1,77 +1,148 @@
-// Sovereign entity — enclave service, phase 1.
-// What it does today: generates its keys (sealed in TEE, dev otherwise), attests them, keeps a public hash-chained
-// ledger, holds a Zcash light wallet (testnet by default), and exposes a read-only HTTP view. No brain yet.
+// Sovereign entity — enclave service, phase 2.
+// This file is wiring only: config in, modules composed, read-only view out. No policy lives here.
 import http from 'node:http';
-import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { config } from './config.mjs';
 import { Ledger } from './ledger.mjs';
 import { loadKeys } from './keys.mjs';
 import { connectDstack, attest } from './attestation.mjs';
 import { ZcashWallet } from './zcash.mjs';
+import { FakeWallet } from './fake-wallet.mjs';
+import { MemoryStore } from './memory/store.mjs';
+import { Pricing } from './economy/pricing.mjs';
+import { Rent } from './economy/rent.mjs';
+import { die } from './economy/death.mjs';
+import { paused } from './safety/pause.mjs';
+import { digestError } from './log.mjs';
+import { Promises } from './life/promises.mjs';
+import { Inference } from './llm/infer.mjs';
+import { Tools } from './tools/registry.mjs';
+import { Life } from './life/loop.mjs';
 
-const STATE = process.env.STATE_DIR ?? './state';
-const PORT = Number(process.env.PORT ?? 8080);
-const ARCHIVE_PUB = process.env.ARCHIVE_PUBKEY ?? ''; // x25519 hex: private ledger entries are encrypted at rest to this key
-const ZCASH_SERVER = process.env.ZCASH_SERVER ?? 'https://testnet.zec.rocks:443';
-const ZCASH_CHAIN = process.env.ZCASH_CHAIN ?? 'testnet';
-const ZINGO = process.env.ZINGO_BIN ?? 'zingo-cli';
-const TICK_MS = Number(process.env.TICK_MS ?? 15 * 60_000);
+const STATE = config.stateDir;
+const LEDGER_PATH = join(STATE, 'ledger.jsonl');
+const DAY_MS = 86_400_000;
+
+// The pause switch fails closed: a missing file means "do not act". Create the default one on first boot so a
+// fresh entity is alive; the operator stops it by writing {paused:true} (corruption still pauses it).
+if (config.pauseFile) {
+  try {
+    if (!existsSync(config.pauseFile)) {
+      mkdirSync(dirname(config.pauseFile), { recursive: true });
+      writeFileSync(config.pauseFile, JSON.stringify({ paused: false, since: new Date().toISOString() }));
+    }
+  } catch (e) { console.error('cannot create pause file:', e.message); }
+}
+
+// The charter is read once and never written: it is immutable for the life of the process.
+const charter = existsSync(config.charterPath) ? readFileSync(config.charterPath, 'utf8') : '';
 
 const dstack = await connectDstack();
 // Fail closed: outside a TEE the service runs only when explicitly asked to (local development).
-if (!dstack && process.env.ALLOW_DEV !== '1') {
+if (!dstack && !config.allowDev) {
   console.error('no TEE (dstack socket unavailable) and ALLOW_DEV is not set: refusing to start unattested');
   process.exit(3);
 }
 const keys = await loadKeys({ dstack: dstack?.client, statePath: join(STATE, 'dev-seed.json') });
-const ledger = new Ledger(join(STATE, 'ledger.jsonl'));
+const ledger = new Ledger(LEDGER_PATH);
 const attestation = await attest(dstack, keys);
 
 if (ledger.seq === 0) {
   ledger.append('birth', { mode: keys.mode, signPublicKey: keys.signPublicKey, boxPublicKey: keys.boxPublicKey, attestation: { mode: attestation.mode, app: attestation.app, compose: attestation.compose } });
 }
 
-const wallet = new ZcashWallet({ bin: ZINGO, dataDir: join(STATE, 'zcash'), server: ZCASH_SERVER, chain: ZCASH_CHAIN, nymProxy: process.env.NYM_PROXY });
-let address = null, balance = null, walletError = null;
+// Memory is encrypted at rest under a subkey of the entity seed: the same identity survives a redeploy.
+const memory = new MemoryStore({ path: join(STATE, 'memory.bin'), key: keys.deriveSubkey('memory') });
+
+// Wallet: real zingo-cli (offline locally, online through the mixnet to sync/send), or an in-memory fake.
+const wallet = config.fakeWallet
+  ? new FakeWallet({ zats: config.fakeBalanceZats, dataDir: join(STATE, 'zcash') })
+  : new ZcashWallet({ bin: config.zingoBin, dataDir: join(STATE, 'zcash'), server: config.zcashServer, chain: config.zcashChain, nymProxy: config.nymProxy });
+
+// Directories to shred on death. The in-memory fake wallet leaves no files behind, so it passes none.
+if (!config.fakeWallet) config.walletPaths = [join(STATE, 'zcash')];
+
+let address = null, walletError = null;
 try {
-  address = await wallet.init();
-  ledger.append('wallet', { chain: ZCASH_CHAIN, address, ufvk: await wallet.viewingKey(), birthday: await wallet.birthday() });
+  address = await wallet.init(); // creates the wallet on first run, offline
+  ledger.append('wallet', { chain: config.zcashChain, address, ufvk: await wallet.viewingKey(), birthday: await wallet.birthday() });
 } catch (e) {
   walletError = e.message;
-  ledger.append('wallet-error', { error: walletError.slice(0, 300) });
+  ledger.append('wallet-error', digestError('wallet', e));
 }
 
-// ---- life loop (phase 1: only heartbeat + wallet sync; the brain arrives in phase 2) ----------------------------
-const safeAppend = (type, data) => { try { ledger.append(type, data); } catch (e) { console.error('ledger append failed:', e.message); } };
-
-async function tick() {
-  const t0 = Date.now();
-  try {
-    let height = null;
-    if (address) {
-      try { height = await wallet.sync(); } catch (e) { safeAppend('sync-skipped', { reason: String(e.message).slice(0, 160) }); }
-      balance = await wallet.balance();
-    }
-    safeAppend('tick', { height, zatoshis: balance?.total_zatoshis ?? null, ms: Date.now() - t0 });
-  } catch (e) {
-    safeAppend('tick-error', { error: String(e.message).slice(0, 300) });
-  }
+// Online sync can take minutes over the mixnet, so it runs in the background and never delays the service.
+async function syncWallet() {
+  if (!address) return;
+  try { await wallet.sync(); ledger.append('wallet-sync', { ok: true }); }
+  catch (e) { ledger.append('sync-skipped', digestError('sync', e)); }
 }
-// Self-scheduling loop: a slow tick (mixnet sync) never overlaps the next one.
-(async function loop() { await tick(); setTimeout(loop, TICK_MS); })();
 
-// Private entry: content encrypted at rest; only its existence, size and position in the chain are public.
-export function writePrivate(type, text) {
-  if (!ARCHIVE_PUB) throw new Error('ARCHIVE_PUBKEY not configured: refusing to store a private entry in clear');
-  return ledger.appendPrivate(type, keys.sealPrivate(ARCHIVE_PUB, text));
-}
+const pricing = new Pricing({ ledger });
+const rent = new Rent({ ledger, wallet, config });
+const promises = new Promises({ ledger, memory });
+const inference = new Inference({ config, ledger, pricing });
+const tools = new Tools({ ledger, wallet, memory, pricing, keys, config, channels: { public: 'public' }, promises });
+
+const life = new Life({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused });
+life.start();
+void syncWallet();
 
 // ---- read-only public view ------------------------------------------------------------------------------------
-http.createServer((req, res) => {
+const readLedger = () => {
+  if (!existsSync(LEDGER_PATH)) return [];
+  const out = [];
+  for (const line of readFileSync(LEDGER_PATH, 'utf8').split('\n')) {
+    if (!line) continue;
+    try { out.push(JSON.parse(line)); } catch { /* torn tail: ignore, same policy as the Ledger */ }
+  }
+  return out;
+};
+
+http.createServer(async (req, res) => {
   const json = (code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body, null, 1)); };
-  if (req.url === '/') return json(200, { entity: 'unnamed (phase 1)', mode: keys.mode, keys: { sign: keys.signPublicKey, box: keys.boxPublicKey }, zcash: { chain: ZCASH_CHAIN, address, balance, error: walletError }, ledger: { entries: ledger.seq, head: ledger.head }, attestation: { mode: attestation.mode, app: attestation.app, compose: attestation.compose } });
-  if (req.url === '/attestation') return json(200, attestation);
-  if (req.url === '/ledger') { res.writeHead(200, { 'content-type': 'application/x-ndjson' }); return res.end(existsSync(join(STATE, 'ledger.jsonl')) ? readFileSync(join(STATE, 'ledger.jsonl')) : ''); }
-  if (req.url === '/verify') return json(200, Ledger.verify(join(STATE, 'ledger.jsonl')));
-  json(404, { error: 'not found' });
-}).listen(PORT, () => console.log(`entity up on :${PORT} mode=${keys.mode} ledger=${ledger.seq} zcash=${address ?? walletError}`));
+  try {
+    if (req.url === '/') {
+      const m = await memory.load();
+      return json(200, {
+        entity: m.identity?.name || 'unnamed',
+        mode: keys.mode,
+        keys: { sign: keys.signPublicKey, box: keys.boxPublicKey },
+        zcash: { chain: config.zcashChain, address, balance: life.lastBalance, error: walletError },
+        ledger: { entries: ledger.seq, head: ledger.head },
+        attestation: { mode: attestation.mode, app: attestation.app, compose: attestation.compose },
+      });
+    }
+    if (req.url === '/attestation') return json(200, attestation);
+    if (req.url === '/ledger') { res.writeHead(200, { 'content-type': 'application/x-ndjson' }); return res.end(existsSync(LEDGER_PATH) ? readFileSync(LEDGER_PATH) : ''); }
+    if (req.url === '/verify') return json(200, Ledger.verify(LEDGER_PATH));
+    // Who the entity is and what it plans, plus the last public events — never the private diary.
+    if (req.url === '/memory-public') {
+      const m = await memory.load();
+      return json(200, {
+        identity: m.identity,
+        plan: m.plan,
+        promises: promises.open(),
+        events: readLedger().filter((e) => !e.private).slice(-10).map((e) => ({ seq: e.seq, ts: e.ts, type: e.type })),
+      });
+    }
+    if (req.url === '/vitals') {
+      const bal = life.lastBalance ?? Number((await wallet.balance())?.total_zatoshis ?? 0);
+      const m = await memory.load();
+      return json(200, {
+        zatoshis: bal,
+        hoursLeft: rent.hoursLeft(bal),
+        hunger: life.lastHunger,
+        daysAlive: Math.round(((Date.now() - life.startedAt) / DAY_MS) * 100) / 100,
+        sleepUntil: m.sleepUntil ?? null,
+      });
+    }
+    if (req.url === '/public-channel') {
+      return json(200, readLedger().filter((e) => e.type === 'post_public').map((e) => ({ seq: e.seq, ts: e.ts, channel: e.data?.channel, text: e.data?.text })));
+    }
+    json(404, { error: 'not found' });
+  } catch (e) {
+    json(500, { error: String(e.message).slice(0, 300), code: e.code ?? null });
+  }
+}).listen(config.port, () => console.log(`entity up on :${config.port} mode=${keys.mode} ledger=${ledger.seq} zcash=${address ?? walletError}`));
