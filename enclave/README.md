@@ -8,7 +8,7 @@ sola lettura (`/`, `/attestation`, `/ledger`, `/verify`). Niente cervello: arriv
 ```bash
 npm install
 npm test
-ZINGO_BIN=../vendor/zingolib/target/release/zingo-cli npm start
+ALLOW_DEV=1 ZINGO_BIN=../vendor/zingolib/target/release/zingo-cli npm start   # senza TEE parte solo con ALLOW_DEV=1
 # poi: curl localhost:8080 ; curl localhost:8080/verify
 ```
 In locale l'attestazione risponde `mode: "dev"`: è dichiaratamente **non attestata**.
@@ -19,8 +19,8 @@ In locale l'attestazione risponde `mode: "dev"`: è dichiaratamente **non attest
    ricostruirla da questo repo (github.com/nocontentinhere4-art/sovereign-entity) e confrontare. Il digest va nel
    `docker-compose.yml` (`image: …@sha256:…`): è ciò che il compose hash dell'attestazione impegna.
 2. Account su [cloud.phala.com](https://cloud.phala.com) (CVM TDX piccola, pochi dollari/giorno; la GPU non serve in fase 1).
-3. "Deploy from compose": incolla `docker-compose.yml`, imposta `ARCHIVE_PUBKEY` (chiave x25519 pubblica usata per
-   cifrare a riposo le voci private del registro; la parte segreta resta offline).
+3. "Deploy from compose": incolla `docker-compose.yml`, imposta `ARCHIVE_PUBKEY` (chiave x25519 pubblica con cui le
+   voci private del registro vengono cifrate a riposo).
 4. Apri `https://<app>.dstack-<...>.phala.network:8080/attestation`: la `quote` TDX con `reportData = sha512(chiavi)`.
    Verifica: Phala offre il verificatore in dashboard; in fase 2 pubblichiamo il nostro, offline.
 

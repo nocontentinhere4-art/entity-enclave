@@ -18,6 +18,11 @@ const ZINGO = process.env.ZINGO_BIN ?? 'zingo-cli';
 const TICK_MS = Number(process.env.TICK_MS ?? 15 * 60_000);
 
 const dstack = await connectDstack();
+// Fail closed: outside a TEE the service runs only when explicitly asked to (local development).
+if (!dstack && process.env.ALLOW_DEV !== '1') {
+  console.error('no TEE (dstack socket unavailable) and ALLOW_DEV is not set: refusing to start unattested');
+  process.exit(3);
+}
 const keys = await loadKeys({ dstack: dstack?.client, statePath: join(STATE, 'dev-seed.json') });
 const ledger = new Ledger(join(STATE, 'ledger.jsonl'));
 const attestation = await attest(dstack, keys);
@@ -37,25 +42,27 @@ try {
 }
 
 // ---- life loop (phase 1: only heartbeat + wallet sync; the brain arrives in phase 2) ----------------------------
+const safeAppend = (type, data) => { try { ledger.append(type, data); } catch (e) { console.error('ledger append failed:', e.message); } };
+
 async function tick() {
   const t0 = Date.now();
   try {
     let height = null;
     if (address) {
-      try { height = await wallet.sync(); } catch (e) { ledger.append('sync-skipped', { reason: String(e.message).slice(0, 160) }); }
+      try { height = await wallet.sync(); } catch (e) { safeAppend('sync-skipped', { reason: String(e.message).slice(0, 160) }); }
       balance = await wallet.balance();
     }
-    ledger.append('tick', { height, zatoshis: balance?.total_zatoshis ?? null, ms: Date.now() - t0 });
+    safeAppend('tick', { height, zatoshis: balance?.total_zatoshis ?? null, ms: Date.now() - t0 });
   } catch (e) {
-    ledger.append('tick-error', { error: String(e.message).slice(0, 300) });
+    safeAppend('tick-error', { error: String(e.message).slice(0, 300) });
   }
 }
-tick();
-setInterval(tick, TICK_MS);
+// Self-scheduling loop: a slow tick (mixnet sync) never overlaps the next one.
+(async function loop() { await tick(); setTimeout(loop, TICK_MS); })();
 
 // Private entry: content encrypted at rest; only its existence, size and position in the chain are public.
 export function writePrivate(type, text) {
-  if (!ARCHIVE_PUB) return ledger.append(type + '-unencrypted', { note: 'no archive key configured', text });
+  if (!ARCHIVE_PUB) throw new Error('ARCHIVE_PUBKEY not configured: refusing to store a private entry in clear');
   return ledger.appendPrivate(type, keys.sealPrivate(ARCHIVE_PUB, text));
 }
 

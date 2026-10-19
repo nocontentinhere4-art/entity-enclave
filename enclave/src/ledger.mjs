@@ -32,14 +32,23 @@ export class Ledger {
     return e;
   }
 
+  /** Lines on disk; a torn trailing line (crash or disk-full mid-write) is dropped, never fatal. */
+  #lines() {
+    if (!existsSync(this.path)) return [];
+    const lines = readFileSync(this.path, 'utf8').split('\n').filter(Boolean);
+    while (lines.length) {
+      try { JSON.parse(lines.at(-1)); break; } catch { lines.pop(); }
+    }
+    return lines;
+  }
+
   #lastHash() {
-    if (!existsSync(this.path)) return '0'.repeat(64);
-    const lines = readFileSync(this.path, 'utf8').trim().split('\n').filter(Boolean);
+    const lines = this.#lines();
     return lines.length ? JSON.parse(lines.at(-1)).hash : '0'.repeat(64);
   }
 
   #count() {
-    return existsSync(this.path) ? readFileSync(this.path, 'utf8').trim().split('\n').filter(Boolean).length : 0;
+    return this.#lines().length;
   }
 
   /** Verify the whole chain from disk. Returns { ok, entries, brokenAt }. */
@@ -48,7 +57,8 @@ export class Ledger {
     let prev = '0'.repeat(64);
     const lines = readFileSync(path, 'utf8').trim().split('\n').filter(Boolean);
     for (let i = 0; i < lines.length; i++) {
-      const e = JSON.parse(lines[i]);
+      let e;
+      try { e = JSON.parse(lines[i]); } catch { return { ok: false, entries: lines.length, brokenAt: i + 1, reason: 'unparsable line' }; }
       const { hash, ...rest } = e;
       const recomputed = createHash('sha256').update(JSON.stringify(rest)).digest('hex');
       if (hash !== recomputed || e.prev !== prev) return { ok: false, entries: lines.length, brokenAt: i + 1 };
