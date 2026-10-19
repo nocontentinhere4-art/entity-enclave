@@ -33,6 +33,15 @@ In locale l'attestazione risponde `mode: "dev"`: è dichiaratamente **non attest
   comando, mai nei log). Un riavvio o una migrazione della stessa immagine TEE ricrea quindi lo stesso wallet e lo
   stesso indirizzo; una nuova immagine (chiavi diverse) invece rinascerebbe con un nuovo indirizzo.
 
+## Nascita, pausa, morte
+- **Non nata**: finché il saldo è sotto `BIRTH_MIN_ZATS` (default 2 ore di affitto) l'entità non spende, non pensa e
+  non muore; `/vitals` mostra `state: unborn`, il registro `waiting_birth`. Il primo dono che supera la soglia la fa nascere.
+- **Pausa**: `PAUSE_FILE` (default `./state/pause.json`, creato all'avvio con `paused: false`). `PAUSE_FILE=` vuoto o
+  file illeggibile = pausa fail-safe. Non è un kill switch: ferma i cicli, l'affitto continua.
+- **Morta resta morta**: a saldo zero l'entità muore una volta sola; il riavvio sullo stesso volume mostra solo `/memorial`.
+  Un volume nuovo con la stessa immagine ricrea lo stesso wallet (stessa seed) ma una vita nuova.
+- Errori del wallet nel registro (`wallet-error`, `sync-skipped`): solo `code` breve e hash del messaggio; il testo è nei log.
+
 ## Cosa manca (fase 2)
 Cervello (inferenza TEE a gettoni), canale pubblico, note private cifrate a riposo, pausa a soglia,
 NEAR Intents, seconda entità, narratore.

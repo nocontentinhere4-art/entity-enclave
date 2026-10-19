@@ -83,10 +83,13 @@ function run(bin, argv, { timeoutMs, env, secret } = {}) {
   return new Promise((resolve, reject) => {
     const p = spawn(bin, argv, { stdio: ['ignore', 'pipe', 'pipe'], env: env ? { ...process.env, ...env } : undefined });
     let out = '', err = '', done = false;
-    const timer = setTimeout(() => { if (!done) { p.kill('SIGKILL'); reject(new Error(`${bin} ${argv.at(-1)} timed out after ${timeoutMs} ms`)); } }, timeoutMs);
+    // Errors carry a short, content-free `code` (timeout / exit_N / spawn errno) so the public ledger can say
+    // what kind of failure happened without exposing the message.
+    const fail = (code, msg) => Object.assign(new Error(msg), { code });
+    const timer = setTimeout(() => { if (!done) { p.kill('SIGKILL'); reject(fail('timeout', `${bin} ${argv.at(-1)} timed out after ${timeoutMs} ms`)); } }, timeoutMs);
     p.stdout.on('data', (d) => (out += d));
     p.stderr.on('data', (d) => (err += d));
-    p.on('close', (code) => { done = true; clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error(`${bin} ${argv.at(-1)} exit ${code}: ${redact((err || out).slice(-500), secret)}`)); });
+    p.on('close', (code, signal) => { done = true; clearTimeout(timer); code === 0 ? resolve(out) : reject(fail(`exit_${code ?? signal}`, `${bin} ${argv.at(-1)} exit ${code ?? signal}: ${redact((err || out).slice(-500), secret)}`)); });
     p.on('error', (e) => { done = true; clearTimeout(timer); reject(e); });
   });
 }
