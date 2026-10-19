@@ -12,8 +12,9 @@ function loadProviders() {
     ? JSON.parse(process.env.LLM_PROVIDERS)
     // OpenAI-compatible endpoints only. `apiKeyEnv` names the secret; the value is resolved just below.
     : [
-        { name: 'phala', baseUrl: 'https://api.redpill.ai/v1', model: 'phala/deepseek-v3.1', speed: 'fast', pricePerMTokZats: 100_000, apiKeyEnv: 'REDPILL_API_KEY' },
-        { name: 'near', baseUrl: 'https://cloud-api.near.ai/v1', model: 'deepseek-ai/DeepSeek-V3.1', speed: 'deep', pricePerMTokZats: 600_000, apiKeyEnv: 'NEAR_AI_API_KEY' },
+        // Open-weight models served in TEEs via Redpill (Phala). Both speeds on one key: REDPILL_API_KEY.
+        { name: 'redpill-fast', baseUrl: 'https://api.redpill.ai/v1', model: 'z-ai/glm-5.3-flash', speed: 'fast', pricePerMTokZats: 100_000, apiKeyEnv: 'REDPILL_API_KEY' },
+        { name: 'redpill-deep', baseUrl: 'https://api.redpill.ai/v1', model: 'z-ai/glm-5.3', speed: 'deep', pricePerMTokZats: 600_000, apiKeyEnv: 'REDPILL_API_KEY' },
       ];
   if (!Array.isArray(list) || list.length === 0) throw new Error('LLM_PROVIDERS must be a non-empty JSON array');
   // Resolve the keys here: config is the only module allowed to read the environment.

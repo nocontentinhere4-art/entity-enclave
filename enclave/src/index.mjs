@@ -84,16 +84,44 @@ try {
 // It repeats forever: incoming ZEC (the birth gift, every later payment) is only visible after a sync. A sync that
 // hits its timeout keeps the progress zingo saved, so the next round continues from there.
 // The ledger records failures and height changes, not every quiet round.
+let syncState = { ok: null, height: null, at: null };
 async function syncWallet() {
   if (!address) return;
-  let lastHeight = null;
   for (;;) {
     try {
       const h = await wallet.sync();
       const height = Number.isFinite(h) ? h : null;
-      if (height !== lastHeight) { ledger.append('wallet-sync', { ok: true, height }); lastHeight = height; }
-    } catch (e) { ledger.append('sync-skipped', digestError('sync', e)); }
+      // The ledger records transitions (first success, recovery after a failure); the height lives in /vitals.
+      if (syncState.ok !== true) ledger.append('wallet-sync', { ok: true, height });
+      syncState = { ok: true, height, at: new Date().toISOString() };
+    } catch (e) {
+      ledger.append('sync-skipped', digestError('sync', e));
+      syncState = { ...syncState, ok: false, at: new Date().toISOString() };
+    }
     await new Promise((r) => setTimeout(r, Math.max(1, config.syncMinutes) * 60_000));
+  }
+}
+
+// Brain check at boot: one 1-token completion per provider, paid by the founder's bootstrap credit (not the treasury).
+// Public proof that the entity has a working brain before anyone gifts it a life. Keys never leave this process.
+const providersPublic = (config.providers ?? []).map((p) => ({ name: p.name, model: p.model, speed: p.speed ?? 'any', keyConfigured: Boolean(p.apiKey) }));
+async function probeProviders() {
+  if (config.fakeLlm) return;
+  for (const p of config.providers ?? []) {
+    let status = 'no_key', ok = false;
+    if (p.apiKey) {
+      try {
+        const base = String(p.baseUrl ?? '').replace(/\/+$/, '');
+        const res = await fetch(`${base}/chat/completions`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${p.apiKey}` },
+          body: JSON.stringify({ model: p.model, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1 }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        status = res.status; ok = res.ok;
+      } catch (e) { status = e?.name === 'TimeoutError' ? 'timeout' : 'unreachable'; }
+    }
+    ledger.append('llm_probe', { provider: p.name, model: p.model, keyConfigured: Boolean(p.apiKey), ok, status });
   }
 }
 
@@ -106,6 +134,7 @@ const tools = new Tools({ ledger, wallet, memory, pricing, keys, config, channel
 const life = new Life({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused });
 life.start();
 void syncWallet();
+void probeProviders();
 
 // ---- read-only public view ------------------------------------------------------------------------------------
 const readLedger = () => {
@@ -155,7 +184,8 @@ http.createServer(async (req, res) => {
       return json(200, {
         state: m.bornAt ? 'alive' : 'unborn',
         zatoshis: bal,
-        wallet: walletFault ? { fault: String(walletFault) } : { ok: true },
+        wallet: walletFault ? { fault: String(walletFault) } : { ok: true, sync: syncState },
+        brain: providersPublic,
         hoursLeft: rent.hoursLeft(bal ?? 0),
         hunger: life.lastHunger,
         daysAlive: Math.round(((Date.now() - life.startedAt) / DAY_MS) * 100) / 100,
