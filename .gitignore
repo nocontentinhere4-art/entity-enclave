@@ -1,0 +1,7 @@
+enclave/node_modules
+enclave/state
+vendor/
+# design docs stay local: the public repo will carry code only
+ARCHITETTURA-v0.md
+FASE0-verifiche.md
+NOTE-*.md

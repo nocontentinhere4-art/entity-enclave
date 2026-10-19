@@ -1,0 +1,42 @@
+# Builds the entity enclave image on amd64 (Phala TDX is x86_64) and publishes it to GHCR with a public digest.
+# The digest is what the attestation's compose hash ultimately commits to: anyone can rebuild from this repo
+# and compare.
+name: entity-image
+on:
+  push:
+    branches: [main]
+    paths: ["enclave/**", ".github/workflows/image.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: enclave
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/sovereign-entity:0.1.0
+            ghcr.io/${{ github.repository_owner }}/sovereign-entity:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: |
+          echo "IMAGE DIGEST: ${{ steps.build.outputs.digest }}"
+          echo "ghcr.io/${{ github.repository_owner }}/sovereign-entity@${{ steps.build.outputs.digest }}" > digest.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest
+          path: digest.txt
