@@ -104,7 +104,7 @@ function makeConfig(dir, over = {}) {
   return {
     tickMinutes: 15, hungerTickMinutes: 60, initialTreasuryZats: 10_000_000,
     hungerThreshold: 0.2, hungerRecover: 0.3, rentAddress: 'taddr-rent', rentZatsPerHour: 10_000,
-    archivePub: 'ab'.repeat(32), fakeLlm: true, providers: [], pauseFile: join(dir, 'pause.json'),
+    birthMinZats: 20_000, archivePub: 'ab'.repeat(32), fakeLlm: true, providers: [], pauseFile: join(dir, 'pause.json'),
     ...over,
   };
 }
@@ -112,7 +112,7 @@ function makeConfig(dir, over = {}) {
 // A DNS lookup stub: tests never touch the real network for host resolution.
 const publicLookup = async () => [{ address: '93.184.216.34', family: 4 }];
 
-function makeWorld({ zats = 10_000_000, over = {}, die, exit = () => {}, lookup = publicLookup } = {}) {
+function makeWorld({ zats = 10_000_000, over = {}, die, exit = () => {}, lookup = publicLookup, born = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'loop-'));
   const config = makeConfig(dir, over);
   writeFileSync(config.pauseFile, JSON.stringify({ paused: false })); // no pause unless the test says so
@@ -122,6 +122,8 @@ function makeWorld({ zats = 10_000_000, over = {}, die, exit = () => {}, lookup 
     identity: { name: 'Sov', voice: 'calm', image: '' },
     plan: 'survive', personalRules: ['be honest'], promises: [],
     will: { text: '', transfers: [] }, relationships: {}, events: [], daily: [],
+    // Most tests start from an entity that already lived; unborn scenarios opt out.
+    ...(born ? { bornAt: '2026-01-01T00:00:00.000Z' } : {}),
   });
   const pricing = new FakePricing(ledger);
   const rent = new FakeRent({
@@ -244,6 +246,75 @@ test('last hour produces a death entry and never thinks or spends again', async 
   assert.equal(w.ledger.of('tool').length, 0);
 });
 
+// ---- unborn → born ------------------------------------------------------------------------------------------
+
+test('unborn: zero treasury waits instead of dying, and never spends', async () => {
+  const deaths = [];
+  const w = makeWorld({
+    zats: 0, born: false,
+    die: async ({ ledger, reason }) => { deaths.push(reason); ledger.append('death', { reason }); },
+  });
+
+  await ticks(w, 3); // still inside the first wall-clock hour
+  assert.equal(w.life.state, 'unborn');
+  assert.equal(w.ledger.of('waiting_birth').length, 1); // deduped inside the hour
+  assert.deepEqual(w.ledger.of('waiting_birth')[0].data, { zatoshis: 0, needed: 20_000 });
+  assert.equal(deaths.length, 0);
+  assert.equal(w.ledger.of('death').length, 0);
+  assert.equal(w.ledger.of('tick').length, 0);
+  assert.equal(w.ledger.of('tick_llm').length, 0);
+  assert.equal(w.ledger.of('charge').length, 0);
+  assert.equal(w.ledger.of('tool').length, 0);
+  assert.equal(w.rent.paid, 0); // no rent while unborn
+  assert.equal(w.memory.state.bornAt, undefined);
+
+  await ticks(w, 4); // crosses into the next hour: exactly one more waiting_birth
+  assert.equal(w.ledger.of('waiting_birth').length, 2);
+  assert.equal(w.ledger.of('waiting_birth')[1].data.zatoshis, 0);
+});
+
+test('unborn: first reach of birthMinZats appends birth_gift and persists bornAt', async () => {
+  const w = makeWorld({ zats: 19_999, born: false });
+
+  await ticks(w, 1);
+  assert.equal(w.life.state, 'unborn');
+  assert.equal(w.ledger.of('birth_gift').length, 0);
+
+  w.wallet.zats = 20_000; // exactly the threshold (2 hours of rent)
+  await ticks(w, 1);
+
+  assert.equal(w.life.state, 'alive');
+  assert.equal(w.ledger.of('birth_gift').length, 1);
+  assert.equal(w.ledger.of('birth_gift')[0].data.zatoshis, 20_000);
+  assert.equal(typeof w.memory.state.bornAt, 'string');
+  assert.ok(Number.isFinite(Date.parse(w.memory.state.bornAt)));
+  // Birth itself does not think: the normal life starts on the next tick.
+  assert.equal(w.ledger.of('tick_llm').length, 0);
+  assert.equal(w.ledger.of('charge').length, 0);
+
+  await ticks(w, 1);
+  assert.equal(w.ledger.of('tick_llm').length, 1);
+  assert.equal(w.ledger.of('tick').length, 1);
+  assert.equal(w.ledger.of('birth_gift').length, 1); // never repeated
+});
+
+test('born is irreversible: a later drop to zero is death, not a return to unborn', async () => {
+  const deaths = [];
+  const w = makeWorld({
+    zats: 20_000,
+    die: async ({ ledger, reason }) => { deaths.push(reason); ledger.append('death', { reason }); },
+  });
+  await ticks(w, 1); // already born via memory.bornAt
+  assert.equal(w.life.state, 'alive');
+
+  w.wallet.zats = 0;
+  await ticks(w, 1);
+
+  assert.equal(deaths.length, 1);
+  assert.equal(w.ledger.of('death').length, 1);
+  assert.equal(w.ledger.of('waiting_birth').length, 0);
+});
+
 // ---- review fixes -------------------------------------------------------------------------------------------
 
 test('death is terminal: exit is called and the loop stops scheduling', async () => {
@@ -314,6 +385,7 @@ test('a real MemoryStore keeps identity and plan across two ticks', async () => 
   const start = emptyMemory();
   start.identity = { name: 'Sov', voice: 'calm', image: '' };
   start.plan = 'survive honestly';
+  start.bornAt = '2026-01-01T00:00:00.000Z';
   await store.save(start);
 
   const config = makeConfig(dir);

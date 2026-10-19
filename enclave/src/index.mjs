@@ -19,6 +19,9 @@ import { Promises } from './life/promises.mjs';
 import { Inference } from './llm/infer.mjs';
 import { Tools } from './tools/registry.mjs';
 import { Life } from './life/loop.mjs';
+import { deathState, deadView } from './boot.mjs';
+
+import { entropyToMnemonic } from './bip39.mjs';
 
 const STATE = config.stateDir;
 const LEDGER_PATH = join(STATE, 'ledger.jsonl');
@@ -48,6 +51,11 @@ const keys = await loadKeys({ dstack: dstack?.client, statePath: join(STATE, 'de
 const ledger = new Ledger(LEDGER_PATH);
 const attestation = await attest(dstack, keys);
 
+// Dead stays dead: a ledger that already records a death reboots into the memorial view only — no wallet,
+// no life loop, nothing further is appended. deadView never resolves, so nothing below ever runs.
+const death = deathState(LEDGER_PATH);
+if (death.dead) await deadView({ port: config.port, ledgerPath: LEDGER_PATH, keys, attestation, death });
+
 if (ledger.seq === 0) {
   ledger.append('birth', { mode: keys.mode, signPublicKey: keys.signPublicKey, boxPublicKey: keys.boxPublicKey, attestation: { mode: attestation.mode, app: attestation.app, compose: attestation.compose } });
 }
@@ -58,7 +66,7 @@ const memory = new MemoryStore({ path: join(STATE, 'memory.bin'), key: keys.deri
 // Wallet: real zingo-cli (offline locally, online through the mixnet to sync/send), or an in-memory fake.
 const wallet = config.fakeWallet
   ? new FakeWallet({ zats: config.fakeBalanceZats, dataDir: join(STATE, 'zcash') })
-  : new ZcashWallet({ bin: config.zingoBin, dataDir: join(STATE, 'zcash'), server: config.zcashServer, chain: config.zcashChain, nymProxy: config.nymProxy });
+  : new ZcashWallet({ bin: config.zingoBin, dataDir: join(STATE, 'zcash'), server: config.zcashServer, chain: config.zcashChain, nymProxy: config.nymProxy, seedMnemonic: entropyToMnemonic(keys.deriveSubkey('zcash')), birthday: config.zcashBirthday });
 
 // Directories to shred on death. The in-memory fake wallet leaves no files behind, so it passes none.
 if (!config.fakeWallet) config.walletPaths = [join(STATE, 'zcash')];
@@ -131,10 +139,12 @@ http.createServer(async (req, res) => {
       const bal = life.lastBalance ?? Number((await wallet.balance())?.total_zatoshis ?? 0);
       const m = await memory.load();
       return json(200, {
+        state: m.bornAt ? 'alive' : 'unborn',
         zatoshis: bal,
         hoursLeft: rent.hoursLeft(bal),
         hunger: life.lastHunger,
         daysAlive: Math.round(((Date.now() - life.startedAt) / DAY_MS) * 100) / 100,
+        bornAt: m.bornAt ?? null,
         sleepUntil: m.sleepUntil ?? null,
       });
     }

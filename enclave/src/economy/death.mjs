@@ -8,6 +8,12 @@ import { digestError } from '../log.mjs';
 export async function die({ ledger, memory, wallet, keys, reason, walletPaths = [] }) {
   // Accept both the MemoryStore (load()/wipe()) and a plain Memory object: the loop owns the former.
   const m = typeof memory?.load === 'function' ? await memory.load() : (memory ?? {});
+  // An entity that has never lived must not die: birth is irreversible, and death requires it.
+  if (!m?.bornAt) {
+    const e = new Error('refusing to die: entity was never born');
+    e.code = 'not_born';
+    throw e;
+  }
   ledger.append('last_words', { text: m?.will?.text ?? '', reason });
   // Best-effort bequests: a failing transfer is recorded, never blocks the ones after it.
   const outcomes = [];

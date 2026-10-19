@@ -28,6 +28,10 @@ In locale l'attestazione risponde `mode: "dev"`: è dichiaratamente **non attest
 - Testnet: faucet da chiedere a mano (es. canali community Zcash) all'indirizzo che `/` mostra. Mainnet: cambia
   `ZCASH_CHAIN=mainnet` e `ZCASH_SERVER` (es. `https://zec.rocks:443`).
 - La **viewing key** (`exportufvk`) va pubblicata sul sito: tutti vedono i saldi, nessuno spende.
+- Il wallet è **riproducibile**: la seed phrase è derivata dalla chiave dell'enclave (`entropyToMnemonic(deriveSubkey('zcash'))`,
+  BIP39) e passata a zingo-cli solo alla prima creazione tramite la variabile d'ambiente `ZINGO_SEED` (mai sulla riga di
+  comando, mai nei log). Un riavvio o una migrazione della stessa immagine TEE ricrea quindi lo stesso wallet e lo
+  stesso indirizzo; una nuova immagine (chiavi diverse) invece rinascerebbe con un nuovo indirizzo.
 
 ## Cosa manca (fase 2)
 Cervello (inferenza TEE a gettoni), canale pubblico, note private cifrate a riposo, pausa a soglia,

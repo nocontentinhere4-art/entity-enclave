@@ -13,6 +13,7 @@ services:
     environment:
       - ARCHIVE_PUBKEY=c1e8f8b399500f35273dfc0ce126b64c630b52947023811fab929004ed975837
       - ZCASH_CHAIN=testnet
+      - ZCASH_BIRTHDAY=4460000
       - ZCASH_SERVER=https://testnet.zec.rocks:443
       - TICK_MS=900000
       - FAKE_LLM=0

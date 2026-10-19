@@ -10,6 +10,7 @@ function setup() {
   const ledger = { entries: [], append(type, data) { this.entries.push({ type, data }); } };
   const memory = {
     will: { text: 'goodbye', transfers: [] },
+    bornAt: '2026-01-01T00:00:00.000Z',
     wiped: false,
     async wipe() { this.wiped = true; },
   };
@@ -57,4 +58,27 @@ test('a failing bequest is recorded by code + hash, never the raw message', asyn
   assert.equal(t.msgHash.length, 16);
   assert.equal('error' in t, false);
   assert.equal(JSON.stringify(ledger.entries).includes('raw wallet secret 42'), false);
+});
+
+test('death is refused before birth: code not_born, nothing written, memory intact', async () => {
+  const { ledger, memory } = setup();
+  delete memory.bornAt;
+  const wallet = { async send() { throw new Error('must not be called'); } };
+
+  await assert.rejects(
+    die({ ledger, memory, wallet, keys: { sign: () => 'sig' }, reason: 'last hour', walletPaths: [] }),
+    (e) => e.code === 'not_born',
+  );
+
+  assert.equal(ledger.entries.length, 0); // no last_words, no death certificate
+  assert.equal(memory.wiped, false);
+});
+
+test('death is allowed once born', async () => {
+  const { ledger, memory } = setup(); // setup() sets bornAt
+
+  await die({ ledger, memory, wallet: { async send() {} }, keys: { sign: () => 'sig' }, reason: 'last hour', walletPaths: [] });
+
+  assert.equal(memory.wiped, true);
+  assert.equal(ledger.entries.filter((e) => e.type === 'death').length, 1);
 });

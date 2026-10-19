@@ -26,6 +26,8 @@ export class Life {
     this.lastBalance = null;
     this.lastHunger = 'ok';
     this.lastSignals = { daysLeft: null, lifeSlopePerDay: 0, incomeRhythmPerDay: 0 };
+    // 'unborn' until memory.bornAt exists: an entity that has never lived cannot die.
+    this.state = 'unborn';
     this.running = false;
     this.timer = null;
   }
@@ -50,7 +52,11 @@ export class Life {
 
     const tickId = `${this.session}:${++this.tickNo}`;
 
-    // 2. Vital numbers. Fewer than one hour of rent means death, before any spending.
+    // 2. Born flag first: an entity that has never lived cannot die, pay rent, hunger or think.
+    let mem = await this.memory.load();
+    this.state = mem.bornAt ? 'alive' : 'unborn';
+
+    // 3. Vital numbers.
     const bal = await this.wallet.balance();
     const treasury = Number(bal?.total_zatoshis ?? bal ?? 0);
     this.lastBalance = treasury;
@@ -59,6 +65,31 @@ export class Life {
     if (this.history.length > 1000) this.history.shift();
     this.tools.setTreasury?.(treasury);
 
+    // 4. Unborn: no inference, no tools, no rent, no hunger, no death. Just wait for the first gift.
+    if (this.state === 'unborn') {
+      const needed = this.birthMinZats();
+      if (treasury < needed) {
+        // Public proof of waiting, deduped by wall-clock hour so a fast tick cannot flood the ledger.
+        // The hour marker lives in memory too, so a restart inside the same hour does not repeat it.
+        const hour = Math.floor(now / HOUR_MS);
+        if (this.lastWaitingHour !== hour && mem.lastWaitingBirthHour !== hour) {
+          mem.lastWaitingBirthHour = hour;
+          await this.memory.save(mem);
+          this.ledger.append('waiting_birth', { zatoshis: treasury, needed });
+        }
+        this.lastWaitingHour = hour;
+        return;
+      }
+      // First time over the threshold: remember it permanently, then live from the next tick on.
+      mem.bornAt = new Date(now).toISOString();
+      await this.memory.save(mem);
+      this.ledger.append('birth_gift', { zatoshis: treasury });
+      this.state = 'alive';
+      this.lastRentAt = now; // hours spent unborn are not billed retroactively
+      return;
+    }
+
+    // 5. Death: fewer than one hour of rent left. Only a born entity can die (die() asserts it too).
     if (this.rent.isLastHour(treasury)) {
       const dieFn = this._die ?? await loads.die();
       try {
@@ -71,12 +102,12 @@ export class Life {
       return;
     }
 
-    // 3. Hunger: fast/cheap when close to the edge, deep otherwise.
+    // 6. Hunger: fast/cheap when close to the edge, deep otherwise.
     const hunger = this.rent.hunger(treasury);
     this.lastHunger = hunger;
     const speed = hunger === 'hungry' ? 'fast' : 'deep';
 
-    // 4. Rent, once an hour of life has passed. Paid by wall clock, before the sleep short-circuit below:
+    // 7. Rent, once an hour of life has passed. Paid by wall clock, before the sleep short-circuit below:
     //    sleeping is not free, the host keeps charging while the entity is quiet.
     if (now - this.lastRentAt >= HOUR_MS) {
       try {
@@ -87,20 +118,19 @@ export class Life {
       this.lastRentAt = now;
     }
 
-    let mem = await this.memory.load();
     // A previous tick asked to sleep: keep the wallet untouched, skip the thought.
     if (mem.sleepUntil && Date.parse(mem.sleepUntil) > now) {
       this.ledger.append('tick', { trigger, zatoshis: treasury, hunger, sleeping: true, tools: 0 });
       return;
     }
 
-    // 5. Context = charter + vital numbers + signals + memory + recent events.
+    // 8. Context = charter + vital numbers + signals + memory + recent events.
     const signalsFn = await loads.signals();
     this.lastSignals = signalsFn(this.history, this.config.rentZatsPerHour ?? 0);
     this.mem = mem;
     const context = await this.buildContext(now);
 
-    // 6. One paid thought.
+    // 9. One paid thought.
     const thought = await this.inference.think({
       context,
       speed,
@@ -110,7 +140,7 @@ export class Life {
     // The thought is paid already: tools quote against what is actually left.
     this.tools.setTreasury?.(Math.max(0, treasury - (Number(thought.costZats) || 0)));
 
-    // 7. Execute tool calls in order, at most 8 per tick. One failure does not cancel the others.
+    // 10. Execute tool calls in order, at most 8 per tick. One failure does not cancel the others.
     const calls = (thought.toolCalls ?? []).slice(0, MAX_TOOL_CALLS);
     let executed = 0;
     for (const c of calls) {
@@ -122,7 +152,7 @@ export class Life {
       }
     }
 
-    // 8. Remember. Reload first: tools may have changed identity, will or promises meanwhile.
+    // 11. Remember. Reload first: tools may have changed identity, will or promises meanwhile.
     mem = await this.memory.load();
     const summary = `${speed} · ${executed} tools · ${treasury} zats`;
     mem.events = [...(mem.events ?? []), { ts: new Date(now).toISOString(), type: 'tick', summary }].slice(-50);
@@ -130,8 +160,15 @@ export class Life {
 
     this.ledger.append('tick', { trigger, zatoshis: treasury, hunger, speed, tools: executed, costZats: thought.costZats ?? 0 });
 
-    // 9. Nightly consolidation, at most once per UTC day.
+    // 12. Nightly consolidation, at most once per UTC day.
     await this.dailyReview(now, tickId);
+  }
+
+  /** Zats the treasury must have ever reached to be born. Defaults to two hours of rent. */
+  birthMinZats() {
+    const configured = Number(this.config.birthMinZats);
+    if (Number.isFinite(configured) && configured >= 0) return configured;
+    return 2 * Number(this.config.rentZatsPerHour ?? 0);
   }
 
   /** The prompt the model wakes up to. Read-only: nothing here is persisted by itself. */

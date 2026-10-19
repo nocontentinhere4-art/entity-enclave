@@ -1,11 +1,18 @@
 // Zcash wallet adapter: drives `zingo-cli` (Zingo Labs light wallet, Orchard) as a subprocess.
 // zingo-cli v7 is offline by default and goes online only through the Nym mixnet (good: the entity's wallet traffic
 // is anonymised too). Local commands run `--offline`; sync runs `--online --server …` and needs `nym-proxy`.
+// The wallet is deterministic: on first creation the mnemonic reaches zingo-cli only via the $ZINGO_SEED
+// environment variable — never argv, never a log line.
 import { spawn } from 'node:child_process';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 export class ZcashWallet {
-  constructor({ bin = 'zingo-cli', dataDir, server, chain = 'testnet', nymProxy }) {
+  constructor({ bin = 'zingo-cli', dataDir, server, chain = 'testnet', nymProxy, seedMnemonic = null, birthday = 0 }) {
     this.bin = bin; this.dataDir = dataDir; this.server = server; this.chain = chain; this.nymProxy = nymProxy;
+    this.seedMnemonic = seedMnemonic;
+    // Restoring from a seed requires a birthday height (zingo refuses otherwise); 0 = scan from genesis (slow but safe).
+    this.birthdayHeight = Number(birthday) || 0;
   }
 
   base(online) {
@@ -16,8 +23,12 @@ export class ZcashWallet {
   }
 
   /** Run one command and parse the JSON object/array in its output. */
-  async cmd(command, args = [], { online = false } = {}) {
-    const out = await run(this.bin, [...this.base(online), ...(online ? [] : ['--nosync']), command, ...args]);
+  async cmd(command, args = [], { online = false, env, secret, preArgs = false } = {}) {
+    // preArgs: global options (e.g. --birthday) must come before the subcommand.
+    const argv = preArgs
+      ? [...this.base(online), ...(online ? [] : ['--nosync']), ...args, command]
+      : [...this.base(online), ...(online ? [] : ['--nosync']), command, ...args];
+    const out = await run(this.bin, argv, { env, secret });
     const i = [out.indexOf('{'), out.indexOf('[')].filter((x) => x >= 0).sort((a, b) => a - b)[0];
     if (i === undefined) return { raw: out.trim() };
     const end = Math.max(out.lastIndexOf('}'), out.lastIndexOf(']'));
@@ -26,6 +37,11 @@ export class ZcashWallet {
 
   /** Creates the wallet on first run (offline) and returns the unified address. */
   async init() {
+    // First run only: when no wallet file exists yet, zingo-cli creates the wallet from $ZINGO_SEED.
+    // The seed never goes on the command line (it would leak into ps/history) and is redacted from logs.
+    if (this.seedMnemonic && !walletFileExists(this.dataDir)) {
+      await this.cmd('addresses', ['--birthday', String(this.birthdayHeight)], { env: { ZINGO_SEED: this.seedMnemonic }, secret: this.seedMnemonic, preArgs: true });
+    }
     const addrs = await this.cmd('addresses');
     const first = Array.isArray(addrs) ? addrs[0] : null;
     return first?.encoded_address ?? null;
@@ -47,15 +63,35 @@ function parseBalance(out) {
   return b;
 }
 
+/** A wallet exists if any .dat/.db state file was already written under the data dir (recursively). */
+function walletFileExists(dataDir) {
+  const walk = (d) => {
+    let names;
+    try { names = readdirSync(d, { withFileTypes: true }); } catch { return false; }
+    for (const n of names) {
+      if ((n.isFile() || n.isSymbolicLink()) && /\.(dat|db)$/i.test(n.name)) return true;
+      if (n.isDirectory() && walk(join(d, n.name))) return true;
+    }
+    return false;
+  };
+  return walk(dataDir ?? '');
+}
+
 /** Run zingo-cli with a hard timeout: a hung child must never stall the life loop. Online syncs get longer. */
-function run(bin, argv, timeoutMs = argv.includes('--online') ? 45 * 60_000 : 60_000) {
+function run(bin, argv, { timeoutMs, env, secret } = {}) {
+  if (timeoutMs === undefined) timeoutMs = argv.includes('--online') ? 45 * 60_000 : 60_000;
   return new Promise((resolve, reject) => {
-    const p = spawn(bin, argv, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(bin, argv, { stdio: ['ignore', 'pipe', 'pipe'], env: env ? { ...process.env, ...env } : undefined });
     let out = '', err = '', done = false;
     const timer = setTimeout(() => { if (!done) { p.kill('SIGKILL'); reject(new Error(`${bin} ${argv.at(-1)} timed out after ${timeoutMs} ms`)); } }, timeoutMs);
     p.stdout.on('data', (d) => (out += d));
     p.stderr.on('data', (d) => (err += d));
-    p.on('close', (code) => { done = true; clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error(`${bin} ${argv.at(-1)} exit ${code}: ${(err || out).slice(-500)}`)); });
+    p.on('close', (code) => { done = true; clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error(`${bin} ${argv.at(-1)} exit ${code}: ${redact((err || out).slice(-500), secret)}`)); });
     p.on('error', (e) => { done = true; clearTimeout(timer); reject(e); });
   });
+}
+
+/** The seed must never reach a log, an error or a report: scrub it wherever it could echo back. */
+function redact(text, secret) {
+  return secret ? text.split(secret).join('[redacted]') : text;
 }

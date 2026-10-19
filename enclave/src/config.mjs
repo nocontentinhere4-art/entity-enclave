@@ -30,6 +30,8 @@ const minutes = (msEnv, minEnv, fallback) => {
   return ms !== null && ms > 0 ? ms / 60_000 : num(process.env[minEnv], fallback);
 };
 
+const rentZatsPerHour = num(process.env.RENT_ZATS_PER_HOUR, 1_000_000);
+
 export const config = {
   tickMinutes: minutes('TICK_MS', 'TICK_MINUTES', 15),
   hungerTickMinutes: minutes('HUNGER_TICK_MS', 'HUNGER_TICK_MINUTES', 60),
@@ -37,7 +39,9 @@ export const config = {
   hungerThreshold: 0.2,
   hungerRecover: 0.3,
   rentAddress: process.env.RENT_ADDRESS ?? '',
-  rentZatsPerHour: num(process.env.RENT_ZATS_PER_HOUR, 1_000_000),
+  rentZatsPerHour,
+  // An entity is unborn until its treasury has ever reached this threshold: two hours of rent by default.
+  birthMinZats: num(process.env.BIRTH_MIN_ZATS, rentZatsPerHour * 2),
   archivePub: process.env.ARCHIVE_PUBKEY ?? '',
   fakeLlm: bool(process.env.FAKE_LLM, !anyRealKey),
   providers,
@@ -51,6 +55,8 @@ export const config = {
   fakeBalanceZats: num(process.env.FAKE_BALANCE_ZATS, 5_000_000),
   zcashServer: process.env.ZCASH_SERVER ?? 'https://testnet.zec.rocks:443',
   zcashChain: process.env.ZCASH_CHAIN ?? 'testnet',
+  // Wallet birthday height used when the wallet is (re)created from the enclave seed. 0 = scan from genesis.
+  zcashBirthday: num(process.env.ZCASH_BIRTHDAY, (process.env.ZCASH_CHAIN ?? 'testnet') === 'testnet' ? 4460000 : 0),
   zingoBin: process.env.ZINGO_BIN ?? 'zingo-cli',
   nymProxy: process.env.NYM_PROXY,
   // Hard ceiling on a single model call: a slow provider must never hang the entity.
