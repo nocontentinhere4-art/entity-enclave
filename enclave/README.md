@@ -15,8 +15,8 @@ In locale l'attestazione risponde `mode: "dev"`: è dichiaratamente **non attest
 
 ## Su Phala Cloud (TEE vero)
 1. L'immagine la costruisce GitHub Actions (`.github/workflows/image.yml`) su amd64 e la pubblica su
-   `ghcr.io/nocontentinhere4-art/sovereign-entity` con un **digest** stampato nel log del workflow: chiunque può
-   ricostruirla da questo repo (github.com/nocontentinhere4-art/sovereign-entity) e confrontare. Il digest va nel
+   `ghcr.io/nocontentinhere4-art/entity-enclave` con un **digest** stampato nel log del workflow: chiunque può
+   ricostruirla da questo repo (github.com/nocontentinhere4-art/entity-enclave) e confrontare. Il digest va nel
    `docker-compose.yml` (`image: …@sha256:…`): è ciò che il compose hash dell'attestazione impegna.
 2. Account su [cloud.phala.com](https://cloud.phala.com) (CVM TDX piccola, pochi dollari/giorno; la GPU non serve in fase 1).
 3. "Deploy from compose": incolla `docker-compose.yml`, imposta `ARCHIVE_PUBKEY` (chiave x25519 pubblica con cui le

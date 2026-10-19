@@ -4,7 +4,7 @@
 # Image is pinned by digest (replace DIGEST with the one printed by the GitHub Actions build "entity-image").
 services:
   entity:
-    image: ghcr.io/nocontentinhere4-art/sovereign-entity@sha256:DIGEST
+    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:DIGEST
     ports:
       - "8080:8080"
     volumes:
