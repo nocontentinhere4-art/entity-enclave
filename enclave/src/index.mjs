@@ -146,12 +146,17 @@ http.createServer(async (req, res) => {
       });
     }
     if (req.url === '/vitals') {
-      const bal = life.lastBalance ?? Number((await wallet.balance())?.total_zatoshis ?? 0);
+      // A wallet that cannot be read must not hide the rest of the vitals: report the failure kind instead of a 500.
+      let bal = life.lastBalance ?? null, walletFault = walletError ? 'init' : null;
+      if (bal === null && !walletFault) {
+        try { bal = Number((await wallet.balance())?.total_zatoshis ?? 0); } catch (e) { walletFault = e.code ?? 'balance'; }
+      }
       const m = await memory.load();
       return json(200, {
         state: m.bornAt ? 'alive' : 'unborn',
         zatoshis: bal,
-        hoursLeft: rent.hoursLeft(bal),
+        wallet: walletFault ? { fault: String(walletFault) } : { ok: true },
+        hoursLeft: rent.hoursLeft(bal ?? 0),
         hunger: life.lastHunger,
         daysAlive: Math.round(((Date.now() - life.startedAt) / DAY_MS) * 100) / 100,
         bornAt: m.bornAt ?? null,
