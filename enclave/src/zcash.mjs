@@ -1,6 +1,6 @@
 // Zcash wallet adapter: drives `zingo-cli` (Zingo Labs light wallet, Orchard) as a subprocess.
-// zingo-cli v7 is offline by default and goes online only through the Nym mixnet (good: the entity's wallet traffic
-// is anonymised too). Local commands run `--offline`; sync runs `--online --server …` and needs `nym-proxy`.
+// zingo-cli is offline by default. Local commands run `--offline`; sync runs `--online --server …`. The image ships a
+// clearnet build (no Nym mixnet: it could not establish an exit from the CVM); pass `nymProxy` to use a mixnet build.
 // The wallet is deterministic: on first creation the mnemonic reaches zingo-cli only via the $ZINGO_SEED
 // environment variable — never argv, never a log line.
 import { spawn } from 'node:child_process';
