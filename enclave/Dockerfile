@@ -12,6 +12,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts
 COPY src ./src
+COPY charter.md ./charter.md
 COPY --from=zingo /src/target/release/zingo-cli /usr/local/bin/zingo-cli
 COPY --from=zingo /src/zingo-netutils/target/release/nym-proxy /usr/local/bin/nym-proxy
 ENV STATE_DIR=/state PORT=8080 ZINGO_BIN=/usr/local/bin/zingo-cli NYM_PROXY=/usr/local/bin/nym-proxy
