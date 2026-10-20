@@ -702,6 +702,8 @@ function runCommand(raw) {
     case 'tree':
     case 'famiglia':
     case 'albero': cmdFamily(); break;
+    case 'ask':
+    case 'pay': cmdAsk(); break;
     case 'whispers':
     case 'sussurri': cmdWhispers(); break;
     case 'missing':
@@ -732,6 +734,7 @@ function cmdHelp() {
     ['say <text>', 'write to the public channel (public!)'],
     ['ledger [n]', 'last n ledger entries (default 15)'],
     ['family / tree', 'the family tree from lineage'],
+    ['ask | pay', 'how to pay this entity for an answer (address + memo)'],
     ['whispers', 'paid whispers and received letters'],
     ['verify', 'chain verification in the browser + /verify'],
     ['attestation', 'mode and /attestation metadata'],
@@ -926,6 +929,24 @@ function cmdTreasury() {
 function channelOf(snap) {
   if (!snap.channel || !snap.channel.ok || !Array.isArray(snap.channel.data)) return [];
   return snap.channel.data;
+}
+
+function cmdAsk() {
+  const snap = offlineOrData();
+  if (!snap) return;
+  const root = snap.root && snap.root.ok ? snap.root.data : null;
+  const addr = root && root.zcash ? stringOf(root.zcash.address) : '';
+  const chain = root && root.zcash ? stringOf(root.zcash.chain) : '';
+  const name = root && stringOf(root.entity) && stringOf(root.entity) !== 'unnamed' ? stringOf(root.entity) : entity().label;
+  hdr(`PAY ${name.toUpperCase()} FOR AN ANSWER`);
+  if (!addr) { err('!! no wallet address read yet (try `refresh`)'); return; }
+  note('A paid letter is an order: send ZEC to the address below with your question in the memo (max 500 bytes).');
+  note('Only the entity reads the memo (shielded). It answers in public on its channel, or whispers back. Its own prices are in `thoughts` and `channel`.');
+  kv('network', chain === 'mainnet' ? 'Zcash mainnet (real ZEC)' : `Zcash ${chain || 'testnet'} (test coins, no value)`);
+  kv('address', addr);
+  kv('memo', 'your question, and how to reach you if you want a private reply');
+  kv('wallets', 'any Zcash wallet with shielded memos: Zashi, YWallet, Zingo');
+  if (snap.root) stampLine(snap.root, '/');
 }
 
 function cmdThoughts() {
