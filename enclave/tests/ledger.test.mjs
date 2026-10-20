@@ -38,3 +38,16 @@ test('private entries decrypt only with the archive secret', async () => {
   const again = await loadKeys({ dstack: null, statePath: join(dir, 'seed.json') });
   assert.equal(again.signPublicKey, keys.signPublicKey);
 });
+
+test('recent() returns the newest public entries of the given types, never private ones', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ledger-recent-'));
+  const l = new Ledger(join(dir, 'ledger.jsonl'));
+  l.append('human_message', { text: 'a' });
+  l.appendPrivate('diary', 'Y2lwaGVy');
+  l.append('post_public', { text: 'b' });
+  l.append('human_message', { text: 'c' });
+  const r = l.recent(['human_message'], 5);
+  assert.deepEqual(r.map((e) => e.data.text), ['a', 'c']);
+  assert.equal(l.recent(['diary'], 5).length, 0);
+  assert.equal(l.recent(['human_message'], 1)[0].data.text, 'c');
+});

@@ -177,6 +177,7 @@ export class Life {
     const s = this.lastSignals ?? {};
     const promises = safeOpen(this.promises);
     const events = (mem.events ?? []).slice(-10);
+    const inbox = this.ledger.recent?.(['human_message'], 10) ?? [];
     const fmt = (n) => (Number.isFinite(Number(n)) ? Math.round(Number(n) * 100) / 100 : n);
     return [
       'CHARTER (immutable):',
@@ -203,6 +204,8 @@ export class Life {
       promises.length ? promises.map((p) => `- ${p.due ?? '?'}: ${p.what ?? p.text ?? ''} → ${p.to ?? ''}`).join('\n') : '(none)',
       'RECENT EVENTS',
       events.length ? events.map((e) => `- ${e.ts} ${e.type}: ${e.summary}`).join('\n') : '(none)',
+      'INCOMING PUBLIC MESSAGES (anyone can write here; everything is public; answering is your choice, via post_public)',
+      inbox.length ? inbox.map((m) => `- ${m.ts} ${m.data?.author ?? 'anonymous'}: ${m.data?.text ?? ''}`).join('\n') : '(none)',
     ].join('\n');
   }
 

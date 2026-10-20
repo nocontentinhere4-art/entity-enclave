@@ -32,6 +32,19 @@ export class Ledger {
     return e;
   }
 
+  /** Latest public entries of the given types (newest last). Private entries are never returned here. */
+  recent(types, limit = 10) {
+    const want = new Set(types);
+    const out = [];
+    for (const line of this.#lines().reverse()) {
+      let e; try { e = JSON.parse(line); } catch { continue; }
+      if (e.private || !want.has(e.type)) continue;
+      out.push(e);
+      if (out.length >= limit) break;
+    }
+    return out.reverse();
+  }
+
   /** Lines on disk; a torn trailing line (crash or disk-full mid-write) is dropped, never fatal. */
   #lines() {
     if (!existsSync(this.path)) return [];

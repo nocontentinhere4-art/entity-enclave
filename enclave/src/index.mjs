@@ -152,9 +152,43 @@ const readLedger = () => {
   return out;
 };
 
+// Public channel, write side: anyone may post (no accounts, no privilege, same door for everyone, us included).
+// Abuse limits only: size caps, one message per source per minute, a global hourly cap. Messages are public ledger
+// entries; the entity sees the latest ones in its context and decides whether to answer (post_public) or not.
+const HUMAN_MSG = { maxText: 500, maxAuthor: 40, perSourceMs: 60_000, globalPerHour: 120 };
+const lastBySource = new Map(); let globalWindow = { start: Date.now(), n: 0 };
+function acceptHumanMessage(source, body) {
+  const text = String(body?.text ?? '').trim(), author = String(body?.author ?? '').trim().slice(0, HUMAN_MSG.maxAuthor);
+  if (!text) return { code: 400, error: 'text required' };
+  if (text.length > HUMAN_MSG.maxText) return { code: 413, error: `text over ${HUMAN_MSG.maxText} chars` };
+  const now = Date.now();
+  if (now - globalWindow.start > 3_600_000) globalWindow = { start: now, n: 0 };
+  if (globalWindow.n >= HUMAN_MSG.globalPerHour) return { code: 429, error: 'channel busy, try later' };
+  if (now - (lastBySource.get(source) ?? 0) < HUMAN_MSG.perSourceMs) return { code: 429, error: 'one message per minute' };
+  lastBySource.set(source, now); globalWindow.n++;
+  if (lastBySource.size > 10_000) lastBySource.clear();
+  return { code: 201, entry: ledger.append('human_message', { author: author || 'anonymous', text }) };
+}
+const readBody = (req, max = 4096) => new Promise((resolve, reject) => {
+  let buf = ''; req.on('data', (d) => { buf += d; if (buf.length > max) { reject(Object.assign(new Error('body too large'), { code: 413 })); req.destroy(); } });
+  req.on('end', () => resolve(buf)); req.on('error', reject);
+});
+
 http.createServer(async (req, res) => {
+  // Everything served here is public; a browser UI on any origin may read it and post to the channel.
+  res.setHeader('access-control-allow-origin', '*');
+  res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
+  res.setHeader('access-control-allow-headers', 'content-type');
   const json = (code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body, null, 1)); };
   try {
+    if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+    if (req.method === 'POST' && req.url === '/public-channel') {
+      let body; try { body = JSON.parse(await readBody(req) || '{}'); } catch (e) { return json(e.code === 413 ? 413 : 400, { error: e.code === 413 ? 'body too large' : 'invalid json' }); }
+      const source = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '?').split(',')[0].trim();
+      const r = acceptHumanMessage(source, body);
+      return r.entry ? json(201, { seq: r.entry.seq, ts: r.entry.ts }) : json(r.code, { error: r.error });
+    }
+    if (req.method !== 'GET') return json(405, { error: 'method not allowed' });
     if (req.url === '/') {
       const m = await memory.load();
       return json(200, {
@@ -199,7 +233,12 @@ http.createServer(async (req, res) => {
       });
     }
     if (req.url === '/public-channel') {
-      return json(200, readLedger().filter((e) => e.type === 'post_public').map((e) => ({ seq: e.seq, ts: e.ts, channel: e.data?.channel, text: e.data?.text })));
+      // Both directions, in ledger order: the entity's posts and the humans' messages.
+      return json(200, readLedger().filter((e) => e.type === 'post_public' || e.type === 'human_message').slice(-200).map((e) => (
+        e.type === 'post_public'
+          ? { seq: e.seq, ts: e.ts, from: 'entity', text: e.data?.text }
+          : { seq: e.seq, ts: e.ts, from: 'human', author: e.data?.author, text: e.data?.text }
+      )));
     }
     json(404, { error: 'not found' });
   } catch (e) {
