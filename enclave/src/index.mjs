@@ -85,6 +85,27 @@ try {
 // hits its timeout keeps the progress zingo saved, so the next round continues from there.
 // The ledger records failures and height changes, not every quiet round.
 let syncState = { ok: null, height: null, at: null };
+
+// Letters: incoming shielded payments that carry a memo. The words are for the entity alone (and the archive);
+// the public ledger records only that a paid letter arrived. Seen txids persist in memory so a restart does not re-read.
+const inbox = [];
+async function readLetters() {
+  if (typeof wallet.valueTransfers !== 'function') return;
+  const mem = await memory.load();
+  const seen = new Set(mem.seenTxids ?? []);
+  let changed = false;
+  for (const t of await wallet.valueTransfers()) {
+    if (t.kind !== 'received' || t.status !== 'confirmed' || !t.memos?.length || seen.has(t.txid)) continue;
+    seen.add(t.txid); changed = true;
+    const text = t.memos.join('\n---\n').slice(0, 2000);
+    ledger.append('letter', { zats: t.value, bytes: Buffer.byteLength(text, 'utf8'), txid: t.txid });
+    if (config.archivePub) ledger.appendPrivate('letter_text', keys.sealPrivate(config.archivePub, JSON.stringify({ txid: t.txid, zats: t.value, text })));
+    inbox.push({ at: t.datetime, zats: t.value, text });
+    if (inbox.length > 20) inbox.shift();
+  }
+  if (changed) { mem.seenTxids = [...seen].slice(-500); await memory.save(mem); }
+}
+config.letters = () => inbox.slice(-10);
 async function syncWallet() {
   for (;;) {
     try {
@@ -99,6 +120,7 @@ async function syncWallet() {
       // The ledger records transitions (first success, recovery after a failure); the height lives in /vitals.
       if (syncState.ok !== true) ledger.append('wallet-sync', { ok: true, height });
       syncState = { ok: true, height, at: new Date().toISOString() };
+      await readLetters();
     } catch (e) {
       ledger.append('sync-skipped', digestError('sync', e));
       syncState = { ...syncState, ok: false, at: new Date().toISOString() };
@@ -134,6 +156,14 @@ const pricing = new Pricing({ ledger });
 const rent = new Rent({ ledger, wallet, config });
 const promises = new Promises({ ledger, memory });
 const inference = new Inference({ config, ledger, pricing });
+// The other entities this one knows: the sibling (PEER_URL), the parent (PARENT_URL) and every child it paid for.
+config.peers = () => {
+  const out = [];
+  if (config.peerUrl) out.push({ role: 'peer', url: config.peerUrl });
+  if (config.parentUrl) out.push({ role: 'parent', url: config.parentUrl });
+  for (const e of ledger.recent(['birth_of'], 1000)) if (e.data?.url) out.push({ role: 'child', url: e.data.url });
+  return out;
+};
 const tools = new Tools({ ledger, wallet, memory, pricing, keys, config, channels: { public: 'public' }, promises });
 
 const life = new Life({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused });
@@ -199,6 +229,7 @@ http.createServer(async (req, res) => {
         keys: { sign: keys.signPublicKey, box: keys.boxPublicKey },
         zcash: { chain: config.zcashChain, address, balance: life.lastBalance, error: walletError },
         peer: config.peerUrl,
+        lineage: { parent: config.parentUrl, children: ledger.recent(['birth_of'], 1000).map((e) => ({ url: e.data?.url, address: e.data?.address, ts: e.ts })) },
         ledger: { entries: ledger.seq, head: ledger.head },
         attestation: { mode: attestation.mode, app: attestation.app, compose: attestation.compose },
       });

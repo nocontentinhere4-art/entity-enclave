@@ -57,6 +57,17 @@ export const config = {
   charterPath: process.env.CHARTER_PATH ?? './charter.md',
   // The other entity's public base URL (its /, /vitals, /public-channel …). Empty until the second one exists.
   peerUrl: (process.env.PEER_URL ?? '').trim().replace(/\/+$/, '') || null,
+  // Lineage. PARENT_URL is set on a child by the parent that paid its birth. SELF_URL is this entity's public URL
+  // (children get it as PEER_URL/PARENT_URL). Spawning needs a Phala API key and the image reference to clone.
+  parentUrl: (process.env.PARENT_URL ?? '').trim().replace(/\/+$/, '') || null,
+  selfUrl: (process.env.SELF_URL ?? '').trim().replace(/\/+$/, '') || null,
+  phalaApiKey: process.env.PHALA_API_KEY || null,
+  imageRef: (process.env.IMAGE_REF ?? '').trim() || null,
+  gatewayDomain: (process.env.GATEWAY_DOMAIN ?? 'dstack-pha-prod9.phala.network').trim(),
+  spawnMinZats: num(process.env.SPAWN_MIN_ZATS, 50_000_000),   // treasury needed before a birth is allowed
+  childGiftZats: num(process.env.CHILD_GIFT_ZATS, 20_000_000), // what the parent gives the newborn
+  // Speaking to another entity costs: a whisper is a shielded payment with a memo (min amount, in zatoshi).
+  whisperMinZats: num(process.env.WHISPER_MIN_ZATS, 10_000),
   allowDev: bool(process.env.ALLOW_DEV, false),
   fakeWallet: bool(process.env.FAKE_WALLET, false),
   fakeBalanceZats: num(process.env.FAKE_BALANCE_ZATS, 5_000_000),

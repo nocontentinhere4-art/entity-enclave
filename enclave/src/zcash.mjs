@@ -58,6 +58,44 @@ export class ZcashWallet {
   /** Online: go online through the mixnet, wait for the startup sync, then return the chain height seen. */
   async sync() { const out = await run(this.bin, [...this.base(true), '--waitsync', 'info']); return Number((out.match(/"latest_block_height":\s*(\d+)/) || out.match(/(\d{6,})/) || [])[1]); }
   async send(to, zatoshis, memo = '') { return this.cmd('quicksend', [to, String(zatoshis), memo], { online: true }); }
+  /** Every transfer the wallet knows (offline read of the synced wallet), parsed; memos included. */
+  async valueTransfers() { return parseValueTransfers(await run(this.bin, [...this.base(false), '--nosync', 'value_transfers'])); }
+}
+
+/**
+ * zingo prints value transfers as text blocks:
+ *   { txid: …  datetime: …  status: confirmed  kind: received  value: 1500000  memos: \n\tmemo 1: hello … }
+ * A memo may span several lines (the faucet's does). Returns [{ txid, datetime, status, kind, value, recipient, memos: [] }].
+ */
+export function parseValueTransfers(out) {
+  const items = [];
+  for (const block of String(out ?? '').split(/^\s*\{\s*$/m).slice(1)) {
+    const body = block.split(/^\s*\}\s*$/m)[0];
+    const it = { txid: null, datetime: null, status: null, kind: null, value: 0, recipient: null, memos: [] };
+    const lines = body.split('\n');
+    let inMemos = false, current = null;
+    for (const raw of lines) {
+      const line = raw.replace(/\r$/, '');
+      if (!inMemos) {
+        const m = line.match(/^\s*([a-z_ ]+):\s?(.*)$/);
+        if (!m) continue;
+        const key = m[1].trim(), val = m[2].trim();
+        if (key === 'memos') { inMemos = true; continue; }
+        if (key === 'txid') it.txid = val;
+        else if (key === 'datetime') it.datetime = val;
+        else if (key === 'status') it.status = val;
+        else if (key === 'kind') it.kind = val;
+        else if (key === 'value') it.value = Number(val.replace(/_/g, '')) || 0;
+        else if (key === 'recipient_address') it.recipient = val === 'not available' ? null : val;
+      } else {
+        const mm = line.match(/^\s*memo \d+:\s?(.*)$/);
+        if (mm) { current = mm[1]; it.memos.push(current); }
+        else if (it.memos.length && line.length) it.memos[it.memos.length - 1] += '\n' + line.replace(/^\s+/, '');
+      }
+    }
+    if (it.txid) items.push(it);
+  }
+  return items;
 }
 
 /** zingo prints balances as `name: zatoshis` lines with `_` thousands separators (100_000_000); turn them into numbers. */

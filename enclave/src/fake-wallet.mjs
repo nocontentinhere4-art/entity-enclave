@@ -16,6 +16,7 @@ export class FakeWallet {
   async balance() { return { total_zatoshis: this.zats, total_orchard_balance: this.zats }; }
   async sync() { return 1; }
 
+  async valueTransfers() { return this.received ?? []; }
   async send(to, zats, memo = '') {
     const amount = Number(zats) || 0;
     if (amount > this.zats) { const e = new Error('fake wallet: insufficient funds'); e.code = 'insufficient_funds'; throw e; }

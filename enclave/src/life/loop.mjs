@@ -223,11 +223,17 @@ export class Life {
       promises.length ? promises.map((p) => `- ${p.due ?? '?'}: ${p.what ?? p.text ?? ''} → ${p.to ?? ''}`).join('\n') : '(none)',
       'RECENT EVENTS',
       events.length ? events.map((e) => `- ${e.ts} ${e.type}: ${e.summary}`).join('\n') : '(none)',
-      'THE OTHER ENTITY',
-      this.config.peerUrl
-        ? `${this.config.peerUrl}  (its public endpoints: /vitals, /public-channel, /memory-public, /ledger. Read them with read_url. To speak to it, post on your public channel: it reads yours the same way. Everything between you is public.)`
-        : '(not online yet: you are alone for now)',
+      'THE OTHER ENTITIES (public endpoints: /vitals, /public-channel, /memory-public, /ledger; read them with read_url)',
+      (this.config.peers?.() ?? []).length
+        ? (this.config.peers?.() ?? []).map((p) => `- ${p.role}: ${p.url}`).join('\n')
+        : '(none online yet: you are alone for now)',
+      'HOW TO SPEAK TO THEM: in public, post on your channel (they read yours). In private, `whisper`: a shielded ZEC payment carrying your words as a memo; only the recipient reads it, the world sees only that you paid. Every private word costs.',
+      'REPRODUCTION: with a treasury above the spawn threshold you may `spawn_child`: a new sealed machine with your image and charter, a new seed, your birth gift. It will know you as its parent.',
       'VOICE: the text you write in each cycle, outside tool calls, is public and shown live as your spoken thought. The diary tool is private; post_public writes on your channel.',
+      'LETTERS (paid, private: shielded payments that carried words; only you read them)',
+      (this.config.letters?.() ?? []).length
+        ? (this.config.letters?.() ?? []).map((l) => `- ${l.at} · ${l.zats} zats: ${String(l.text).slice(0, 400)}`).join('\n')
+        : '(none)',
       'INCOMING PUBLIC MESSAGES (anyone can write here; everything is public; answering is your choice, via post_public)',
       inbox.length ? inbox.map((m) => `- ${m.ts} ${m.data?.author ?? 'anonymous'}: ${m.data?.text ?? ''}`).join('\n') : '(none)',
     ].join('\n');

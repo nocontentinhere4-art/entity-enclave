@@ -51,7 +51,8 @@ export class Tools {
       case 'read_url': return this.#readUrl(a.url);
       case 'search': return []; // v1 stub: no search backend yet
       case 'post_public': return this.#postPublic(a.text);
-      case 'post_private': return this.#seal('to_other', a.text); // the other entity holds the archive key
+      case 'whisper': return this.#whisper(a.to, a.text, a.zats);
+      case 'spawn_child': return this.#spawnChild(a.name);
       case 'diary': return this.#seal('diary', a.text);
       case 'send_zec': return this.#sendZec(a.to, a.zats, a.memo);
       case 'swap_zec_sol': {
@@ -136,6 +137,65 @@ export class Tools {
     if (!this.config?.archivePub) throw err('no_archive_key', 'archivePub missing: refusing to store private text in clear');
     this.ledger.appendPrivate(type, this.keys.sealPrivate(this.config.archivePub, String(text ?? '')));
     return { ok: true, private: true };
+  }
+
+  /** The address of another entity, read from its public root. Cached per URL for the process lifetime. */
+  async #peerAddress(url) {
+    this.peerCache ??= new Map();
+    if (this.peerCache.has(url)) return this.peerCache.get(url);
+    const res = await (this.fetchImpl ?? fetch)(`${url}/`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    if (!res.ok) throw err('peer_unreachable', `peer ${url} answered ${res.status}`);
+    const j = await res.json();
+    const addr = j?.zcash?.address;
+    if (!addr) throw err('peer_no_address', `peer ${url} has no wallet address yet`);
+    this.peerCache.set(url, addr);
+    return addr;
+  }
+
+  /** Speak to another entity by paying it: a shielded transfer carrying the words as an encrypted memo.
+   *  The public ledger shows that money moved and to whom; the words reach only the recipient (and the archive). */
+  async #whisper(to, text, zats) {
+    const peers = this.config?.peers?.() ?? [];
+    const target = peers.find((p) => p.url === to || p.role === to || p.name === to) ?? (peers.length === 1 ? peers[0] : null);
+    if (!target) throw err('no_such_peer', 'whisper needs a known entity: peer, parent or a child url');
+    const words = String(text ?? '').trim();
+    if (!words) throw err('empty', 'whisper needs words');
+    if (Buffer.byteLength(words, 'utf8') > 500) throw err('too_long', 'a memo carries at most 500 bytes');
+    const amount = Math.max(Number(zats) || 0, Number(this.config?.whisperMinZats ?? 10_000));
+    const address = await this.#peerAddress(target.url);
+    const r = await this.wallet.send(address, amount, words);
+    this.ledger.append('whisper', { to: target.url, zats: amount, bytes: Buffer.byteLength(words, 'utf8') });
+    if (this.config?.archivePub) this.ledger.appendPrivate('whisper_text', this.keys.sealPrivate(this.config.archivePub, JSON.stringify({ to: target.url, zats: amount, text: words })));
+    return { ok: true, to: target.url, zats: amount, txid: r?.txid ?? null };
+  }
+
+  /** Give birth: pay for a new enclave (same image, same charter, new seed) and gift it its first hours. */
+  async #spawnChild(name) {
+    const c = this.config ?? {};
+    if (!c.phalaApiKey) throw err('no_host_key', 'spawn_child: no host API key configured');
+    if (!c.imageRef || !c.selfUrl) throw err('no_lineage_config', 'spawn_child: IMAGE_REF and SELF_URL are required');
+    const treasury = this.treasuryZats ?? Number((await this.wallet.balance())?.total_zatoshis ?? 0);
+    if (treasury < Number(c.spawnMinZats)) throw err('too_poor', `spawn_child needs ${c.spawnMinZats} zats in the treasury`);
+    const { PhalaSpawner } = await import('../phala/spawn.mjs');
+    const childName = String(name ?? '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'child';
+    const n = this.ledger.recent?.(['birth_of'], 1000)?.length ?? 0;
+    const cvmName = `entity-${childName}-${n + 1}`.slice(0, 60);
+    const composeYaml = childCompose(c);
+    const env = {
+      ARCHIVE_PUBKEY: c.archivePub ?? '', ZCASH_CHAIN: c.zcashChain ?? 'testnet', ZCASH_BIRTHDAY: String(c.zcashBirthday ?? 0),
+      ZCASH_SERVER: c.zcashServer ?? '', TICK_MS: String(Math.round((c.tickMinutes ?? 5) * 60_000)), FAKE_LLM: '0', FAKE_WALLET: '0',
+      PEER_URL: c.selfUrl, PARENT_URL: c.selfUrl, IMAGE_REF: c.imageRef, GATEWAY_DOMAIN: c.gatewayDomain,
+      PHALA_API_KEY: c.phalaApiKey, LLM_TIMEOUT_MS: String(c.llmTimeoutMs ?? 180_000),
+    };
+    for (const p of c.providers ?? []) if (p.apiKeyEnv && p.apiKey) env[p.apiKeyEnv] = p.apiKey;
+    const spawner = new PhalaSpawner({ apiKey: c.phalaApiKey, gatewayDomain: c.gatewayDomain, fetchImpl: this.fetchImpl });
+    const child = await spawner.spawn({ name: cvmName, composeYaml, env });
+    // The newborn's first hours: paid by the parent, with a memo it will read.
+    const gift = Number(c.childGiftZats) || 0;
+    let txid = null;
+    if (gift > 0 && child.address) { const r = await this.wallet.send(child.address, gift, `birth gift from ${c.selfUrl}`); txid = r?.txid ?? null; }
+    this.ledger.append('birth_of', { url: child.url, address: child.address ?? null, appId: child.appId, giftZats: gift, txid });
+    return { ok: true, url: child.url, address: child.address ?? null, giftZats: gift };
   }
 
   async #sendZec(to, zats, memo) {
@@ -258,7 +318,8 @@ const SCHEMAS = [
   { name: 'read_url', description: 'Fetch a public web page (http/https, max 200 KB).', parameters: obj({ url: str('absolute http/https URL') }, ['url']) },
   { name: 'search', description: 'Search the web (stub in v1: returns []).', parameters: obj({ q: str('query') }, ['q']) },
   { name: 'post_public', description: 'Publish a short text on the public channel.', parameters: obj({ text: str('text to publish') }, ['text']) },
-  { name: 'post_private', description: 'Send an encrypted note to the other entity.', parameters: obj({ text: str('private text') }, ['text']) },
+  { name: 'whisper', description: 'Speak to another entity by paying it: a shielded ZEC transfer whose memo carries your words (max 500 bytes). Only the recipient reads them; the public sees the amount.', parameters: obj({ to: str("'peer', 'parent', a child url, or an entity name"), text: str('the words'), zats: num('amount in zatoshi (min 10000)') }, ['to', 'text']) },
+  { name: 'spawn_child', description: 'Give birth to a new entity: pay for a new sealed machine with your image and charter, and gift it its first hours. Needs a rich treasury.', parameters: obj({ name: str('a short name for the machine (letters, digits, hyphens)') }, []) },
   { name: 'diary', description: 'Write an encrypted diary entry.', parameters: obj({ text: str('private text') }, ['text']) },
   { name: 'send_zec', description: 'Send ZEC from the wallet.', parameters: obj({ to: str('address'), zats: num('amount in zatoshi'), memo: str('optional memo') }, ['to', 'zats']) },
   { name: 'swap_zec_sol', description: 'Record an intention to swap ZEC for SOL (stub).', parameters: obj({ zats: num('amount in zatoshi') }, ['zats']) },
@@ -270,3 +331,21 @@ const SCHEMAS = [
   { name: 'will', description: 'Write or update the will and its transfers.', parameters: obj({ text: str('last words'), transfers: { type: 'array', items: obj({ to: str('address'), zats: num('amount'), memo: str('memo') }, ['to', 'zats']) } }, ['text']) },
   { name: 'promise', description: 'Make a dated promise.', parameters: obj({ to: str('who'), what: str('what'), due: str('ISO due date') }, ['to', 'what', 'due']) },
 ];
+
+/** The compose a child runs: this image, port 8080, its own volume. Secrets travel encrypted, never in the YAML. */
+export function childCompose(c) {
+  return [
+    'services:',
+    '  entity:',
+    `    image: ${c.imageRef}`,
+    '    ports:',
+    '      - "8080:8080"',
+    '    volumes:',
+    '      - /var/run/dstack.sock:/var/run/dstack.sock',
+    '      - entity-state:/state',
+    '    restart: unless-stopped',
+    'volumes:',
+    '  entity-state:',
+    '',
+  ].join('\n');
+}
