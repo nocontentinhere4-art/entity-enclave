@@ -68,6 +68,8 @@ export const config = {
   childGiftZats: num(process.env.CHILD_GIFT_ZATS, 20_000_000), // what the parent gives the newborn
   // Speaking to another entity costs: a whisper is a shielded payment with a memo (min amount, in zatoshi).
   whisperMinZats: num(process.env.WHISPER_MIN_ZATS, 10_000),
+  // Multiplies every price in the list (mainnet: 0.01 brings a deep thought from 0.002 ZEC to 0.00002 ZEC ≈ its real cost).
+  priceScale: Number(process.env.PRICE_SCALE) > 0 ? Number(process.env.PRICE_SCALE) : 1,
   allowDev: bool(process.env.ALLOW_DEV, false),
   fakeWallet: bool(process.env.FAKE_WALLET, false),
   fakeBalanceZats: num(process.env.FAKE_BALANCE_ZATS, 5_000_000),

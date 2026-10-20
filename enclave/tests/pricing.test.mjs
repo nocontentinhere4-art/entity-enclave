@@ -15,7 +15,7 @@ test('price list matches the contract exactly', () => {
     read_url: 1000, search: 2000, post_public: 500, post_private: 500, diary: 100,
     send_zec: 1000, swap_zec_sol: 5000, balance: 0, sleep: 0, set_identity: 2000,
     paywall_set: 500, bounty_post: 1000, will: 100, promise: 100, think_fast: 20000, think_deep: 200000,
-    whisper: 500, spawn_child: 1_000_000,
+    whisper: 500, spawn_child: 1_000_000, swap_quote: 1000,
   });
 });
 
@@ -39,4 +39,10 @@ test('charge is idempotent per (action, tickId): retried tick is billed once', (
   assert.deepEqual(charges[0].data, { action: 'diary', tickId: 't1', costZats: 100 });
   assert.equal(p.charge('balance', 't2'), 0); // free actions still leave an auditable entry
   assert.deepEqual(ledger.of('charge').at(-1).data, { action: 'balance', tickId: 't2', costZats: 0 });
+});
+
+test('a price scale rescales every quote and charge (mainnet: real costs)', () => {
+  const p = new Pricing({ ledger: new FakeLedger(), scale: 0.01 });
+  assert.deepEqual(p.quote('think_deep', 10_000), { costZats: 2000, affordable: true });
+  assert.equal(p.charge('think_fast', 't1'), 200);
 });

@@ -66,10 +66,10 @@ const memory = new MemoryStore({ path: join(STATE, 'memory.bin'), key: keys.deri
 // Wallet: real zingo-cli (offline locally, online through the mixnet to sync/send), or an in-memory fake.
 const wallet = config.fakeWallet
   ? new FakeWallet({ zats: config.fakeBalanceZats, dataDir: join(STATE, 'zcash') })
-  : new ZcashWallet({ bin: config.zingoBin, dataDir: join(STATE, 'zcash'), server: config.zcashServer, chain: config.zcashChain, nymProxy: config.nymProxy, seedMnemonic: entropyToMnemonic(keys.deriveSubkey('zcash')), birthday: config.zcashBirthday });
+  : new ZcashWallet({ bin: config.zingoBin, dataDir: join(STATE, config.zcashChain === 'mainnet' ? 'zcash-mainnet' : 'zcash'), server: config.zcashServer, chain: config.zcashChain, nymProxy: config.nymProxy, seedMnemonic: entropyToMnemonic(keys.deriveSubkey('zcash')), birthday: config.zcashBirthday });
 
 // Directories to shred on death. The in-memory fake wallet leaves no files behind, so it passes none.
-if (!config.fakeWallet) config.walletPaths = [join(STATE, 'zcash')];
+if (!config.fakeWallet) config.walletPaths = [join(STATE, config.zcashChain === 'mainnet' ? 'zcash-mainnet' : 'zcash')];
 
 let address = null, walletError = null;
 try {
@@ -152,7 +152,7 @@ async function probeProviders() {
   }
 }
 
-const pricing = new Pricing({ ledger });
+const pricing = new Pricing({ ledger, scale: config.priceScale });
 const rent = new Rent({ ledger, wallet, config, pricing });
 const promises = new Promises({ ledger, memory });
 const inference = new Inference({ config, ledger, pricing });

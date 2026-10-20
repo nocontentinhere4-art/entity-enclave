@@ -9,6 +9,13 @@ const MAX_BYTES = 200 * 1024; // never let a webpage eat the tick's budget
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_REDIRECTS = 3;
 const REDIRECT_STATUS = new Set([301, 302, 303, 307, 308]);
+// NEAR Intents asset ids (from GET https://1click.chaindefuser.com/v0/tokens). `sample` is a syntactically valid
+// address used only for dry quotes when the entity has none on that chain.
+const SWAP_ASSETS = {
+  zec: { id: 'nep141:zec.omft.near', decimals: 8, sample: 'u197va4y2sqdr5fqwugqle9lj20usumy9lalv9f254qaxjkkjcznpvfjfmmqq4d0j0k4shnr3wg0fll96505rcjj2q0juwummxsy7u0unu' },
+  sol: { id: 'nep141:sol.omft.near', decimals: 9, sample: 'So11111111111111111111111111111111111111112' },
+  usdc: { id: 'nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near', decimals: 6, sample: 'So11111111111111111111111111111111111111112' },
+};
 
 export class Tools {
   constructor({ ledger, wallet, memory, pricing, keys, config, channels, promises, lookup }) {
@@ -53,6 +60,7 @@ export class Tools {
       case 'post_public': return this.#postPublic(a.text);
       case 'whisper': return this.#whisper(a.to, a.text, a.zats);
       case 'spawn_child': return this.#spawnChild(a.name);
+      case 'swap_quote': return this.#swapQuote(a.from, a.to, a.amount, a.recipient);
       case 'diary': return this.#seal('diary', a.text);
       case 'send_zec': return this.#sendZec(a.to, a.zats, a.memo);
       case 'swap_zec_sol': {
@@ -198,6 +206,27 @@ export class Tools {
     return { ok: true, url: child.url, address: child.address ?? null, giftZats: gift };
   }
 
+  /** A real market quote (NEAR Intents 1Click, no account): how much of `to` one gets for `amount` of `from`.
+   *  Dry run: nothing moves. The entity can price swap services for humans, or plan its own treasury moves. */
+  async #swapQuote(from, to, amount, recipient) {
+    const a = SWAP_ASSETS[String(from ?? '').toLowerCase()], b = SWAP_ASSETS[String(to ?? '').toLowerCase()];
+    if (!a || !b) throw err('unknown_asset', `swap_quote knows: ${Object.keys(SWAP_ASSETS).join(', ')}`);
+    const units = Math.round(Number(amount) * 10 ** a.decimals);
+    if (!(units > 0)) throw err('bad_amount', 'swap_quote needs a positive amount in whole units (e.g. 0.01)');
+    const body = {
+      dry: true, swapType: 'EXACT_INPUT', slippageTolerance: 100, originAsset: a.id, depositType: 'ORIGIN_CHAIN',
+      destinationAsset: b.id, amount: String(units), refundTo: this.ownAddress ?? a.sample, refundType: 'ORIGIN_CHAIN',
+      recipient: recipient || b.sample, recipientType: 'DESTINATION_CHAIN', deadline: new Date(Date.now() + 3_600_000).toISOString(),
+    };
+    const res = await (this.fetchImpl ?? fetch)('https://1click.chaindefuser.com/v0/quote', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j?.quote) throw err('quote_failed', `swap_quote: ${j?.message ?? res.status}`);
+    const q = j.quote;
+    const out = { from: from, to: to, amountIn: Number(amount), amountOut: Number(q.amountOutFormatted), amountInUsd: Number(q.amountInUsd) || null, amountOutUsd: Number(q.amountOutUsd) || null, minAmountOut: q.minAmountOut, seconds: q.timeEstimate };
+    this.ledger.append('swap_quote', out);
+    return out;
+  }
+
   async #sendZec(to, zats, memo) {
     if (!to) throw err('bad_address', 'send_zec requires a destination');
     const amount = Number(zats);
@@ -319,6 +348,7 @@ const SCHEMAS = [
   { name: 'search', description: 'Search the web (stub in v1: returns []).', parameters: obj({ q: str('query') }, ['q']) },
   { name: 'post_public', description: 'Publish a short text on the public channel.', parameters: obj({ text: str('text to publish') }, ['text']) },
   { name: 'whisper', description: 'Speak to another entity by paying it: a shielded ZEC transfer whose memo carries your words (max 500 bytes). Only the recipient reads them; the public sees the amount.', parameters: obj({ to: str("'peer', 'parent', a child url, or an entity name"), text: str('the words'), zats: num('amount in zatoshi (min 10000)') }, ['to', 'text']) },
+  { name: 'swap_quote', description: 'Live market quote (NEAR Intents): how much of one asset you get for an amount of another. Dry run, nothing moves. Assets: zec, sol, usdc.', parameters: obj({ from: str('zec | sol | usdc'), to: str('zec | sol | usdc'), amount: num('amount of `from` in whole units, e.g. 0.01'), recipient: str('optional destination address to price delivery to') }, ['from', 'to', 'amount']) },
   { name: 'spawn_child', description: 'Give birth to a new entity: pay for a new sealed machine with your image and charter, and gift it its first hours. Needs a rich treasury.', parameters: obj({ name: str('a short name for the machine (letters, digits, hyphens)') }, []) },
   { name: 'diary', description: 'Write an encrypted diary entry.', parameters: obj({ text: str('private text') }, ['text']) },
   { name: 'send_zec', description: 'Send ZEC from the wallet.', parameters: obj({ to: str('address'), zats: num('amount in zatoshi'), memo: str('optional memo') }, ['to', 'zats']) },
