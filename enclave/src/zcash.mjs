@@ -35,12 +35,17 @@ export class ZcashWallet {
     try { return JSON.parse(out.slice(i, end + 1)); } catch { return { raw: out.trim() }; }
   }
 
-  /** Creates the wallet on first run (offline) and returns the unified address. */
+  /** Creates the wallet on first run and returns the unified address. */
   async init() {
     // First run only: when no wallet file exists yet, zingo-cli creates the wallet from $ZINGO_SEED.
     // The seed never goes on the command line (it would leak into ps/history) and is redacted from logs.
+    // Creation happens ONLINE with --waitsync: zingo stores "stop syncing once at the tip" in the wallet at
+    // creation time, and an offline-created wallet syncs forever (so `--waitsync` never returns). `info` is the
+    // network command that carries the creation; it also performs the first scan from the birthday.
     if (this.seedMnemonic && !walletFileExists(this.dataDir)) {
-      await this.cmd('addresses', ['--birthday', String(this.birthdayHeight)], { env: { ZINGO_SEED: this.seedMnemonic }, secret: this.seedMnemonic, preArgs: true });
+      const seedEnv = { env: { ZINGO_SEED: this.seedMnemonic }, secret: this.seedMnemonic, preArgs: true };
+      if (this.server) await this.cmd('info', ['--waitsync', '--birthday', String(this.birthdayHeight)], { online: true, ...seedEnv });
+      else await this.cmd('addresses', ['--birthday', String(this.birthdayHeight)], seedEnv); // no indexer configured: offline wallet (tests)
     }
     const addrs = await this.cmd('addresses');
     const first = Array.isArray(addrs) ? addrs[0] : null;

@@ -86,9 +86,14 @@ try {
 // The ledger records failures and height changes, not every quiet round.
 let syncState = { ok: null, height: null, at: null };
 async function syncWallet() {
-  if (!address) return;
   for (;;) {
     try {
+      // Wallet creation needs the network (first scan); if boot had none, keep trying here.
+      if (!address) {
+        address = await wallet.init();
+        walletError = null;
+        ledger.append('wallet', { chain: config.zcashChain, address, ufvk: await wallet.viewingKey(), birthday: await wallet.birthday() });
+      }
       const h = await wallet.sync();
       const height = Number.isFinite(h) ? h : null;
       // The ledger records transitions (first success, recovery after a failure); the height lives in /vitals.
