@@ -4,7 +4,7 @@
 # Image is pinned by digest (replace DIGEST with the one printed by the GitHub Actions build "entity-image").
 services:
   entity:
-    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:dfecbd1c6765b85880420a1200d8ed2df0af5522060450e3768037352f23eefe
+    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:8d6964ff4b12613bf0f8c0c13c737b67e199bf404f096047367986b84d8718a2
     ports:
       - "8080:8080"
     volumes:
@@ -16,6 +16,9 @@ services:
       - ZCASH_BIRTHDAY=4518000
       - ZCASH_SERVER=https://testnet.zec.rocks:443
       - TICK_MS=300000
+      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:8d6964ff4b12613bf0f8c0c13c737b67e199bf404f096047367986b84d8718a2
+      - GATEWAY_DOMAIN=dstack-pha-prod9.phala.network
+      # per-CVM: SELF_URL=<this CVM's public URL>, PEER_URL=<the other's>; secrets (REDPILL_API_KEY, PHALA_API_KEY) in the dashboard
       - FAKE_LLM=0
       - FAKE_WALLET=0
     restart: unless-stopped
