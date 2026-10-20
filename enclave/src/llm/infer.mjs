@@ -97,6 +97,10 @@ export function verifyAttestation(a) {
 function fake(context, tools) {
   const h = sha256(String(context ?? ''));
   const slug = h.slice(0, 8);
+  // Second round of a cycle (tool results are in the context): speak, call nothing, so a cycle ends after two rounds.
+  if (String(context ?? '').includes('TOOL RESULTS')) {
+    return { text: `fake reflection ${slug}: I saw the results.`, toolCalls: [], provider: 'fake', model: 'fake-deterministic', tokens: 200, attestation: { mode: 'dev', note: 'fake provider is not attested' } };
+  }
   const provided = tools?.list ? tools.list() : tools;
   const offered = Array.isArray(provided) ? new Set(provided.map((t) => t.name)) : null;
   const has = (n) => !offered || offered.has(n); // no list = free choice; empty list = no tools

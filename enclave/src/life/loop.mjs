@@ -6,6 +6,7 @@ import { digestError } from '../log.mjs';
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 const MAX_TOOL_CALLS = 8; // a single thought cannot spend the whole treasury
+const MAX_ROUNDS = 3; // think → act → think with the results, at most three times per cycle
 
 export class Life {
   constructor({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused, exit, now }) {
@@ -132,32 +133,43 @@ export class Life {
     this.mem = mem;
     const context = await this.buildContext(now);
 
-    // 9. One paid thought.
-    const thought = await this.inference.think({
-      context,
-      speed,
-      tools: this.tools.list(),
-      tickId,
-    });
-    // The spoken thought is public: the text the entity writes each cycle goes to the ledger as its voice.
-    // (Tools are separate: the diary stays private; post_public is the channel.)
-    const spoken = String(thought.text ?? '').trim();
-    if (spoken) this.ledger.append('thought', { speed, text: spoken.slice(0, 1200) });
+    // 9. Think, act, and think again with the results: up to MAX_ROUNDS paid rounds per cycle. The first round
+    //    runs at the cycle's speed; follow-ups (after tool results) run fast. A round without tool calls ends the cycle.
+    let executed = 0, costZats = 0, remaining = treasury;
+    let results = [];
+    for (let round = 1; round <= MAX_ROUNDS; round++) {
+      const roundSpeed = round === 1 ? speed : 'fast';
+      const roundContext = results.length
+        ? `${context}\nTOOL RESULTS (this cycle, round ${round - 1})\n${results.map((r) => `- ${r}`).join('\n')}`
+        : context;
+      const thought = await this.inference.think({ context: roundContext, speed: roundSpeed, tools: this.tools.list(), tickId: `${tickId}:r${round}` });
+      costZats += Number(thought.costZats) || 0;
+      // The spoken thought is public: the text the entity writes each round goes to the ledger as its voice.
+      // (Tools are separate: the diary stays private; post_public is the channel.)
+      const spoken = String(thought.text ?? '').trim();
+      if (spoken) this.ledger.append('thought', { speed: roundSpeed, round, text: spoken.slice(0, 1200) });
 
-    // The thought is paid already: tools quote against what is actually left.
-    this.tools.setTreasury?.(Math.max(0, treasury - (Number(thought.costZats) || 0)));
+      // The thought is paid already: tools quote against what is actually left.
+      remaining = Math.max(0, remaining - (Number(thought.costZats) || 0));
+      this.tools.setTreasury?.(remaining);
 
-    // 10. Execute tool calls in order, at most 8 per tick. One failure does not cancel the others.
-    const calls = (thought.toolCalls ?? []).slice(0, MAX_TOOL_CALLS);
-    let executed = 0;
-    for (const c of calls) {
-      try {
-        await this.tools.call(c.name, c.args ?? {}, tickId);
-        executed++;
-      } catch (e) {
-        this.ledger.append('tool_error', { name: c.name, ...digestError(`tool ${c.name}`, e) });
+      // 10. Execute tool calls in order, at most MAX_TOOL_CALLS per round. One failure does not cancel the others.
+      const calls = (thought.toolCalls ?? []).slice(0, MAX_TOOL_CALLS);
+      if (!calls.length) break;
+      results = [];
+      for (const c of calls) {
+        try {
+          const out = await this.tools.call(c.name, c.args ?? {}, tickId);
+          executed++;
+          results.push(`${c.name}: ${summarizeResult(out)}`);
+        } catch (e) {
+          this.ledger.append('tool_error', { name: c.name, ...digestError(`tool ${c.name}`, e) });
+          results.push(`${c.name}: error (${e?.code ?? 'failed'})`);
+        }
       }
+      remaining = Number(this.tools.treasuryZats ?? remaining);
     }
+    const thought = { costZats };
 
     // 11. Remember. Reload first: tools may have changed identity, will or promises meanwhile.
     mem = await this.memory.load();
@@ -325,4 +337,12 @@ function extractJson(text) {
   const i = s.indexOf('{'), j = s.lastIndexOf('}');
   if (i < 0 || j <= i) return null;
   try { return JSON.parse(s.slice(i, j + 1)); } catch { return null; }
+}
+
+/** Tool output for the next round: short, JSON-ish, never a secret (tools never return keys). */
+function summarizeResult(out) {
+  if (out === undefined) return 'ok';
+  let text;
+  try { text = typeof out === 'string' ? out : JSON.stringify(out); } catch { text = String(out); }
+  return String(text ?? 'ok').replace(/\s+/g, ' ').slice(0, 400);
 }

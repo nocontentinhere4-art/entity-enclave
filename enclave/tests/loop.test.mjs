@@ -177,12 +177,13 @@ test('six ticks are reproducible and every action is charged once per tick', asy
   // Same inputs → byte-identical ledger, including tick ids and tool argument hashes.
   assert.deepEqual(b.ledger.entries, a.ledger.entries);
   assert.equal(a.ledger.of('tick').length, 6);
-  assert.equal(a.ledger.of('tick_llm').length, 6);
+  assert.equal(a.ledger.of('tick_llm').length, 12); // two rounds per tick: think, act, then think with the results
 
   const actions = a.ledger.of('charge').map((e) => e.data.action);
-  for (const action of ['think_deep', 'read_url', 'diary', 'post_public', 'balance']) {
+  for (const action of ['think_deep', 'think_fast', 'read_url', 'diary', 'post_public', 'balance']) {
     assert.equal(actions.filter((x) => x === action).length, 6, `${action} charged once per tick`);
   }
+  assert.equal(a.ledger.of('thought').length, 12); // the spoken text of every round is public
 
   const toolEntries = a.ledger.of('tool');
   assert.equal(toolEntries.length, 24); // 4 fake calls × 6 ticks
@@ -293,7 +294,7 @@ test('unborn: first reach of birthMinZats appends birth_gift and persists bornAt
   assert.equal(w.ledger.of('charge').length, 0);
 
   await ticks(w, 1);
-  assert.equal(w.ledger.of('tick_llm').length, 1);
+  assert.equal(w.ledger.of('tick_llm').length, 2); // one cycle = two rounds (think, act, think with the results)
   assert.equal(w.ledger.of('tick').length, 1);
   assert.equal(w.ledger.of('birth_gift').length, 1); // never repeated
 });
