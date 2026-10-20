@@ -186,7 +186,7 @@ test('six ticks are reproducible and every action is charged once per tick', asy
   assert.equal(a.ledger.of('thought').length, 12); // the spoken text of every round is public
 
   const toolEntries = a.ledger.of('tool');
-  assert.equal(toolEntries.length, 24); // 4 fake calls × 6 ticks
+  assert.equal(toolEntries.length, 24); // 4 fake calls × 6 ticks (whisper has no peer in this world: not executed)
   assert.ok(toolEntries.every((e) => e.data.ok === true));
   assert.equal(toolEntries.filter((e) => e.data.name === 'read_url').length, 6);
 

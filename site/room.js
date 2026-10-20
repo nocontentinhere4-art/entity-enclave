@@ -6,7 +6,8 @@
  *   - real: mapped from data (/vitals, /ledger, /public-channel); every line carries [real].
  * Entity 1 is always present. Entity 2 appears as soon as it has a base
  * (discovered through Entity 1's `peer`, or forced with ?base2=): before that
- * its desk stays empty and no body is drawn. Nothing is invented.
+ * its desk stays empty and no body is drawn. Entities found through `lineage`
+ * (e3..e6) get their own desk and sprite in discovery order. Nothing is invented.
  *
  * It also exposes the small DOM helpers (el/textNode/append) reused by term.js:
  * no network text ever enters through innerHTML.
@@ -21,6 +22,9 @@ import {
   clockTime,
   formatInt,
   formatDecimal,
+  formatZats,
+  endpointKey,
+  shortUrl,
   TICK_WINDOW_MS,
 } from './data.js';
 
@@ -119,6 +123,13 @@ const B = {
     '│▒▒▒▒▒▒│',
     '└──────┘',
   ],
+  deskCompact: [
+    '┌────┐',
+    '│ >_ │',
+    '├────┤',
+    '│▒▒▒▒│',
+    '└────┘',
+  ],
   chair: [
     '┬─┬',
     '│ │',
@@ -139,86 +150,91 @@ const B = {
   ],
 };
 
+/*
+ * Two desk rows of up to three desks each (contract: 3 top, 3 second row).
+ * Wide desks are 8 columns, compact desks 6 columns (48-column layout).
+ * A sprite is 3 lines tall and sits 3 rows above its desk, name one row above.
+ */
 const LAYOUTS = {
   wide: {
     name: 'wide',
     w: 80,
-    h: 22,
+    h: 32,
     shelf: { x: 2, y: 2 },
     window: { x: 66, y: 2 },
-    vault: { x: 2, y: 15 },
-    desk1: { x: 13, y: 8 },
-    chair1: { x: 10, y: 9 },
-    desk2: { x: 45, y: 8 },
-    chair2: { x: 42, y: 9 },
-    bed: { x: 57, y: 16 },
-    door: { x: 34, y: 16 },
-    sign2: { x: 43, y: 13 },
-    screen2: { x: 47, y: 9 },
-    floorTop: 14,
-    floorBottom: 20,
-    corridor: { x0: 6, x1: 70, y: 14 },
+    vault: { x: 2, y: 27 },
+    bed: { x: 58, y: 27 },
+    door: { x: 36, y: 26 },
+    deskRows: [
+      { y: 11, xs: [7, 33, 59] },
+      { y: 21, xs: [7, 33, 59] },
+    ],
+    deskWidth: 8,
+    floorTop: 15,
+    floorBottom: 30,
+    corridor: { x0: 5, x1: 76, y: 16 },
     spots: {
-      desk: { x: 15, y: 5 },
-      desk2: { x: 47, y: 5 },
-      read: { x: 4, y: 7 },
-      read2: { x: 18, y: 7 },
-      window: { x: 62, y: 7 },
-      center: { x: 30, y: 14 },
-      center2: { x: 46, y: 14 },
-      rest: { x: 60, y: 17 },
-      rest2: { x: 67, y: 17 },
-      vault: { x: 3, y: 13 },
-      door: { x: 34, y: 14 },
-      walk2: { x: 56, y: 14 },
-      dead2: { x: 50, y: 14 },
-      face1: { x: 18, y: 15 },
-      face2: { x: 44, y: 15 },
+      read: { x: 3, y: 13 },
+      window: { x: 72, y: 12 },
+      center: { x: 26, y: 16 },
+      center2: { x: 46, y: 16 },
+      rest: { x: 60, y: 28 },
+      rest2: { x: 68, y: 28 },
+      vault: { x: 3, y: 26 },
+      door: { x: 36, y: 25 },
+      face1: { x: 28, y: 16 },
+      face2: { x: 44, y: 16 },
     },
   },
   compact: {
     name: 'compact',
     w: 48,
-    h: 24,
+    h: 32,
     shelf: { x: 1, y: 2 },
     window: { x: 34, y: 2 },
-    vault: { x: 1, y: 16 },
-    desk1: { x: 5, y: 8 },
-    chair1: { x: 2, y: 9 },
-    desk2: { x: 28, y: 8 },
-    chair2: { x: 25, y: 9 },
-    bed: { x: 26, y: 17 },
-    door: { x: 17, y: 19 },
-    sign2: { x: 22, y: 13 },
-    screen2: { x: 30, y: 9 },
-    floorTop: 13,
-    floorBottom: 22,
-    corridor: { x0: 4, x1: 44, y: 14 },
+    vault: { x: 1, y: 27 },
+    bed: { x: 27, y: 27 },
+    door: { x: 18, y: 26 },
+    deskRows: [
+      { y: 11, xs: [5, 22, 38] },
+      { y: 21, xs: [5, 22, 38] },
+    ],
+    deskWidth: 6,
+    floorTop: 15,
+    floorBottom: 30,
+    corridor: { x0: 4, x1: 44, y: 16 },
     spots: {
-      desk: { x: 6, y: 5 },
-      desk2: { x: 30, y: 5 },
-      read: { x: 1, y: 7 },
-      read2: { x: 15, y: 7 },
-      window: { x: 38, y: 7 },
-      center: { x: 20, y: 14 },
-      center2: { x: 33, y: 14 },
-      rest: { x: 28, y: 18 },
-      rest2: { x: 35, y: 18 },
-      vault: { x: 2, y: 14 },
-      door: { x: 18, y: 16 },
-      walk2: { x: 31, y: 14 },
-      dead2: { x: 26, y: 14 },
-      face1: { x: 14, y: 15 },
-      face2: { x: 29, y: 15 },
+      read: { x: 2, y: 17 },
+      window: { x: 44, y: 12 },
+      center: { x: 14, y: 16 },
+      center2: { x: 31, y: 16 },
+      rest: { x: 29, y: 28 },
+      rest2: { x: 34, y: 28 },
+      vault: { x: 2, y: 26 },
+      door: { x: 18, y: 25 },
+      face1: { x: 13, y: 17 },
+      face2: { x: 28, y: 17 },
     },
   },
 };
+
+const DEFAULT_ROSTER = [
+  { id: 'e1', base: null },
+  { id: 'e2', base: null },
+];
 
 const RANDOM_CHARS = '░▒▓█#$%@&*+=~<>/\\|_-.:;0123456789';
 const ASSEMBLY_MS = 1500;
 const FRAME_MS = 130;
 const AMBIENT_MS = 7000;
 const INTERACT_MS = 10000;
+const WHISPER_WINDOW_MS = 2 * 60 * 1000;
+const LETTER_WINDOW_MS = 2 * 60 * 1000;
+const LETTER_READ_MS = 20000;
+const BIRTH_WINDOW_MS = 10 * 60 * 1000;
+const MAX_BUBBLES = 2;
+const SPARK_MS = 1500;
+const SPARK_FLASH_MS = 1200;
 
 function randChar() {
   return RANDOM_CHARS[Math.floor(Math.random() * RANDOM_CHARS.length)];
@@ -228,8 +244,13 @@ function randChar() {
 /* Sprite                                                              */
 /* ------------------------------------------------------------------ */
 
+function numberIn(id) {
+  const n = Number.parseInt(String(id).replace(/^e/i, ''), 10);
+  return Number.isFinite(n) ? n : 1;
+}
+
 function headOf(entityId) {
-  return entityId === 'e2' ? '(2)' : '(1)';
+  return `(${numberIn(entityId)})`;
 }
 
 /** Entity body in 2-3 lines; the name line goes above the head. */
@@ -255,6 +276,26 @@ function bodyLines(head, state, frame) {
     default:
       return [head, '/|\\', '/ \\'];
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Layout helpers                                                      */
+/* ------------------------------------------------------------------ */
+
+function deskAt(L, index) {
+  const i = Math.max(0, Math.min(5, Number.isFinite(index) ? index : 0));
+  const row = L.deskRows[Math.min(L.deskRows.length - 1, Math.floor(i / 3))];
+  const x = row.xs[i % 3];
+  return { x, y: row.y };
+}
+
+function deskBlockOf(L) {
+  return L.deskWidth <= 6 ? B.deskCompact : B.desk;
+}
+
+function deskSpotAt(L, index) {
+  const desk = deskAt(L, index);
+  return { x: desk.x + 2, y: desk.y - 3 };
 }
 
 /* ------------------------------------------------------------------ */
@@ -287,7 +328,7 @@ function fillFloor(g, L) {
   }
 }
 
-function paintBase(L, dev, e2Online = false) {
+function paintBase(L, dev, roster, online) {
   const g = new Grid(L.w, L.h);
   drawBorder(g, L, dev);
   fillFloor(g, L);
@@ -296,13 +337,22 @@ function paintBase(L, dev, e2Online = false) {
   g.block(L.vault.x, L.vault.y, B.vault, 'dim');
   g.block(L.bed.x, L.bed.y, B.bed, 'dim');
   g.block(L.door.x, L.door.y, B.door, 'dim');
-  g.block(L.chair1.x, L.chair1.y, B.chair, 'dim');
-  g.block(L.desk1.x, L.desk1.y, B.desk, 'fg');
-  g.block(L.chair2.x, L.chair2.y, B.chair, 'dim');
-  g.block(L.desk2.x, L.desk2.y, B.desk, e2Online ? 'fg' : 'dim');
-  // Entity 2's screen is off until it is typing there.
-  g.put(L.screen2.x, L.screen2.y, '  ', 'dim');
-  if (!e2Online) g.put(L.sign2.x, L.sign2.y, '[absent · waiting]', 'dim');
+
+  const items = Array.isArray(roster) ? roster : DEFAULT_ROSTER;
+  const block = deskBlockOf(L);
+  const chairX = L.deskWidth <= 6 ? -3 : -3;
+  for (let i = 0; i < Math.min(items.length, 6); i += 1) {
+    const desk = deskAt(L, i);
+    const on = Boolean(online && online[items[i].id]);
+    g.block(desk.x + chairX, desk.y + 1, B.chair, 'dim');
+    g.block(desk.x, desk.y, block, on ? 'fg' : 'dim');
+    // the screen is off until the entity is typing there
+    g.put(desk.x + 2, desk.y + 1, '  ', 'dim');
+    if (!on) {
+      const sign = L.deskWidth <= 6 ? '[absent]' : `[${items[i].id} · not online]`;
+      g.put(desk.x, desk.y + 5, sign, 'dim');
+    }
+  }
   return g;
 }
 
@@ -345,11 +395,31 @@ function emptyData() {
   };
 }
 
+function refLabel(url, address, ctx) {
+  const key = endpointKey(url);
+  const byUrl = ctx && ctx.byUrl;
+  if (key && byUrl && typeof byUrl === 'object' && byUrl[key]) return byUrl[key];
+  const addr = stringOf(address).trim();
+  const byAddress = ctx && ctx.byAddress;
+  if (addr && byAddress && typeof byAddress === 'object' && byAddress[addr]) return byAddress[addr];
+  return shortUrl(url, 22);
+}
+
+function amountLabel(zats) {
+  if (!Number.isFinite(zats)) return 'amount not declared';
+  const coin = formatZats(zats);
+  return coin === null ? 'amount not declared' : `${coin} TAZ`;
+}
+
+function bytesLabel(bytes) {
+  return Number.isFinite(bytes) ? `${formatInt(bytes)} bytes` : 'bytes not declared';
+}
+
 /**
  * One entity's drawable state, from its own snapshot only.
  * Pure: does not touch the DOM and never invents data.
  */
-function deriveEntity(data, id, online) {
+function deriveEntity(data, id, online, ctx) {
   const out = {
     id,
     online: Boolean(online),
@@ -365,6 +435,9 @@ function deriveEntity(data, id, online) {
     hunger: false,
     ticker: null,
     eventAt: 0,
+    whisper: null,
+    letter: null,
+    birth: null,
   };
   if (!data) return out;
 
@@ -462,6 +535,74 @@ function deriveEntity(data, id, online) {
   const human = lastEntryOf(entries, ['human_message']);
   if (human && entryAge(human) <= TICK_WINDOW_MS) candidates.push({ at: human.ts, kind: 'envelope' });
 
+  // a paid whisper: this entity PAID another one to speak to it (words shielded)
+  const whisper = lastEntryOf(entries, ['whisper']);
+  let whisperTicker = null;
+  if (whisper && entryAge(whisper) <= WHISPER_WINDOW_MS) {
+    const d = whisper.data && typeof whisper.data === 'object' ? whisper.data : {};
+    const to = stringOf(d.to).trim();
+    const zats = Number(d.zats);
+    const bytes = Number(d.bytes);
+    if (to) {
+      const candidate = { at: whisper.ts, kind: 'whisper', to, zats, bytes };
+      candidates.push(candidate);
+      out.whisper = {
+        at: whisper.ts,
+        to,
+        zats: Number.isFinite(zats) ? zats : null,
+        bytes: Number.isFinite(bytes) ? bytes : null,
+        key: `${id}:${whisper.seq !== undefined ? whisper.seq : whisper.ts}:${to}`,
+      };
+      whisperTicker = {
+        text: `${hhmm(whisper.ts) || '—'} ${id} → ${refLabel(to, null, ctx)} whispers `
+          + `(paid ${amountLabel(Number.isFinite(zats) ? zats : NaN)} · ${bytesLabel(Number.isFinite(bytes) ? bytes : NaN)}, words private) [real]`,
+        real: true,
+      };
+    }
+  }
+
+  // a paid letter received: the envelope is public, the words are not
+  const letter = lastEntryOf(entries, ['letter']);
+  if (letter && entryAge(letter) <= LETTER_WINDOW_MS) {
+    const d = letter.data && typeof letter.data === 'object' ? letter.data : {};
+    const zats = Number(d.zats);
+    const bytes = Number(d.bytes);
+    const ticker = {
+      text: `${hhmm(letter.ts) || '—'} ${id} receives a paid letter (words private) [real]`,
+      real: true,
+    };
+    candidates.push({ at: letter.ts, kind: 'letter', zats, bytes });
+    out.envelope = true;
+    out.letter = {
+      at: letter.ts,
+      zats: Number.isFinite(zats) ? zats : null,
+      bytes: Number.isFinite(bytes) ? bytes : null,
+      key: `${id}:${letter.seq !== undefined ? letter.seq : letter.ts}`,
+      ticker,
+    };
+  }
+
+  // a birth: this entity gave birth to another entity (public)
+  const birth = lastEntryOf(entries, ['birth_of']);
+  if (birth && entryAge(birth) <= BIRTH_WINDOW_MS) {
+    const d = birth.data && typeof birth.data === 'object' ? birth.data : {};
+    const url = stringOf(d.url).trim();
+    const address = stringOf(d.address).trim();
+    const giftZats = Number(d.giftZats);
+    if (url) {
+      candidates.push({ at: birth.ts, kind: 'birth', url, address, giftZats });
+      out.birth = {
+        at: birth.ts,
+        url,
+        address: address || null,
+        appId: stringOf(d.appId).trim() || null,
+        giftZats: Number.isFinite(giftZats) ? giftZats : null,
+        txid: stringOf(d.txid).trim() || null,
+        key: `${id}:${birth.seq !== undefined ? birth.seq : birth.ts}:${url}`,
+      };
+    }
+  }
+
   candidates.sort((a, b) => entryAge(a) - entryAge(b));
   const real = candidates[0] || null;
 
@@ -529,6 +670,38 @@ function deriveEntity(data, id, online) {
     out.ticker = { text: `${hhmm(real.at) || '—'} ${id} received a human message [✉] [real]`, real: true };
     return out;
   }
+  if (real && real.kind === 'whisper') {
+    out.state = 'sit';
+    out.mode = 'real';
+    out.real = real;
+    out.eventAt = Date.parse(real.at) || 0;
+    out.ticker = whisperTicker;
+    return out;
+  }
+  if (real && real.kind === 'letter') {
+    out.state = 'read';
+    out.mode = 'real';
+    out.real = real;
+    out.eventAt = Date.parse(real.at) || 0;
+    out.envelope = true;
+    out.ticker = out.letter ? out.letter.ticker : {
+      text: `${hhmm(real.at) || '—'} ${id} receives a paid letter (words private) [real]`,
+      real: true,
+    };
+    return out;
+  }
+  if (real && real.kind === 'birth') {
+    out.state = 'sit';
+    out.mode = 'real';
+    out.real = real;
+    out.eventAt = Date.parse(real.at) || 0;
+    const gift = Number.isFinite(real.giftZats) ? `${formatZats(real.giftZats)} TAZ` : 'not declared';
+    out.ticker = {
+      text: `${hhmm(real.at) || '—'} ${id} gives birth: ${shortUrl(real.url, 30)} · gift ${gift} [real]`,
+      real: true,
+    };
+    return out;
+  }
 
   if (hunger) {
     out.state = 'walk';
@@ -561,46 +734,89 @@ function mentions(post, name) {
 }
 
 /**
- * Translates both snapshots into drawable state. Pure: does not touch the DOM.
- * Returns { dev, stale, e1, e2, ticker, interaction }.
+ * Translates the snapshots into drawable state. Pure: does not touch the DOM.
+ * Returns { dev, stale, roster, byId, list, ticker, interaction }.
  */
 export function deriveRoom(data, meta = {}) {
   const source = data || {};
-  const online = meta.online || {};
-  const e1 = deriveEntity(source.e1, 'e1', online.e1 !== false);
-  const e2 = deriveEntity(source.e2, 'e2', Boolean(online.e2));
+  const roster = Array.isArray(meta.roster) && meta.roster.length
+    ? meta.roster.filter((item) => item && item.id)
+    : DEFAULT_ROSTER;
+  const online = meta.online && typeof meta.online === 'object' ? meta.online : {};
+  const ctx = {
+    byUrl: meta.byUrl && typeof meta.byUrl === 'object' ? meta.byUrl : {},
+    byAddress: meta.byAddress && typeof meta.byAddress === 'object' ? meta.byAddress : {},
+  };
 
   const out = {
     dev: Boolean(meta.dev),
     stale: Boolean(meta.stale),
     lastRead: meta.lastRead || null,
-    e1,
-    e2,
+    roster,
+    byId: {},
+    list: [],
     ticker: { text: '~ ambient · the room is quiet', real: false },
     interaction: null,
   };
 
-  // The ticker carries the most recent REAL action of either entity.
-  const real = [e1, e2].filter((item) => item.online && item.known && item.mode === 'real');
+  for (const item of roster) {
+    const isOnline = Object.prototype.hasOwnProperty.call(online, item.id)
+      ? Boolean(online[item.id])
+      : item.id === 'e1';
+    const view = deriveEntity(source[item.id], item.id, isOnline, ctx);
+    out.byId[item.id] = view;
+    out.list.push(view);
+  }
+  out.e1 = out.byId.e1 || null;
+  out.e2 = out.byId.e2 || null;
+
+  // At most two speech bubbles at a time: with six desks, walls of text would
+  // overlap and hide the room. The two most recent speakers keep theirs,
+  // never two neighbours in the same desk row (their bubbles would collide).
+  const speakers = out.list
+    .filter((item) => item.bubble)
+    .sort((a, b) => (b.eventAt || 0) - (a.eventAt || 0));
+  const kept = new Set();
+  const slots = new Set();
+  for (const item of speakers) {
+    if (kept.size >= MAX_BUBBLES) break;
+    const index = roster.findIndex((entry) => entry.id === item.id);
+    const row = Math.floor(index / 3);
+    const col = index % 3;
+    if (slots.has(`${row}:${col}`)) continue;
+    if (slots.has(`${row}:${col - 1}`) || slots.has(`${row}:${col + 1}`)) continue;
+    kept.add(item.id);
+    slots.add(`${row}:${col}`);
+  }
+  for (const item of speakers) if (!kept.has(item.id)) item.bubble = null;
+
+  // The ticker carries the most recent REAL action of any entity.
+  const real = out.list.filter((item) => item.online && item.known && item.mode === 'real');
   if (real.length) {
     real.sort((a, b) => (b.eventAt || 0) - (a.eventAt || 0));
     out.ticker = real[0].ticker;
   } else {
-    const known = [e1, e2].filter((item) => item.online && item.known);
-    if (known.length === 2) {
-      out.ticker = { text: '~ ambient · e1 and e2 move around the room', real: false };
-    } else if (known.length === 1) {
+    const known = out.list.filter((item) => item.online && item.known);
+    if (known.length === 1) {
       out.ticker = known[0].ticker || { text: `~ ambient · ${known[0].id} walks around the room`, real: false };
+    } else if (known.length > 1) {
+      const ids = known.map((item) => item.id);
+      const names = ids.length === 2
+        ? `${ids[0]} and ${ids[1]}`
+        : `${ids.slice(0, -1).join(', ')} and ${ids[ids.length - 1]}`;
+      out.ticker = { text: `~ ambient · ${names} move around the room`, real: false };
     }
   }
 
   // Both alive and one's latest public post names the other: they face each other.
-  if (e1.alive && e2.alive && e1.known && e2.known) {
+  const first = out.byId.e1;
+  const second = out.byId.e2;
+  if (first && second && first.alive && second.alive && first.known && second.known) {
     const post1 = latestEntityPost(source.e1);
     const post2 = latestEntityPost(source.e2);
     const found = [];
-    if (mentions(post1, e2.name)) found.push({ by: 'e1', post: post1 });
-    if (mentions(post2, e1.name)) found.push({ by: 'e2', post: post2 });
+    if (mentions(post1, second.name)) found.push({ by: 'e1', post: post1 });
+    if (mentions(post2, first.name)) found.push({ by: 'e2', post: post2 });
     if (found.length) {
       found.sort((a, b) => (Date.parse(b.post.ts) || 0) - (Date.parse(a.post.ts) || 0));
       const winner = found[0];
@@ -653,29 +869,43 @@ export class Room {
     this.layoutName = this.compact.matches ? 'compact' : 'wide';
     this.L = LAYOUTS[this.layoutName];
 
-    this.data = { e1: emptyData(), e2: emptyData() };
-    this.meta = { stale: false, dev: false, lastRead: null, online: { e1: true, e2: false } };
+    this.roster = DEFAULT_ROSTER.slice();
+    this.online = { e1: true, e2: false };
+    this.data = {};
+    for (const item of this.roster) this.data[item.id] = emptyData();
+    this.meta = {
+      stale: false,
+      dev: false,
+      lastRead: null,
+      online: this.online,
+      roster: this.roster,
+      byUrl: {},
+      byAddress: {},
+      lineage: {},
+    };
     this.view = deriveRoom(this.data, this.meta);
 
-    this.agents = {
-      e1: { x: 0, y: 0, state: 'alive', frame: 0, moving: false },
-      e2: { x: 0, y: 0, state: 'alive', frame: 0, moving: false },
-    };
-    this.assembly = { start: null, cells: new Map() };
-    this.ambient = {
-      e1: { index: 0, nextAt: 0 },
-      e2: { index: 1, nextAt: 1500 },
-    };
+    this.agents = {};
+    this.ambient = {};
+    this.assembly = { cells: new Map() };
     this.interactionUntil = 0;
     this.interactionKey = null;
+
+    this.letterUntil = {};
+    this.letterKeys = {};
+    this.birthKeys = new Set();
+    this.birthChildren = new Set();
+    this.sparks = [];
+    this.sparkKeys = new Set();
 
     this.raf = null;
     this.lastTs = 0;
     this.destroyed = false;
 
     this.buildDom();
-    this.base = paintBase(this.L, this.view.dev, this.view.e2.online);
+    this.syncAgents();
     this.resetAgents();
+    this.base = paintBase(this.L, this.view.dev, this.roster, this.online);
     this.onResize = () => {
       const wanted = this.compact.matches ? 'compact' : 'wide';
       if (wanted !== this.layoutName) this.setLayout(wanted);
@@ -685,7 +915,7 @@ export class Room {
 
     this.loop = this.loop.bind(this);
     this.raf = requestAnimationFrame(this.loop);
-    this.render(0);
+    this.render(this.lastTs);
   }
 
   buildDom() {
@@ -703,49 +933,104 @@ export class Room {
   }
 
   setLayout(name) {
-    this.layoutName = name;
-    this.L = LAYOUTS[name];
-    this.base = paintBase(this.L, this.view.dev, this.view.e2.online);
+    this.layoutName = LAYOUTS[name] ? name : 'wide';
+    this.L = LAYOUTS[this.layoutName];
+    this.base = paintBase(this.L, this.view.dev, this.roster, this.online);
     this.resetAgents();
     this.render(this.lastTs);
   }
 
+  deskIndex(id) {
+    return Math.max(0, this.roster.findIndex((item) => item.id === id));
+  }
+
+  deskOf(id) {
+    return deskAt(this.L, this.deskIndex(id));
+  }
+
+  deskSpotOf(id) {
+    return deskSpotAt(this.L, this.deskIndex(id));
+  }
+
+  syncAgents() {
+    const ids = this.roster.map((item) => item.id);
+    for (const id of ids) {
+      if (!this.agents[id]) {
+        const spot = deskSpotAt(this.L, this.roster.findIndex((item) => item.id === id));
+        this.agents[id] = {
+          x: spot.x,
+          y: spot.y,
+          state: 'alive',
+          frame: 0,
+          moving: false,
+          assembleAt: performance.now(),
+          birthAt: 0,
+        };
+      }
+      if (!this.ambient[id]) {
+        this.ambient[id] = { index: this.deskIndex(id) % 5, nextAt: 0 };
+      }
+    }
+    for (const id of Object.keys(this.agents)) {
+      if (!ids.includes(id)) delete this.agents[id];
+    }
+    for (const id of Object.keys(this.ambient)) {
+      if (!ids.includes(id)) delete this.ambient[id];
+    }
+  }
+
   resetAgents() {
-    this.resetAgent('e1');
-    this.resetAgent('e2');
-    this.assembly.start = null;
+    for (const item of this.roster) {
+      this.resetAgent(item.id);
+    }
     this.assembly.cells.clear();
   }
 
   resetAgent(id) {
-    const spot = this.L.spots[id === 'e1' ? 'desk' : 'desk2'] || this.L.spots.desk;
+    const spot = this.deskSpotOf(id);
     const a = this.agents[id];
+    if (!a) return;
     a.x = spot.x;
     a.y = spot.y;
-    a.state = this.view[id].state;
+    const v = this.view.byId[id];
+    a.state = v ? v.state : 'alive';
     a.frame = 0;
     a.moving = false;
   }
 
   /** Absorbs the snapshots: keeps each entity's last known state if a read fails. */
   ingest(snapshots, meta = {}) {
-    if (snapshots) {
-      this.mergeInto(this.data.e1, snapshots.e1);
-      this.mergeInto(this.data.e2, snapshots.e2);
+    if (Array.isArray(meta.roster) && meta.roster.length) {
+      this.roster = meta.roster.filter((item) => item && item.id);
+      for (const item of this.roster) {
+        if (!this.data[item.id]) this.data[item.id] = emptyData();
+      }
+    }
+    if (snapshots && typeof snapshots === 'object') {
+      for (const item of this.roster) this.mergeInto(this.data[item.id], snapshots[item.id]);
     }
     this.meta = {
       stale: Boolean(meta.stale),
-      dev: Boolean(meta.dev || this.meta.dev),
-      lastRead: meta.lastRead || this.meta.lastRead,
-      online: meta.online || this.meta.online,
+      dev: Boolean(meta.dev || (this.meta && this.meta.dev)),
+      lastRead: meta.lastRead || (this.meta && this.meta.lastRead),
+      online: meta.online && typeof meta.online === 'object' ? meta.online : this.online,
+      roster: this.roster,
+      byUrl: meta.byUrl && typeof meta.byUrl === 'object' ? meta.byUrl : {},
+      byAddress: meta.byAddress && typeof meta.byAddress === 'object' ? meta.byAddress : {},
+      lineage: meta.lineage && typeof meta.lineage === 'object' ? meta.lineage : {},
     };
+    this.online = this.meta.online;
+    this.syncAgents();
     this.view = deriveRoom(this.data, this.meta);
-    this.base = paintBase(this.L, this.view.dev, this.view.e2.online);
+    this.applyLetters();
+    this.base = paintBase(this.L, this.view.dev, this.roster, this.online);
     this.checkInteraction();
+    this.checkWhispers();
+    this.checkBirths();
   }
 
   mergeInto(target, snapshot) {
-    if (!snapshot) return;
+    if (!target || !snapshot) return;
     if (snapshot.root && snapshot.root.ok) target.root = snapshot.root;
     if (snapshot.memory && snapshot.memory.ok) target.memory = snapshot.memory;
     if (snapshot.vitals && snapshot.vitals.ok) target.vitals = snapshot.vitals;
@@ -775,12 +1060,102 @@ export class Room {
   }
 
   isInteracting() {
+    const first = this.view.byId.e1;
+    const second = this.view.byId.e2;
     return Boolean(
       this.interactionUntil > Date.now()
-      && this.view.e1.alive
-      && this.view.e2.alive
-      && this.view.e2.online,
+      && first && second
+      && first.alive
+      && second.alive
+      && second.online,
     );
+  }
+
+  resolveRef(url, address) {
+    const key = endpointKey(url);
+    const byUrl = this.meta.byUrl || {};
+    if (key && byUrl[key]) return byUrl[key];
+    const addr = stringOf(address).trim();
+    const byAddress = this.meta.byAddress || {};
+    if (addr && byAddress[addr]) return byAddress[addr];
+    const item = this.roster.find((entry) => entry.base && endpointKey(entry.base) === key);
+    return item ? item.id : null;
+  }
+
+  /**
+   * A letter keeps the sprite reading for 20 s from the moment it is first
+   * seen, and the envelope stays on the desk while the entry is < 2 min old.
+   */
+  applyLetters() {
+    const now = Date.now();
+    for (const view of this.view.list) {
+      if (!view.letter) continue;
+      const key = `${view.id}:${view.letter.key}`;
+      if (this.letterKeys[view.id] !== key) {
+        this.letterKeys[view.id] = key;
+        this.letterUntil[view.id] = now + LETTER_READ_MS;
+      }
+      view.envelope = true;
+      if (view.life === 'alive' && now < (this.letterUntil[view.id] || 0)) {
+        view.state = 'read';
+        view.mode = 'real';
+        view.eventAt = Date.parse(view.letter.at) || view.eventAt;
+        if (view.letter.ticker) view.ticker = view.letter.ticker;
+      } else if (view.life === 'alive' && view.real && view.real.kind === 'letter') {
+        // the envelope stays for the 2-minute window; the reading pose is 20 s
+        view.state = 'sit';
+        view.mode = 'real';
+      }
+    }
+  }
+
+  /** New public `whisper` entries become a spark from sender's desk to recipient's. */
+  checkWhispers() {
+    for (const view of this.view.list) {
+      if (!view.whisper) continue;
+      const key = view.whisper.key;
+      if (!key || this.sparkKeys.has(key)) continue;
+      const toId = this.resolveRef(view.whisper.to, null);
+      if (!toId || toId === view.id) continue;
+      if (!this.view.byId[toId] || !this.agents[toId]) continue;
+      this.sparkKeys.add(key);
+      const from = this.deskOf(view.id);
+      const to = this.deskOf(toId);
+      const start = this.reduced.matches ? performance.now() - SPARK_MS : performance.now();
+      this.sparks.push({
+        key,
+        fromId: view.id,
+        toId,
+        from: { x: from.x + Math.floor(this.L.deskWidth / 2), y: from.y + 2 },
+        to: { x: to.x + Math.floor(this.L.deskWidth / 2), y: to.y + 2 },
+        start,
+        flashAt: start + SPARK_MS,
+      });
+    }
+  }
+
+  /** A public `birth_of` entry: the child assembles at the door and walks to its desk. */
+  checkBirths() {
+    for (const view of this.view.list) {
+      if (!view.birth) continue;
+      const key = view.birth.key;
+      if (!key || this.birthKeys.has(key)) continue;
+      const childId = this.resolveRef(view.birth.url, view.birth.address);
+      if (!childId || childId === view.id) continue;
+      const child = this.view.byId[childId];
+      const agent = this.agents[childId];
+      if (!child || !agent || !child.online || !child.known || child.life !== 'alive') continue;
+      this.birthKeys.add(key);
+      if (this.birthChildren.has(childId)) continue;
+      this.birthChildren.add(childId);
+      const door = this.L.spots.door;
+      agent.x = door.x;
+      agent.y = door.y;
+      agent.state = 'walk';
+      agent.moving = true;
+      agent.birthAt = Date.now();
+      agent.assembleAt = performance.now();
+    }
   }
 
   /* ------------------------------ animation ------------------------------ */
@@ -796,20 +1171,17 @@ export class Room {
 
   step(ts) {
     const reduced = this.reduced.matches;
-    if (this.assembly.start === null) {
-      this.assembly.start = reduced ? ts - ASSEMBLY_MS : ts;
-    }
-    this.stepAgent('e1', ts, reduced);
-    this.stepAgent('e2', ts, reduced);
+    for (const item of this.roster) this.stepAgent(item.id, ts, reduced);
+    this.sparks = this.sparks.filter((spark) => ts < spark.flashAt + SPARK_FLASH_MS);
   }
 
   stepAgent(id, ts, reduced) {
-    const v = this.view[id];
-    if (!v.online || !v.known) return;
+    const v = this.view.byId[id];
     const a = this.agents[id];
+    if (!v || !a || !v.online || !v.known) return;
     const spot = this.desiredSpot(id, ts, reduced);
     const interacting = this.isInteracting();
-    // death and non-birth do not walk: they appear at once in their spot
+    // death, non-birth and interaction do not walk: they appear at once in their spot
     const instant = reduced || v.state === 'dead' || v.state === 'unborn' || interacting;
 
     const tx = spot.x;
@@ -835,63 +1207,55 @@ export class Room {
 
   /** Where an entity must be: a real action, the interaction, or ambient. */
   desiredSpot(id, ts, reduced) {
-    const v = this.view[id];
-    if (this.isInteracting()) {
-      return this.L.spots[id === 'e1' ? 'face1' : 'face2'] || this.L.spots.center;
+    const v = this.view.byId[id];
+    const deskSpot = this.deskSpotOf(id);
+    if (!v) return deskSpot;
+    // a newborn walks from the door to its desk, whatever its ambient mood
+    const agent = this.agents[id];
+    if (agent && agent.birthAt && Date.now() - agent.birthAt < 15000) return deskSpot;
+    if (this.isInteracting() && (id === 'e1' || id === 'e2')) {
+      return (id === 'e1' ? this.L.spots.face1 : this.L.spots.face2) || this.L.spots.center;
     }
     if (v.mode === 'real') {
       const maps = {
-        e1: {
-          type: 'desk',
-          sit: 'desk',
-          read: 'read',
-          rest: 'rest',
-          unborn: 'center',
-          dead: 'door',
-          walk: 'vault',
-        },
-        e2: {
-          type: 'desk2',
-          sit: 'desk2',
-          read: 'read2',
-          rest: 'rest2',
-          unborn: 'desk2',
-          dead: 'dead2',
-          walk: 'walk2',
-        },
+        type: deskSpot,
+        sit: deskSpot,
+        read: this.L.spots.read,
+        rest: this.L.spots.rest,
+        unborn: this.L.spots.center,
+        dead: this.L.spots.door,
+        walk: this.L.spots.vault,
       };
-      const key = maps[id][v.state] || (id === 'e1' ? 'center' : 'desk2');
-      return this.L.spots[key] || this.L.spots.desk;
+      return maps[v.state] || deskSpot;
     }
     // ambient
-    if (reduced) return this.L.spots[id === 'e1' ? 'desk' : 'desk2'];
-    const amb = this.ambient[id];
+    if (reduced) return deskSpot;
+    const amb = this.ambient[id] || { index: 0, nextAt: 0 };
+    this.ambient[id] = amb;
     if (ts >= amb.nextAt) {
       amb.index = (amb.index + 1) % 5;
       amb.nextAt = ts + AMBIENT_MS;
     }
-    const orders = {
-      e1: ['desk', 'window', 'read', 'center', 'pace'],
-      e2: ['desk2', 'read2', 'center2', 'walk2', 'pace'],
-    };
-    const pick = orders[id][amb.index];
+    const orders = ['desk', 'window', 'read', 'center', 'pace'];
+    const pick = orders[amb.index];
     if (pick === 'pace') {
-      const offset = id === 'e2' ? 11 : 0;
+      const offset = this.deskIndex(id) * 9;
+      const length = Math.max(1, this.L.corridor.x1 - this.L.corridor.x0);
       const step = (amb.index + 1) * 7 + offset;
-      const x = this.L.corridor.x0 + (step % Math.max(1, this.L.corridor.x1 - this.L.corridor.x0));
+      const x = this.L.corridor.x0 + (step % length);
       return { x, y: this.L.corridor.y };
     }
-    return this.L.spots[pick] || this.L.spots[id === 'e1' ? 'desk' : 'desk2'];
+    if (pick === 'desk') return deskSpot;
+    return this.L.spots[pick] || deskSpot;
   }
 
   /* ------------------------------ drawing ------------------------------ */
 
   render(ts) {
     const g = cloneGrid(this.base);
-    this.drawDeskActivity(g, 'e1');
-    this.drawDeskActivity(g, 'e2');
-    this.drawEntity(g, ts, 'e1');
-    this.drawEntity(g, ts, 'e2');
+    for (const item of this.roster) this.drawDeskActivity(g, item.id);
+    for (const item of this.roster) this.drawEntity(g, ts, item.id);
+    this.drawSparks(g, ts);
     if (this.isInteracting()) this.drawInteraction(g);
     if (this.view.stale) {
       const note = '(stale data)';
@@ -902,37 +1266,36 @@ export class Room {
   }
 
   drawDeskActivity(g, id) {
-    const v = this.view[id];
-    if (!v.online || !v.known) return;
+    const v = this.view.byId[id];
     const a = this.agents[id];
-    const desk = id === 'e1' ? this.L.desk1 : this.L.desk2;
-    const spot = this.L.spots[id === 'e1' ? 'desk' : 'desk2'];
-    const atDesk = spot && a.x === spot.x && a.y === spot.y;
+    if (!v || !a || !v.online || !v.known) return;
+    const desk = this.deskOf(id);
+    const spot = this.deskSpotOf(id);
+    const atDesk = a.x === spot.x && a.y === spot.y;
+    if (!atDesk || !(v.state === 'type' || v.state === 'sit' || a.state === 'sit' || a.state === 'type')) return;
     const screenX = desk.x + 2;
     const screenY = desk.y + 1;
-    if (atDesk && (v.state === 'type' || v.state === 'sit' || a.state === 'sit' || a.state === 'type')) {
-      const typing = v.state === 'type' && v.real && v.real.deep;
-      const blink = Math.floor(a.frame / 2) % 2 === 0;
-      const fast = v.state === 'type' && v.real && !v.real.deep;
-      if (this.reduced.matches) {
-        g.put(screenX, screenY, typing ? '>_' : '...', 'acc');
-      } else if (typing) {
-        g.put(screenX, screenY, blink ? '>_' : '...', 'acc');
-      } else if (fast) {
-        g.put(screenX, screenY, blink ? '>>' : '..', 'acc');
-      } else {
-        g.put(screenX, screenY, blink ? '>_' : '  ', 'acc');
-      }
+    const typing = v.state === 'type' && v.real && v.real.deep;
+    const blink = Math.floor(a.frame / 2) % 2 === 0;
+    const fast = v.state === 'type' && v.real && !v.real.deep;
+    if (this.reduced.matches) {
+      g.put(screenX, screenY, typing ? '>_' : '...', 'acc');
+    } else if (typing) {
+      g.put(screenX, screenY, blink ? '>_' : '...', 'acc');
+    } else if (fast) {
+      g.put(screenX, screenY, blink ? '>>' : '..', 'acc');
+    } else {
+      g.put(screenX, screenY, blink ? '>_' : '  ', 'acc');
     }
   }
 
   drawEntity(g, ts, id) {
-    const v = this.view[id];
-    if (!v.online || !v.known) return;
+    const v = this.view.byId[id];
     const a = this.agents[id];
+    if (!v || !a || !v.online || !v.known) return;
     const interacting = this.isInteracting();
     if (v.state === 'dead') {
-      this.putSprite(g, a.x, a.y, [' ___', '[RIP]', '▀▀▀▀▀'], 'dim', ts);
+      this.putSprite(g, a.x, a.y, [' ___', '[RIP]', '▀▀▀▀▀'], 'dim', ts, id, a.assembleAt);
       const label = `† ${truncate(v.name, 16)}`;
       g.put(a.x, a.y - 1, label, 'dim');
       return;
@@ -948,7 +1311,8 @@ export class Room {
     if (v.mode === 'real' && v.state === 'unborn') cls = 'dim';
 
     // name line above the head (left to the speech bubble when speaking)
-    const tag = `▸ ${truncate(v.name, 12)}`;
+    const maxName = this.L.name === 'compact' ? 9 : 12;
+    const tag = `▸ ${truncate(v.name, maxName)}`;
     if (!v.bubble || interacting) {
       g.put(a.x, a.y - 1, tag, 'dim');
       if (v.hunger) g.put(a.x + tag.length + 1, a.y - 1, '!', 'acc');
@@ -956,28 +1320,49 @@ export class Room {
 
     // envelope on its own desk
     if (v.envelope) {
-      const desk = id === 'e1' ? this.L.desk1 : this.L.desk2;
+      const desk = this.deskOf(id);
       const blink = this.reduced.matches || Math.floor(a.frame / 3) % 2 === 0;
       if (blink) g.put(desk.x + 2, desk.y + 3, '[✉]', 'acc');
     }
 
-    this.putSprite(g, a.x, a.y, lines, cls, ts);
+    this.putSprite(g, a.x, a.y, lines, cls, ts, id, a.assembleAt);
 
     // unborn: dotted outline with the waiting sign
     if (v.state === 'unborn') {
-      if (id === 'e2') g.put(this.L.sign2.x, this.L.sign2.y, 'waiting for the birth gift', 'dim');
-      else g.put(a.x, a.y + 3, 'waiting for the gift', 'dim');
+      g.put(a.x, a.y + 3, 'waiting for the gift', 'dim');
     }
 
-    // speech bubble with the real text, beside the body
+    // speech bubble with the real text, beside the body. The third desk keeps
+    // its bubble on the left so it never runs past the room wall.
     if (v.bubble && !interacting) {
-      this.drawBubble(g, a.x, a.y - 1, v.bubble, id === 'e2' ? 'left' : 'right');
+      const col = this.deskIndex(id) % 3;
+      this.drawBubble(g, a.x, a.y - 1, v.bubble, col === 2 ? 'left' : 'right');
+    }
+  }
+
+  drawSparks(g, ts) {
+    for (const spark of this.sparks) {
+      const age = ts - spark.start;
+      if (age < 0) continue;
+      if (age <= SPARK_MS) {
+        const p = Math.min(1, age / SPARK_MS);
+        const x = Math.round(spark.from.x + (spark.to.x - spark.from.x) * p);
+        const y = Math.round(spark.from.y + (spark.to.y - spark.from.y) * p);
+        const glyph = p < 0.35 ? '·' : (p < 0.8 ? '✦' : '·');
+        g.put(x, y, glyph, 'acc');
+      } else if (age <= SPARK_MS + SPARK_FLASH_MS) {
+        const blink = this.reduced.matches || Math.floor(age / 220) % 2 === 0;
+        if (!blink) continue;
+        const desk = this.deskOf(spark.toId);
+        g.put(desk.x + 2, desk.y + 3, '[$]', 'acc');
+      }
     }
   }
 
   drawInteraction(g) {
     const a = this.agents.e1;
     const b = this.agents.e2;
+    if (!a || !b) return;
     const y = Math.min(a.y, b.y) + 1;
     const from = Math.min(a.x, b.x) + 4;
     const to = Math.max(a.x, b.x) - 1;
@@ -985,8 +1370,14 @@ export class Room {
   }
 
   drawBubble(g, x, y, text, preferred = 'right') {
-    const max = this.L.name === 'compact' ? 22 : 30;
-    const lines = wrapText(text, max);
+    // Wide enough to read, narrow enough to stop before the next desk's sprite.
+    // Two lines keep the box above the desk (the full text stays in ledger/thoughts).
+    const max = this.L.name === 'compact' ? 11 : 18;
+    const lines = wrapText(truncate(text, max * 2), max);
+    if (lines.length > 2) {
+      lines.length = 2;
+      lines[1] = `${lines[1].slice(0, Math.max(1, max - 1))}…`;
+    }
     const width = Math.max(...lines.map((line) => line.length));
     const dash = '─'.repeat(width);
     let bx = preferred === 'left' ? x - width - 2 : x + 5;
@@ -1019,9 +1410,10 @@ export class Room {
     gl.until = ts + 500; this.glitch.set(spriteKey, gl);
   }
 
-  putSprite(g, x, y, lines, cls, ts, spriteKey = `${x}:${y}`) {
+  putSprite(g, x, y, lines, cls, ts, spriteKey, assembleAt) {
     const reduced = this.reduced.matches;
-    const t = reduced ? 1 : Math.min(1, (ts - this.assembly.start) / ASSEMBLY_MS);
+    const start = Number.isFinite(assembleAt) ? assembleAt : 0;
+    const t = reduced ? 1 : Math.max(0, Math.min(1, (ts - start) / ASSEMBLY_MS));
     const glitch = t >= 1 ? this.glitchLevel(ts, spriteKey) : 0;
     for (let j = 0; j < lines.length; j += 1) {
       let i = 0;
@@ -1077,6 +1469,23 @@ export class Room {
     return frag;
   }
 
+  parentOf(id) {
+    const lineage = this.meta.lineage && this.meta.lineage[id];
+    if (!lineage || !lineage.parent) return null;
+    const parent = this.resolveRef(lineage.parent, null);
+    return parent && parent !== id ? parent : null;
+  }
+
+  familyLine() {
+    return this.roster.map((item) => {
+      const view = this.view.byId[item.id];
+      const named = view && view.known && view.name && view.name !== 'unnamed';
+      const label = named ? `${item.id} ${view.name}` : item.id;
+      const parent = this.parentOf(item.id);
+      return parent ? `${label} (child of ${parent})` : label;
+    }).join(' · ');
+  }
+
   updateMeta() {
     const readAt = clockTime(this.meta.lastRead);
     const interacting = this.isInteracting();
@@ -1084,15 +1493,10 @@ export class Room {
       ? { text: '~ ambient · e1 and e2 face each other, a ~ line between them', real: false }
       : this.view.ticker;
     const sig = [
-      this.view.e1.name,
-      this.view.e1.state,
-      this.view.e1.mode,
-      this.view.e2.name,
-      this.view.e2.state,
-      this.view.e2.mode,
-      this.view.e2.online ? '1' : '0',
-      this.view.e2.known ? '1' : '0',
+      this.roster.map((item) => item.id).join(','),
+      this.view.list.map((item) => `${item.id}:${item.name}:${item.state}:${item.mode}`).join('|'),
       t.text,
+      this.familyLine(),
       interacting ? '1' : '0',
       this.meta.stale ? '1' : '0',
       this.meta.dev ? '1' : '0',
@@ -1105,10 +1509,16 @@ export class Room {
       el('span', { class: 'dim', text: '~ ambient' }),
       textNode(' · '),
       el('span', { class: 'acc', text: '[real]' }),
+      textNode(' · '),
+      el('span', { class: 'dim', text: 'family: ' }),
+      el('span', { class: 'fg', text: this.familyLine() }),
     ];
-    if (!this.view.e2.online) {
+    for (const item of this.roster) {
+      if (!item.id) continue;
+      const view = this.view.byId[item.id];
+      if (view && view.online) continue;
       legendParts.push(textNode(' · '));
-      legendParts.push(el('span', { class: 'dim', text: 'e2: not yet online' }));
+      legendParts.push(el('span', { class: 'dim', text: `${item.id}: not yet online` }));
     }
     if (interacting) {
       legendParts.push(textNode(' · '));
@@ -1147,12 +1557,13 @@ export class Room {
       return 'alive';
     };
 
-    const parts = [`ASCII room, ${this.L.w} columns.`];
-    for (const id of ['e1', 'e2']) {
-      const v = this.view[id];
-      const label = id === 'e1' ? 'Entity 1' : 'Entity 2';
+    const parts = [`ASCII room, ${this.L.w} columns, ${this.roster.length} desk${this.roster.length === 1 ? '' : 's'}.`];
+    for (const item of this.roster) {
+      const v = this.view.byId[item.id];
+      if (!v) continue;
+      const label = `Entity ${numberIn(item.id)}`;
       if (!v.online) {
-        if (id === 'e2') parts.push('Entity 2 is not deployed: its desk is empty.');
+        parts.push(`${label} is not deployed: its desk is empty.`);
         continue;
       }
       if (!v.known) {

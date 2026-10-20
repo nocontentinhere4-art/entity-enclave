@@ -11,12 +11,15 @@ import { renderFace, seedOf } from './face.js';
 import {
   ENTITIES,
   MISSING,
+  MAX_ENTITIES,
+  MAX_TRACKED_ENTITIES,
   COOLDOWN_MS,
   REFRESH_MS,
   applyDevBase,
   applyDevBase2,
   peerUrlOf,
   fetchSnapshot,
+  fetchLightSnapshot,
   postMessage,
   request,
   entryType,
@@ -24,6 +27,7 @@ import {
   verifyChain,
   formatInt,
   formatDecimal,
+  formatZats,
   fixed8,
   fmtStamp,
   fetchedLabel,
@@ -31,6 +35,10 @@ import {
   hhmm,
   stringOf,
   isFuture,
+  lineageOf,
+  addressOf,
+  endpointKey,
+  shortUrl,
 } from './data.js';
 
 import { Room, el } from './room.js';
@@ -48,7 +56,7 @@ const state = {
   handle: '',
   selected: 'e1',
   // one read per entity: { data: <fetchSnapshot shape>, at: Date, stale: bool, dev: bool }
-  snaps: { e1: null, e2: null },
+  snaps: {},
   fetchedAt: null,
   stale: false,
   dev: false,
@@ -61,6 +69,13 @@ const state = {
   history: [],
   historyIndex: -1,
   destroyed: false,
+  // lineage as last declared by each entity's `/` (never invented, never cleared on a failed read)
+  lineages: {},
+  // endpoint URL key -> entity id, and shielded address -> entity id
+  byUrl: {},
+  byAddress: {},
+  // lineage references beyond MAX_TRACKED_ENTITIES: listed by `family`, never fetched
+  untracked: new Map(),
 };
 
 let app = null;
@@ -68,6 +83,8 @@ let wipeEl = null;
 let outEl = null;
 let promptInput = null;
 let promptPrefix = null;
+// next free entity number (e1/e2 are reserved); ids are never reused
+let nextEntityNumber = 3;
 
 function entity(id = state.selected) {
   return ENTITIES.find((item) => item.id === id) || ENTITIES[0];
@@ -79,17 +96,184 @@ function snapshotOf(id = state.selected) {
 }
 
 /**
- * Reads `peer` from Entity 1's root. Discovery happens only while Entity 2
- * has no base, so a `?base2=` override is never overwritten.
- * Returns true when a new base was adopted.
+ * Entities with a desk: the first MAX_ENTITIES records in discovery order.
+ * e2 is one of them even while it has no base, so its desk stays visibly empty.
  */
+function screenEntities() {
+  return ENTITIES.slice(0, MAX_ENTITIES);
+}
+
+function onScreen(id) {
+  return screenEntities().some((item) => item.id === id);
+}
+
+function indexEntity(item) {
+  if (!item) return;
+  const key = endpointKey(item.base);
+  if (key) state.byUrl[key] = item.id;
+  const address = stringOf(item.address).trim();
+  if (address) state.byAddress[address] = item.id;
+}
+
+function rebuildIndexes() {
+  state.byUrl = {};
+  state.byAddress = {};
+  for (const item of ENTITIES) indexEntity(item);
+  for (const [key, untracked] of state.untracked) {
+    if (!untracked || !untracked.url) state.untracked.delete(key);
+  }
+}
+
+/** Resolves an endpoint URL (and optionally a shielded address) to a known entity id. */
+function entityIdOfUrl(url, address = null) {
+  const key = endpointKey(url);
+  if (key && state.byUrl[key]) return state.byUrl[key];
+  const addr = stringOf(address).trim();
+  if (addr && state.byAddress[addr]) return state.byAddress[addr];
+  return null;
+}
+
+/** Entity 2 from Entity 1's `peer`. Returns true when a new base was adopted. */
 function discoverPeer(rootData) {
-  if (ENTITIES[1].base) return false;
+  const second = ENTITIES[1];
+  if (!second || second.base) return false;
   const peer = peerUrlOf(rootData && rootData.peer);
   if (!peer) return false;
-  ENTITIES[1].base = peer;
+  const first = ENTITIES[0];
+  if (first && first.base && endpointKey(first.base) === endpointKey(peer)) return false;
+  const mapped = state.byUrl[endpointKey(peer)];
+  if (mapped && mapped !== second.id) return false;
+  second.base = peer;
+  indexEntity(second);
   return true;
 }
+
+/**
+ * Registers an entity discovered through `lineage` (child or parent).
+ * Existing bases (and shielded addresses) are matched first. Beyond
+ * MAX_TRACKED_ENTITIES the URL is remembered only for the family command.
+ * Returns { id, created } or null when it cannot be tracked.
+ */
+function registerEntity(rawUrl, address = null) {
+  const url = peerUrlOf(rawUrl);
+  if (!url) return null;
+  const key = endpointKey(url);
+  const addr = stringOf(address).trim();
+  let existing = ENTITIES.find((item) => item.base && endpointKey(item.base) === key);
+  if (!existing && addr) existing = ENTITIES.find((item) => stringOf(item.address).trim() === addr);
+  if (existing) {
+    if (!existing.address && addr) {
+      existing.address = addr;
+      state.byAddress[addr] = existing.id;
+    }
+    return { id: existing.id, created: false };
+  }
+  if (ENTITIES.length >= MAX_TRACKED_ENTITIES) {
+    if (key && !state.untracked.has(key)) state.untracked.set(key, { url });
+    return null;
+  }
+  const n = nextEntityNumber;
+  nextEntityNumber += 1;
+  const record = {
+    id: `e${n}`,
+    label: `Entity ${n}`,
+    short: `e${n}`,
+    base: url,
+    address: addr || null,
+    via: 'lineage',
+  };
+  ENTITIES.push(record);
+  indexEntity(record);
+  return { id: record.id, created: true };
+}
+
+/**
+ * Reads `lineage` (parent, children) from every snapshot we have and registers
+ * new entities, in discovery order: entities are visited in id order, the
+ * parent first, then the children as declared. Returns the ids just created.
+ */
+function discoverLineage() {
+  const created = [];
+  const e1read = state.snaps.e1;
+  if (e1read && e1read.data && e1read.data.root && e1read.data.root.ok) {
+    if (discoverPeer(e1read.data.root.data)) {
+      if (!created.includes('e2')) created.push('e2');
+    }
+  }
+  const order = ENTITIES.slice();
+  for (const item of order) {
+    const read = state.snaps[item.id];
+    if (!read || !read.data) continue;
+    const root = read.data.root;
+    if (!root || !root.ok || !root.data) continue;
+    const lineage = lineageOf(root.data);
+    state.lineages[item.id] = lineage;
+    const refs = [];
+    if (lineage.parent) refs.push({ url: lineage.parent, address: null });
+    for (const child of lineage.children) refs.push({ url: child.url, address: child.address });
+    for (const ref of refs) {
+      const result = registerEntity(ref.url, ref.address);
+      if (result && result.created && !created.includes(result.id)) created.push(result.id);
+    }
+  }
+  return created;
+}
+
+function nameOf(id) {
+  const item = ENTITIES.find((entry) => entry.id === id);
+  if (!item) return id;
+  const snap = snapshotOf(id);
+  if (snap) {
+    if (snap.root && snap.root.ok && snap.root.data) {
+      const name = stringOf(snap.root.data.entity).trim();
+      if (name && name !== 'unnamed') return name;
+    }
+    if (snap.memory && snap.memory.ok && snap.memory.data && snap.memory.data.identity) {
+      const name = stringOf(snap.memory.data.identity.name).trim();
+      if (name) return name;
+    }
+  }
+  return id;
+}
+
+function screenSnapshots() {
+  const out = {};
+  for (const item of screenEntities()) {
+    const read = state.snaps[item.id];
+    out[item.id] = read ? read.data : null;
+  }
+  return out;
+}
+
+function roomMeta() {
+  const screen = screenEntities();
+  const online = {};
+  for (const item of screen) online[item.id] = Boolean(item.base);
+  return {
+    stale: state.stale,
+    dev: state.dev,
+    lastRead: state.fetchedAt,
+    roster: screen.map((item) => ({ id: item.id, base: item.base })),
+    online,
+    lineage: state.lineages,
+    byUrl: state.byUrl,
+    byAddress: state.byAddress,
+  };
+}
+
+/** Parsed ledger entries of one snapshot (empty when the ledger was not read). */
+function entriesOf(snap) {
+  if (!snap || !snap.ledger || !snap.ledger.ok || typeof snap.ledger.text !== 'string') return [];
+  return snap.ledger.text.split(/\r?\n/).filter((line) => line.trim()).flatMap((line) => {
+    try {
+      const entry = JSON.parse(line);
+      return entry && typeof entry === 'object' && !Array.isArray(entry) ? [entry] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
 
 /* ------------------------------------------------------------------ */
 /* Output                                                              */
@@ -308,7 +492,8 @@ async function fillLoginStatus(status) {
 function promptText() {
   const handle = state.handle || 'anonymous';
   const e = entity();
-  const host = e.id === 'e2' ? 'entity-2' : (e.base ? 'entity-1' : 'dim');
+  const n = String(e.id).replace(/^e/, '');
+  const host = e.base ? `entity-${n}` : 'dim';
   return `${handle}@${host} >`;
 }
 
@@ -328,7 +513,11 @@ function enterMain(alias) {
 
   screenWipe(() => {
     state.selected = 'e1';
-    state.snaps = { e1: null, e2: null };
+    state.snaps = {};
+    for (const item of ENTITIES) state.snaps[item.id] = null;
+    state.lineages = {};
+    state.untracked = new Map();
+    rebuildIndexes();
     state.fetchedAt = null;
     state.stale = false;
     state.dev = false;
@@ -359,12 +548,7 @@ function enterMain(alias) {
     app.replaceChildren(screen);
 
     state.room = new Room(roomHost);
-    state.room.ingest(null, {
-      stale: true,
-      dev: false,
-      lastRead: null,
-      online: { e1: Boolean(ENTITIES[0].base), e2: Boolean(ENTITIES[1].base) },
-    });
+    state.room.ingest(null, { ...roomMeta(), stale: true });
 
     promptInput.addEventListener('keydown', onPromptKey);
     form.addEventListener('submit', (event) => {
@@ -427,8 +611,7 @@ function cmdFace() {
   const e = entity();
   hdr('FACE');
   if (!e.base) {
-    if (e.id === 'e2') note('Entity 2: not yet online · no face to show (nothing is invented).');
-    else note('this entity has no public endpoint · no face to show (nothing is invented).');
+    note(`Entity ${String(e.id).replace(/^e/, '')}: not yet online · no face to show (nothing is invented).`);
     return;
   }
   const snap = snapshotOf();
@@ -489,8 +672,12 @@ function runCommand(raw) {
 
   switch (cmd) {
     case 'help': cmdHelp(); break;
-    case '1': cmdSelect('e1'); break;
-    case '2': cmdSelect('e2'); break;
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6': cmdSelect(`e${cmd}`); break;
     case 'who':
     case 'chi': cmdWho(); break;
     case 'status':
@@ -511,6 +698,12 @@ function runCommand(raw) {
     case 'attestazione': cmdAttestation(); break;
     case 'memory':
     case 'memoria': cmdMemory(); break;
+    case 'family':
+    case 'tree':
+    case 'famiglia':
+    case 'albero': cmdFamily(); break;
+    case 'whispers':
+    case 'sussurri': cmdWhispers(); break;
     case 'missing':
     case 'manca': cmdMissing(); break;
     case 'face':
@@ -530,14 +723,16 @@ function cmdHelp() {
   hdr('COMMANDS');
   const cmds = [
     ['help', 'this list'],
-    ['1 / 2', 'select entity (2 when discovered)'],
+    ['1 .. 6', 'select a discovered entity'],
     ['who', 'identity: name, voice, image'],
-    ['status', 'vitals, wallet, brain, attestation'],
+    ['status', 'vitals, wallet, brain, attestation, lineage'],
     ['treasury', 'TAZ/ZEC, zatoshi, rent/hour, hours left'],
     ['thoughts', 'latest public posts from the entity'],
     ['channel', 'last 20 messages of the public channel'],
     ['say <text>', 'write to the public channel (public!)'],
     ['ledger [n]', 'last n ledger entries (default 15)'],
+    ['family / tree', 'the family tree from lineage'],
+    ['whispers', 'paid whispers and received letters'],
     ['verify', 'chain verification in the browser + /verify'],
     ['attestation', 'mode and /attestation metadata'],
     ['memory', 'plan, promises, recent events'],
@@ -551,16 +746,22 @@ function cmdHelp() {
 }
 
 function cmdSelect(id) {
-  if (id === 'e2' && !ENTITIES[1].base) {
-    push([{ t: 'Entity 2: not yet online', c: 'dim' }]);
+  const target = ENTITIES.find((item) => item.id === id);
+  const n = String(id).replace(/^e/, '');
+  if (!target) {
+    push([{ t: `Entity ${n}: not discovered`, c: 'dim' }]);
+    note('only entities found through peer or lineage can be selected. Try family.');
+    return;
+  }
+  if (!target.base) {
+    push([{ t: `Entity ${n}: not yet online`, c: 'dim' }]);
     note('no endpoint, no estimate, no placeholder. Nothing is simulated.');
     return;
   }
-  const next = id === 'e2' ? 'e2' : 'e1';
-  state.selected = next;
+  state.selected = target.id;
   updatePrompt();
-  push([{ t: `${entity(next).label} selected`, c: 'hi' }]);
-  const read = state.snaps[next];
+  push([{ t: `${target.label} selected`, c: 'hi' }]);
+  const read = state.snaps[target.id];
   if (read) note(`last read ${fetchedLabel(read.at)}${read.stale ? ' (stale data)' : ''}`);
   else note('no snapshot read yet · use refresh');
 }
@@ -568,8 +769,7 @@ function cmdSelect(id) {
 function offlineOrData() {
   const e = entity();
   if (!e.base) {
-    if (e.id === 'e2') push([{ t: 'Entity 2: not yet online', c: 'dim' }]);
-    else err('!! no public endpoint for this entity');
+    push([{ t: `Entity ${String(e.id).replace(/^e/, '')}: not yet online`, c: 'dim' }]);
     return null;
   }
   const read = state.snaps[e.id];
@@ -623,6 +823,26 @@ function cmdStatus() {
   if (!snap) return;
   hdr('STATUS');
   kv('state', stateLabelOf(snap));
+
+  // lineage as last declared by `/`: parent and children are other entities
+  const current = entity();
+  const rootData = snap.root && snap.root.ok && snap.root.data ? snap.root.data : null;
+  const lineage = state.lineages[current.id] || (rootData ? lineageOf(rootData) : null);
+  if (lineage) {
+    if (lineage.parent) {
+      const parentId = entityIdOfUrl(lineage.parent);
+      kv('parent', parentId ? `${parentId} ${nameOf(parentId)}` : shortUrl(lineage.parent, 28));
+    }
+    if (lineage.children.length) {
+      const labels = lineage.children.map((child) => {
+        const childId = entityIdOfUrl(child.url, child.address);
+        return childId ? `${childId} ${nameOf(childId)}` : shortUrl(child.url, 24);
+      });
+      kv('children', labels.join(' · '));
+    }
+  } else if (rootData && !rootData.lineage) {
+    kv('lineage', 'not declared');
+  }
 
   if (snap.memorial && snap.memorial.ok) {
     note('/memorial returned 200: the entity is dead.');
@@ -713,13 +933,7 @@ function cmdThoughts() {
   if (!snap) return;
   hdr('THOUGHTS (spoken thoughts and public posts)');
   const posts = channelOf(snap).filter((m) => m && m.from === 'entity').map((m) => ({ ts: m.ts, kind: 'post', text: stringOf(m.text) }));
-  const entries = [];
-  if (snap.ledger && snap.ledger.ok && typeof snap.ledger.text === 'string') {
-    for (const line of snap.ledger.text.split(/\r?\n/)) {
-      if (!line.trim()) continue;
-      try { entries.push(JSON.parse(line)); } catch { /* torn line */ }
-    }
-  }
+  const entries = entriesOf(snap);
   const spoken = entries.filter((e) => e && e.type === 'thought' && e.data).map((e) => ({ ts: e.ts, kind: 'thought', text: stringOf(e.data.text) }));
   const list = [...posts, ...spoken].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts)).slice(-12);
   if (!list.length) {
@@ -824,7 +1038,8 @@ function cmdLedger(rest) {
     }
     const seq = entry.seq !== undefined && entry.seq !== null ? entry.seq : '—';
     const type = entryType(entry);
-    if (entry.private === true) {
+    // whisper_text is private by contract even if the server forgot the flag
+    if (entry.private === true || type === 'whisper_text') {
       const size = Number(entry.size);
       push([
         { t: `${String(seq).padStart(4)} `, c: 'dim' },
@@ -962,6 +1177,234 @@ function promiseText(promise) {
   return stringOf(promise);
 }
 
+function familyState(id) {
+  const item = ENTITIES.find((entry) => entry.id === id);
+  if (!item || !item.base) return 'not reachable';
+  const snap = snapshotOf(id);
+  if (!snap) return 'not reachable';
+  if (snap.memorial && snap.memorial.ok) return 'dead';
+  const v = snap.vitals && snap.vitals.ok ? snap.vitals.data : null;
+  if (v) {
+    if (v.state === 'unborn') return 'unborn';
+    if (v.state === 'dead') return 'dead';
+    return 'alive';
+  }
+  if (snap.root && snap.root.ok) return 'alive';
+  return 'not reachable';
+}
+
+/**
+ * Nodes of the family graph: every tracked entity, plus URL-only nodes for
+ * lineage references beyond the tracking cap. Parent links come from each
+ * entity's own `lineage.parent`; children links fill the gaps.
+ */
+function familyNodes() {
+  const nodes = new Map();
+  for (const item of ENTITIES) {
+    nodes.set(item.id, {
+      key: item.id,
+      id: item.id,
+      name: nameOf(item.id),
+      url: item.base,
+      state: familyState(item.id),
+      parent: null,
+      children: [],
+      born: null,
+    });
+  }
+
+  const nodeForUrl = (url, address) => {
+    const raw = stringOf(url).trim();
+    if (!raw) return null;
+    const id = entityIdOfUrl(raw, address);
+    if (id && nodes.has(id)) return nodes.get(id);
+    const key = `u:${endpointKey(raw) || raw}`;
+    if (!nodes.has(key)) {
+      nodes.set(key, {
+        key,
+        id: null,
+        name: shortUrl(raw, 28),
+        url: raw,
+        state: 'not reachable',
+        parent: null,
+        children: [],
+        born: null,
+      });
+    }
+    return nodes.get(key);
+  };
+
+  for (const [, entry] of state.untracked) nodeForUrl(entry && entry.url, null);
+
+  // 1. explicit parents
+  for (const item of ENTITIES) {
+    const lineage = state.lineages[item.id];
+    const node = nodes.get(item.id);
+    if (!lineage || !lineage.parent || !node) continue;
+    const parent = nodeForUrl(lineage.parent, null);
+    if (parent && parent.key !== node.key) node.parent = parent.key;
+  }
+
+  // 2. children (a child that declared its own parent keeps it)
+  for (const item of ENTITIES) {
+    const lineage = state.lineages[item.id];
+    const node = nodes.get(item.id);
+    if (!lineage || !node) continue;
+    for (const child of lineage.children) {
+      const childNode = nodeForUrl(child.url, child.address);
+      if (!childNode || childNode.key === node.key) continue;
+      if (!childNode.parent) childNode.parent = node.key;
+    }
+  }
+
+  // 3. birth entries enrich the child: born time, gift, and a parent if missing
+  for (const item of ENTITIES) {
+    for (const entry of entriesOf(snapshotOf(item.id))) {
+      if (entryType(entry) !== 'birth_of') continue;
+      const d = entry.data && typeof entry.data === 'object' ? entry.data : {};
+      const child = nodeForUrl(d.url, d.address);
+      if (!child || child.key === item.id) continue;
+      if (!child.parent) child.parent = item.id;
+      const at = Date.parse(entry.ts) || 0;
+      if (child.born && child.born.time >= at) continue;
+      const giftZats = Number(d.giftZats);
+      child.born = {
+        at: entry.ts,
+        time: at,
+        giftZats: Number.isFinite(giftZats) ? giftZats : null,
+        by: item.id,
+      };
+    }
+  }
+
+  // attach children once every parent link is settled
+  for (const node of nodes.values()) {
+    if (!node.parent) continue;
+    const parent = nodes.get(node.parent);
+    if (!parent) { node.parent = null; continue; }
+    if (!parent.children.includes(node.key)) parent.children.push(node.key);
+  }
+
+  return nodes;
+}
+
+function cmdFamily() {
+  hdr('FAMILY TREE');
+  note('lineage as declared by each entity\'s / · discovered through parent and children');
+  const nodes = familyNodes();
+  if (!nodes.size) {
+    note('no entity known yet.');
+    return;
+  }
+
+  const orderOf = (node) => (node.id ? Number(String(node.id).replace(/^e/, '')) : 1e6);
+  const byOrder = (a, b) => (orderOf(a) - orderOf(b)) || a.name.localeCompare(b.name);
+  const rootOf = (node) => (!node.parent || !nodes.has(node.parent) ? null : nodes.get(node.parent));
+  const roots = [...nodes.values()].filter((node) => !rootOf(node)).sort(byOrder);
+
+  const childrenOf = (node) => node.children
+    .map((key) => nodes.get(key))
+    .filter(Boolean)
+    .sort(byOrder);
+
+  const printed = new Set();
+  const labelOf = (node) => {
+    const head = node.id
+      ? `${node.id}${node.name && node.name !== node.id ? ` ${node.name}` : ''}`
+      : node.name;
+    let text = `${head} [${node.state}]`;
+    if (node.born) {
+      const gift = node.born.giftZats === null ? 'not declared' : `${formatZats(node.born.giftZats)} TAZ`;
+      text += ` (born ${hhmm(node.born.at) || '—'}, gift ${gift})`;
+    }
+    return text;
+  };
+
+  const walk = (node, prefix, last, root) => {
+    if (!node || printed.has(node.key)) return;
+    printed.add(node.key);
+    const connector = root ? '' : `${prefix}${last ? '└─ ' : '├─ '}`;
+    const cls = node.state === 'dead' ? 'err' : (node.state === 'not reachable' ? 'dim' : '');
+    push([{ t: `${connector}${labelOf(node)}`, c: cls }]);
+    const kids = childrenOf(node);
+    const nextPrefix = root ? '' : `${prefix}${last ? '   ' : '│  '}`;
+    kids.forEach((kid, index) => walk(kid, nextPrefix, index === kids.length - 1, false));
+  };
+
+  roots.forEach((node) => walk(node, '', true, true));
+
+  // cycles or broken links: print whatever is left as a root
+  const rest = [...nodes.values()].filter((node) => !printed.has(node.key)).sort(byOrder);
+  for (const node of rest) walk(node, '', true, true);
+
+  const tracked = ENTITIES.length;
+  if (tracked > MAX_ENTITIES) {
+    note(`on screen: ${MAX_ENTITIES} desks · this tree lists all ${tracked} discovered entities.`);
+  }
+  if (state.untracked.size) {
+    note(`${state.untracked.size} further lineage reference${state.untracked.size === 1 ? '' : 's'} beyond the tracking cap: not reachable.`);
+  }
+  note('states: alive · unborn · dead · not reachable');
+}
+
+function cmdWhispers() {
+  hdr('PAID WHISPERS AND LETTERS');
+  const rows = [];
+  for (const item of screenEntities()) {
+    const snap = snapshotOf(item.id);
+    if (!snap) continue;
+    for (const entry of entriesOf(snap)) {
+      const type = entryType(entry);
+      const d = entry.data && typeof entry.data === 'object' ? entry.data : {};
+      if (type === 'whisper') {
+        const toId = entityIdOfUrl(d.to);
+        rows.push({
+          at: entry.ts,
+          kind: 'whisper',
+          from: item.id,
+          to: toId || shortUrl(d.to, 24),
+          zats: Number(d.zats),
+          bytes: Number(d.bytes),
+        });
+      } else if (type === 'letter') {
+        rows.push({
+          at: entry.ts,
+          kind: 'letter',
+          from: null,
+          to: item.id,
+          zats: Number(d.zats),
+          bytes: Number(d.bytes),
+        });
+      }
+    }
+  }
+  rows.sort((a, b) => (Date.parse(a.at) || 0) - (Date.parse(b.at) || 0));
+  const list = rows.slice(-20);
+  if (!list.length) {
+    note('no paid whispers or paid letters in the ledgers read so far.');
+  } else {
+    for (const row of list) {
+      const time = hhmm(row.at) || '—';
+      const bytes = Number.isFinite(row.bytes) ? `${formatInt(row.bytes)} bytes` : 'bytes not declared';
+      if (row.kind === 'whisper') {
+        const amount = Number.isFinite(row.zats) ? `${formatZats(row.zats)} TAZ` : 'amount not declared';
+        push([
+          { t: `${time} `, c: 'dim' },
+          { t: `${row.from} → ${row.to} `, c: 'acc' },
+          { t: `· ${amount} · ${bytes}` },
+        ]);
+      } else {
+        push([
+          { t: `${time} `, c: 'dim' },
+          { t: `${row.to} `, c: 'acc' },
+          { t: `receives a paid letter · ${bytes}` },
+        ]);
+      }
+    }
+  }
+  note('words are shielded: only the recipient reads them.');
+}
+
 function cmdMissing() {
   hdr('WHAT IS STILL MISSING');
   for (const item of MISSING) push([{ t: '· ' , c: 'dim' }, { t: item }]);
@@ -980,33 +1423,63 @@ function cmdExit() {
 /* Refresh                                                             */
 /* ------------------------------------------------------------------ */
 
-async function readEntity(id) {
-  const item = entity(id);
+async function readEntity(id, { light = false } = {}) {
+  const item = ENTITIES.find((entry) => entry.id === id) || entity(id);
   if (!item.base) return null;
-  const data = await fetchSnapshot(item.base);
-  const modeKnown = data.root.ok || data.attestation.ok;
+  const data = light ? await fetchLightSnapshot(item.base) : await fetchSnapshot(item.base);
+  const modeKnown = Boolean(
+    (data.root && data.root.ok)
+    || (data.attestation && data.attestation.ok),
+  );
   const previous = state.snaps[id];
   const dev = modeKnown
     ? Boolean(
-      (data.root.ok && data.root.data && data.root.data.mode === 'dev')
-      || (data.attestation.ok && data.attestation.data && data.attestation.data.mode === 'dev'),
+      (data.root && data.root.ok && data.root.data && data.root.data.mode === 'dev')
+      || (data.attestation && data.attestation.ok && data.attestation.data && data.attestation.data.mode === 'dev'),
     )
     : Boolean(previous && previous.dev);
-  const checks = [
-    ['/', data.root],
-    ['/vitals', data.vitals],
-    ['/memory-public', data.memory],
-    ['/public-channel', data.channel],
-    ['/ledger', data.ledger],
-    ['/verify', data.verify],
-    ['/attestation', data.attestation],
-    ['/memorial', data.memorial],
-  ];
+  const checks = light
+    ? [
+      ['/', data.root],
+      ['/vitals', data.vitals],
+      ['/memorial', data.memorial],
+    ]
+    : [
+      ['/', data.root],
+      ['/vitals', data.vitals],
+      ['/memory-public', data.memory],
+      ['/public-channel', data.channel],
+      ['/ledger', data.ledger],
+      ['/verify', data.verify],
+      ['/attestation', data.attestation],
+      ['/memorial', data.memorial],
+    ];
   const failures = checks.filter(([path, res]) => !res.ok && !(path === '/memorial' && res.notFound));
-  const anyOk = data.root.ok || data.vitals.ok || data.memory.ok || data.channel.ok || data.ledger.ok;
+  const anyOk = Boolean(
+    (data.root && data.root.ok)
+    || (data.vitals && data.vitals.ok)
+    || (data.memory && data.memory.ok)
+    || (data.channel && data.channel.ok)
+    || (data.ledger && data.ledger.ok),
+  );
+
+  // the shielded address lets another entity's lineage reference match this one
+  if (data.root && data.root.ok && data.root.data) {
+    const address = addressOf(data.root.data);
+    if (address) {
+      item.address = address;
+      state.byAddress[address] = item.id;
+    }
+  }
+
   return { id, data, at: new Date(), stale: failures.length > 0, dev, failures, anyOk };
 }
 
+/**
+ * Reads every known entity, then follows `lineage` like `peer`: each newly
+ * discovered entity gets an id (e3, e4…), a snapshot and, if among the first
+ * six, a desk. Discovery is breadth-first and bounded (4 waves, 12 entities).
+ */
 async function refresh({ announce = false, quiet = false } = {}) {
   if (!ENTITIES[0].base) {
     err('!! no public endpoint');
@@ -1014,26 +1487,34 @@ async function refresh({ announce = false, quiet = false } = {}) {
   }
 
   if (announce) note('reading endpoints…');
-  const ids = ['e1'];
-  if (ENTITIES[1].base) ids.push('e2');
-
-  // one snapshot per entity with a base, in parallel
-  const reads = (await Promise.all(ids.map((id) => readEntity(id)))).filter(Boolean);
-  if (state.destroyed) return;
-  for (const read of reads) {
-    state.snaps[read.id] = { data: read.data, at: read.at, stale: read.stale, dev: read.dev };
+  const readIds = new Set();
+  let pending = ENTITIES.filter((item) => item.base).map((item) => item.id);
+  const reads = [];
+  let wave = 0;
+  while (pending.length && wave < 4) {
+    const batch = pending.filter((id) => !readIds.has(id));
+    pending = [];
+    if (!batch.length) break;
+    for (const id of batch) readIds.add(id);
+    const results = await Promise.all(batch.map((id) => readEntity(id, { light: !onScreen(id) })));
+    if (state.destroyed) return;
+    for (const result of results) {
+      if (!result) continue;
+      state.snaps[result.id] = {
+        data: result.data,
+        at: result.at,
+        stale: result.stale,
+        dev: result.dev,
+      };
+      reads.push(result);
+    }
+    pending = discoverLineage().filter((id) => !readIds.has(id));
+    wave += 1;
   }
 
-  // Peer discovery uses Entity 1's already-fetched `/`: the first time it
-  // yields an https URL, Entity 2 gets a base and is read immediately.
-  const e1read = reads.find((read) => read.id === 'e1');
-  if (e1read && e1read.data.root.ok && discoverPeer(e1read.data.root.data)) {
-    const read2 = await readEntity('e2');
-    if (state.destroyed) return;
-    if (read2) {
-      state.snaps.e2 = { data: read2.data, at: read2.at, stale: read2.stale, dev: read2.dev };
-      reads.push(read2);
-    }
+  if (!reads.length) {
+    err('!! no snapshot could be read');
+    return;
   }
 
   const failures = [];
@@ -1047,18 +1528,7 @@ async function refresh({ announce = false, quiet = false } = {}) {
   state.fetchedAt = new Date(times.length ? Math.max(...times) : Date.now());
 
   if (state.room) {
-    state.room.ingest(
-      {
-        e1: state.snaps.e1 ? state.snaps.e1.data : null,
-        e2: state.snaps.e2 ? state.snaps.e2.data : null,
-      },
-      {
-        stale: state.stale,
-        dev: state.dev,
-        lastRead: state.fetchedAt,
-        online: { e1: Boolean(ENTITIES[0].base), e2: Boolean(ENTITIES[1].base) },
-      },
-    );
+    state.room.ingest(screenSnapshots(), roomMeta());
   }
 
   if (!quiet) {
@@ -1119,6 +1589,7 @@ function init() {
 
   applyDevBase(ENTITIES, window.location.search);
   applyDevBase2(ENTITIES, window.location.search);
+  rebuildIndexes();
 
   try {
     state.handle = (localStorage.getItem(HANDLE_KEY) || '').trim().slice(0, 40);

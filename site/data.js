@@ -21,6 +21,11 @@ export const ENTITIES = [
   { id: 'e2', label: 'Entity 2', short: 'e2', base: null },
 ];
 
+/** Desks shown in the room. Entities beyond this are listed by `family` only. */
+export const MAX_ENTITIES = 6;
+/** Hard cap on entities we keep track of (screen or family only). */
+export const MAX_TRACKED_ENTITIES = 12;
+
 const LOCAL_BASE_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 export const MISSING = [
@@ -127,6 +132,13 @@ export function fixed8(zats) {
   return Number.isFinite(n) ? (n / 1e8).toFixed(8) : null;
 }
 
+/** Zatoshi -> coin amount, without trailing zeros (0.0001, not 0.00010000). */
+export function formatZats(zats) {
+  const n = Number(zats);
+  if (!Number.isFinite(n)) return null;
+  return new Intl.NumberFormat('en-GB', { maximumFractionDigits: 8 }).format(n / 1e8);
+}
+
 export function formatInt(value) {
   const n = Number(value);
   return Number.isFinite(n) ? INT_FMT.format(n) : '—';
@@ -229,6 +241,70 @@ export function peerUrlOf(value) {
   return `${url.origin}${path}`;
 }
 
+/**
+ * Stable key for comparing two endpoint URLs (host case is normalised by URL,
+ * the path is kept as written, trailing slashes removed). Returns '' if invalid.
+ */
+export function endpointKey(value) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (!url.hostname) return '';
+    return `${url.protocol}//${url.host}${url.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    return '';
+  }
+}
+
+/** Short printable form of a URL for tickers and trees: host + path, truncated. */
+export function shortUrl(value, max = 34) {
+  const raw = stringOf(value).trim();
+  if (!raw) return '—';
+  let text = raw;
+  try {
+    const url = new URL(raw);
+    text = `${url.host}${url.pathname.replace(/\/+$/, '')}`;
+  } catch {
+    /* not a URL: print it as it came */
+  }
+  text = text.replace(/^www\./, '');
+  return text.length > max ? `${text.slice(0, Math.max(1, max - 1))}…` : text;
+}
+
+/**
+ * Root `lineage`, normalised and never throwing:
+ * `{ parent: string|null, children: [{ url, address, ts }] }`.
+ * Invalid or non-https child URLs are dropped.
+ */
+export function lineageOf(rootData) {
+  const src = rootData && typeof rootData === 'object'
+    && rootData.lineage && typeof rootData.lineage === 'object'
+    ? rootData.lineage
+    : null;
+  const parent = src ? peerUrlOf(src.parent) : null;
+  const children = [];
+  if (src && Array.isArray(src.children)) {
+    for (const child of src.children) {
+      if (!child || typeof child !== 'object') continue;
+      const url = peerUrlOf(child.url);
+      if (!url) continue;
+      children.push({
+        url,
+        address: stringOf(child.address).trim() || null,
+        ts: child.ts || null,
+      });
+    }
+  }
+  return { parent, children };
+}
+
+/** The shielded address declared by `/` (used to recognise an entity seen by another base). */
+export function addressOf(rootData) {
+  if (!rootData || typeof rootData !== 'object' || !rootData.zcash || typeof rootData.zcash !== 'object') return '';
+  return stringOf(rootData.zcash.address).trim();
+}
+
 export async function postMessage(base, payload) {
   const at = new Date();
   const controller = new AbortController();
@@ -282,6 +358,28 @@ export async function fetchSnapshot(base) {
     request(base, '/memorial', { allow404: true }),
   ]);
   return { root, vitals, memory, channel, ledger, verify, attestation, memorial };
+}
+
+/**
+ * The three reads needed to place an entity in the family tree (state + lineage).
+ * Used for entities discovered beyond the six desks: no ledger/channel traffic.
+ */
+export async function fetchLightSnapshot(base) {
+  const [root, vitals, memorial] = await Promise.all([
+    request(base, '/'),
+    request(base, '/vitals'),
+    request(base, '/memorial', { allow404: true }),
+  ]);
+  return {
+    root,
+    vitals,
+    memory: null,
+    channel: null,
+    ledger: null,
+    verify: null,
+    attestation: null,
+    memorial,
+  };
 }
 
 /* ------------------------------------------------------------------ */

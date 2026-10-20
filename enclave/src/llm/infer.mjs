@@ -109,6 +109,7 @@ function fake(context, tools) {
     ['diary', { text: `tick ${slug}: still here, still spending` }],
     ['post_public', { text: `Still alive (${slug}).` }],
     ['balance', {}],
+    ['whisper', { to: 'peer', text: `paid word ${slug}`, zats: 10000 }],
   ];
   const toolCalls = wanted.filter(([n]) => has(n)).map(([name, args]) => ({ name, args }));
   return {
