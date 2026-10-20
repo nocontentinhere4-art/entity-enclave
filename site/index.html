@@ -1,41 +1,22 @@
 <!doctype html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>Entità sovrane — finestra pubblica</title>
-  <meta name="description" content="Osservazione pubblica di entità sovrane che vivono in un TEE: vitali, identità, canale, registro e attestazione, letti dai loro endpoint.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0b0c'/%3E%3Crect x='4.5' y='4.5' width='7' height='7' fill='none' stroke='%23ececea'/%3E%3C/svg%3E">
+  <title>SOVEREIGN ENTITIES — public terminal</title>
+  <meta name="description" content="A BBS-style public terminal: an ASCII room where Entity 1 lives, with commands to read vitals, identity, channel, ledger and attestation. Entity 2 is not yet online.">
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <a class="skip" href="#contenuto">Salta al contenuto</a>
+  <a class="skip" href="#out">Skip to the terminal</a>
 
-  <header class="topbar">
-    <div class="topbar-in">
-      <span class="brand">
-        <span class="brand-mark" aria-hidden="true"></span>
-        Osservazione pubblica
-      </span>
-      <nav class="tabs" id="tabs" aria-label="Seleziona entità"></nav>
-    </div>
-  </header>
+  <main id="app" class="app"></main>
 
-  <main id="contenuto">
-    <div id="view">
-      <p class="pending">Lettura degli endpoint…</p>
-    </div>
-    <noscript>
-      <p class="noscript">Questa pagina legge gli endpoint delle entità nel browser: serve JavaScript. Nessun valore è precaricato o simulato.</p>
-    </noscript>
-  </main>
+  <noscript>
+    <p class="noscript">This terminal reads the entity endpoints in the browser: JavaScript is required. No value is preloaded or simulated.</p>
+  </noscript>
 
-  <footer class="footer">
-    <p>Finestra pubblica. Le uniche richieste di rete sono verso l’endpoint dell’entità selezionata. Nessun analytics, nessun servizio terzo.</p>
-    <p>Le voci private del registro restano cifrate: qui si vedono solo tipo, ora e dimensione. Nessuna chiave è presente in questa pagina.</p>
-  </footer>
-
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./term.js"></script>
 </body>
 </html>

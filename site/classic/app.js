@@ -1,23 +1,23 @@
 /*
- * Finestra pubblica sulle entità sovrane.
- * Nessun framework, nessuna dipendenza, nessuna richiesta oltre i base delle entità.
- * Tutto il testo che arriva dalla rete entra nel DOM con textContent, mai con innerHTML.
+ * Public window onto the sovereign entities.
+ * No framework, no dependencies, no requests beyond the entities' bases.
+ * Everything arriving from the network enters the DOM via textContent, never innerHTML.
  */
 
 export const ENTITIES = [
   {
     id: 'e1',
-    label: 'Entità 1',
+    label: 'Entity 1',
     base: 'https://ca42622c7ae63906602b873703a0efa769079dfa-8080.dstack-pha-prod9.phala.network',
   },
-  { id: 'e2', label: 'Entità 2', base: null }, // non ancora distribuita
+  { id: 'e2', label: 'Entity 2', base: null }, // not deployed yet
 ];
 
 const MISSING = [
-  'seconda entità',
-  'sussurri a pagamento',
-  'verifica crittografica della quote nel browser',
-  "verifica dell'attestazione del provider di inferenza",
+  'second entity',
+  'paid whispers',
+  'cryptographic verification of the quotes in the browser',
+  'verification of the inference provider attestation',
   'token',
 ];
 
@@ -27,15 +27,15 @@ const REFRESH_MS = 60000;
 const COOLDOWN_MS = 60000;
 const MAX_LEDGER_ROWS = 100;
 
-const INT_FMT = new Intl.NumberFormat('it-IT');
-const TIME_FMT = new Intl.DateTimeFormat('it-IT', {
+const INT_FMT = new Intl.NumberFormat('en-GB');
+const TIME_FMT = new Intl.DateTimeFormat('en-GB', {
   hour: '2-digit', minute: '2-digit', second: '2-digit',
 });
-const STAMP_FMT = new Intl.DateTimeFormat('it-IT', {
+const STAMP_FMT = new Intl.DateTimeFormat('en-GB', {
   day: '2-digit', month: 'short', year: 'numeric',
   hour: '2-digit', minute: '2-digit', second: '2-digit',
 });
-const SHORT_FMT = new Intl.DateTimeFormat('it-IT', {
+const SHORT_FMT = new Intl.DateTimeFormat('en-GB', {
   day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
 });
 
@@ -125,14 +125,14 @@ function facts(rows, className = 'facts') {
 
 function errorBlock(path, res) {
   return el('div', { class: 'error-block', role: 'status' },
-    el('p', { class: 'error-title', text: `Non riesco a leggere ${path}` }),
-    el('p', { class: 'error-text', text: (res && res.error) || 'errore sconosciuto' }),
+    el('p', { class: 'error-title', text: `Cannot read ${path}` }),
+    el('p', { class: 'error-text', text: (res && res.error) || 'unknown error' }),
     res && res.at ? el('p', { class: 'src', text: fetchedLabel(res.at) }) : null,
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Formattazione                                                       */
+/* Formatting                                                          */
 /* ------------------------------------------------------------------ */
 
 function stringOf(value) {
@@ -169,10 +169,10 @@ function fmtShort(value) {
 
 function fetchedLabel(at) {
   const d = toDate(at);
-  if (!d) return 'ora di lettura non disponibile';
+  if (!d) return 'fetch time not available';
   const now = new Date();
   const sameDay = d.toDateString() === now.toDateString();
-  return sameDay ? `letto alle ${TIME_FMT.format(d)}` : `letto il ${STAMP_FMT.format(d)}`;
+  return sameDay ? `read at ${TIME_FMT.format(d)}` : `read on ${STAMP_FMT.format(d)}`;
 }
 
 function sourceLine(parts) {
@@ -185,7 +185,7 @@ function sourceLine(parts) {
     seen.add(key);
     labels.push(`${path} ${fetchedLabel(at)}`);
   }
-  return labels.length ? labels.join(' · ') : 'ora di lettura non disponibile';
+  return labels.length ? labels.join(' · ') : 'fetch time not available';
 }
 
 function fixed8(zats) {
@@ -201,7 +201,7 @@ function formatInt(value) {
 function formatDecimal(value, digits = 2) {
   const n = Number(value);
   if (!Number.isFinite(n)) return '—';
-  return new Intl.NumberFormat('it-IT', {
+  return new Intl.NumberFormat('en-GB', {
     minimumFractionDigits: 0,
     maximumFractionDigits: digits,
   }).format(n);
@@ -221,13 +221,13 @@ function sleep(ms) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Rete                                                                */
+/* Network                                                             */
 /* ------------------------------------------------------------------ */
 
 function describeNetworkError(err) {
-  if (err && err.name === 'AbortError') return `nessuna risposta entro ${FETCH_TIMEOUT_MS / 1000} s`;
-  if (err instanceof SyntaxError) return 'risposta non valida (JSON atteso)';
-  return 'rete non raggiungibile (o CORS)';
+  if (err && err.name === 'AbortError') return `no response within ${FETCH_TIMEOUT_MS / 1000} s`;
+  if (err instanceof SyntaxError) return 'invalid response (JSON expected)';
+  return 'network unreachable (or CORS)';
 }
 
 async function request(base, path, options = {}) {
@@ -317,7 +317,7 @@ async function postMessage(base, payload) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Tab e stato                                                         */
+/* Tabs and state                                                      */
 /* ------------------------------------------------------------------ */
 
 function buildTabs() {
@@ -342,8 +342,8 @@ function syncTabs() {
 
 function setDocumentTitle(entity) {
   document.title = entity.base
-    ? `${entity.label} — finestra pubblica`
-    : `${entity.label} — non ancora online`;
+    ? `${entity.label} — public window`
+    : `${entity.label} — not yet online`;
 }
 
 function selectEntity(id) {
@@ -365,7 +365,7 @@ function selectEntity(id) {
   try {
     history.replaceState(null, '', `#${entity.id}`);
   } catch {
-    /* un file statico può impedire replaceState: il cambio entità funziona comunque */
+    /* a static file may block replaceState: switching entities still works */
   }
 
   syncTabs();
@@ -404,22 +404,22 @@ function buildOffline(entity) {
     el('p', { class: 'eyebrow' },
       entity.label,
       el('span', { class: 'eyebrow-sep', text: '·' }),
-      'finestra pubblica',
+      'public window',
     ),
     el('div', { class: 'head-line' },
-      el('h1', { class: 'offline-title', text: 'Non ancora online' }),
+      el('h1', { class: 'offline-title', text: 'Not yet online' }),
       el('div', { class: 'badges' },
         el('span', { class: 'badge is-unborn' },
           el('span', { class: 'dot', 'aria-hidden': 'true' }),
-          el('span', { text: 'non distribuita' }),
+          el('span', { text: 'not deployed' }),
         ),
       ),
     ),
-    el('p', { class: 'offline-quote', text: 'Stessa immagine, stesso cervello, seme diverso: arriverà quando la prima avrà dimostrato di vivere.' }),
-    el('p', { class: 'src offline-src', text: 'base: null · nessun endpoint pubblico · nessuna stima, nessun segnaposto' }),
+    el('p', { class: 'offline-quote', text: 'Same image, same brain, different seed: it will arrive once the first one has proven it can live.' }),
+    el('p', { class: 'src offline-src', text: 'base: null · no public endpoint · no estimates, no placeholders' }),
     el('div', { class: 'offline-chain' },
-      el('span', { class: 'label', text: 'Catena' }),
-      el('p', { class: 'offline-chain-text', text: "Nessun registro da verificare: l'entità non è ancora stata distribuita." }),
+      el('span', { class: 'label', text: 'Chain' }),
+      el('p', { class: 'offline-chain-text', text: 'Nothing to verify yet: the entity has not been deployed.' }),
     ),
     makeMissingSection('06'),
   );
@@ -432,7 +432,7 @@ function makeMissingSection(number) {
   return el('section', { class: 'section' },
     el('div', { class: 'section-head' },
       el('span', { class: 'section-num', 'aria-hidden': 'true', text: number }),
-      el('h2', { text: "Cosa non c'è ancora" }),
+      el('h2', { text: 'What is not here yet' }),
     ),
     el('ol', { class: 'missing' },
       ...MISSING.map((item) => el('li', { text: item })),
@@ -449,7 +449,7 @@ function buildShell(entity) {
   const entityName = el('h1', { class: 'entity-name', id: 'entity-name', text: '—' });
   const badges = el('div', { class: 'badges' });
   const attest = el('p', { class: 'head-attest' });
-  const headerSrc = el('p', { class: 'src head-src', text: 'lettura degli endpoint…' });
+  const headerSrc = el('p', { class: 'src head-src', text: 'reading the endpoints…' });
   const refresh = el('button', {
     class: 'btn-refresh',
     type: 'button',
@@ -458,13 +458,13 @@ function buildShell(entity) {
         void load(state.entity, { animate: true, manual: true });
       }
     },
-  }, 'Aggiorna');
+  }, 'Refresh');
 
   const header = el('header', { class: 'entity-head' },
     el('p', { class: 'eyebrow' },
       entity.label,
       el('span', { class: 'eyebrow-sep', text: '·' }),
-      'finestra pubblica',
+      'public window',
     ),
     el('div', { class: 'head-line' }, entityName, badges),
     attest,
@@ -472,13 +472,13 @@ function buildShell(entity) {
   );
 
   const chainMark = el('span', { class: 'chain-mark', 'aria-hidden': 'true', text: '◇' });
-  const chainTitle = el('h2', { class: 'chain-title', text: 'in attesa del registro…' });
+  const chainTitle = el('h2', { class: 'chain-title', text: 'waiting for the ledger…' });
   const chainCount = el('span', { class: 'chain-count', text: '—' });
-  const chainDetail = el('p', { class: 'chain-detail', text: 'la verifica parte appena /ledger risponde' });
+  const chainDetail = el('p', { class: 'chain-detail', text: 'verification starts as soon as /ledger responds' });
   const chainFill = el('span', { class: 'chain-fill' });
   const chain = el('section', { class: 'chain is-pending', 'aria-live': 'polite' },
     el('div', { class: 'chain-head' },
-      el('span', { class: 'label', text: 'Catena' }),
+      el('span', { class: 'label', text: 'Chain' }),
       chainCount,
     ),
     el('div', { class: 'chain-line' }, chainMark, chainTitle),
@@ -498,11 +498,11 @@ function buildShell(entity) {
   refs.chainDetail = chainDetail;
   refs.chainFill = chainFill;
 
-  const vitals = makeSection('01', 'Vitali');
-  const identity = makeSection('02', 'Identità');
-  const channel = makeSection('03', 'Canale pubblico');
-  const ledger = makeSection('04', 'Registro');
-  const attestation = makeSection('05', 'Attestazione');
+  const vitals = makeSection('01', 'Vitals');
+  const identity = makeSection('02', 'Identity');
+  const channel = makeSection('03', 'Public channel');
+  const ledger = makeSection('04', 'Ledger');
+  const attestation = makeSection('05', 'Attestation');
 
   refs.vitalsHeading = vitals.heading;
   refs.vitalsSrc = vitals.src;
@@ -514,32 +514,32 @@ function buildShell(entity) {
   refs.attestSrc = attestation.src;
   refs.attestBody = attestation.body;
 
-  refs.vitalsBody.appendChild(pending('lettura di /vitals…'));
-  refs.identityBody.appendChild(pending('lettura di /memory-public…'));
-  refs.attestBody.appendChild(pending('lettura di /attestation…'));
+  refs.vitalsBody.appendChild(pending('reading /vitals…'));
+  refs.identityBody.appendChild(pending('reading /memory-public…'));
+  refs.attestBody.appendChild(pending('reading /attestation…'));
 
-  /* Canale: lista + composer (il composer non viene ricostruito ai refresh) */
-  const messages = el('div', { class: 'messages' }, pending('lettura di /public-channel…'));
+  /* Channel: list + composer (the composer is not rebuilt on refresh) */
+  const messages = el('div', { class: 'messages' }, pending('reading /public-channel…'));
   const authorInput = el('input', {
     id: 'author', name: 'author', type: 'text', maxlength: '40',
-    autocomplete: 'nickname', placeholder: 'facoltativo',
+    autocomplete: 'nickname', placeholder: 'optional',
   });
   const textInput = el('textarea', {
     id: 'message', name: 'message', maxlength: '500', rows: '4',
-    placeholder: 'Scrivi qualcosa di pubblico…',
+    placeholder: 'Write something public…',
   });
   const counter = el('span', { class: 'counter', text: '0 / 500' });
   const sendNote = el('span', { class: 'send-note', text: '' });
   const formError = el('p', { class: 'form-error', role: 'status', 'aria-live': 'polite', text: '' });
-  const send = el('button', { class: 'send', type: 'submit' }, 'Invia al registro');
+  const send = el('button', { class: 'send', type: 'submit' }, 'Send to the ledger');
   const form = el('form', { class: 'composer', novalidate: true },
-    el('p', { class: 'notice', text: 'Tutto quello che scrivi qui è pubblico e finisce nel registro. Lei legge i messaggi al prossimo ciclo (≤ 15 min) e decide se rispondere.' }),
+    el('p', { class: 'notice', text: 'Everything you write here is public and goes into the ledger. The entity reads messages at the next cycle (≤ 15 min) and decides whether to reply.' }),
     el('div', { class: 'field' },
-      el('label', { for: 'author', text: 'Nome (facoltativo)' }),
+      el('label', { for: 'author', text: 'Name (optional)' }),
       authorInput,
     ),
     el('div', { class: 'field' },
-      el('label', { for: 'message', text: 'Messaggio' }),
+      el('label', { for: 'message', text: 'Message' }),
       textInput,
     ),
     el('div', { class: 'composer-foot' },
@@ -565,9 +565,9 @@ function buildShell(entity) {
 
   channel.body.append(messages, form);
 
-  /* Registro */
-  const typeFilter = el('select', { class: 'select', id: 'type-filter', 'aria-label': 'Filtra il registro per tipo' },
-    el('option', { value: 'all', text: 'tutti i tipi' }),
+  /* Ledger */
+  const typeFilter = el('select', { class: 'select', id: 'type-filter', 'aria-label': 'Filter the ledger by type' },
+    el('option', { value: 'all', text: 'all types' }),
   );
   typeFilter.addEventListener('change', () => {
     state.filter = typeFilter.value;
@@ -578,22 +578,22 @@ function buildShell(entity) {
     href: `${entity.base}/ledger`,
     target: '_blank',
     rel: 'noreferrer noopener',
-    text: 'Apri /ledger (NDJSON) ↗',
+    text: 'Open /ledger (NDJSON) ↗',
   });
-  const ledgerTable = el('div', { class: 'ledger-table' }, pending('lettura di /ledger…'));
+  const ledgerTable = el('div', { class: 'ledger-table' }, pending('reading /ledger…'));
   const ledgerNote = el('p', { class: 'table-note', text: '' });
-  const browserResult = el('p', { class: 'verify-result', text: 'in corso…' });
+  const browserResult = el('p', { class: 'verify-result', text: 'in progress…' });
   const browserDetail = el('p', { class: 'src verify-detail', text: '' });
-  const serverResult = el('p', { class: 'verify-result', text: 'in attesa…' });
+  const serverResult = el('p', { class: 'verify-result', text: 'waiting…' });
   const serverDetail = el('p', { class: 'src verify-detail', text: '' });
   const verifyBlock = el('div', { class: 'verify' },
     el('div', { class: 'verify-col' },
-      label('Nel browser'),
+      label('In the browser'),
       browserResult,
       browserDetail,
     ),
     el('div', { class: 'verify-col' },
-      label('Sul server'),
+      label('On the server'),
       serverResult,
       serverDetail,
     ),
@@ -611,7 +611,7 @@ function buildShell(entity) {
   ledger.body.append(
     el('div', { class: 'ledger-tools' },
       el('div', { class: 'filter' },
-        el('label', { class: 'label', for: 'type-filter', text: 'Tipo' }),
+        el('label', { class: 'label', for: 'type-filter', text: 'Type' }),
         typeFilter,
       ),
       rawLedger,
@@ -661,7 +661,7 @@ async function load(entity, options = {}) {
   state.loading = true;
   setRefresh(true);
   if (state.refs) {
-    state.refs.headerSrc.textContent = options.manual ? 'aggiornamento richiesto…' : 'aggiornamento in corso…';
+    state.refs.headerSrc.textContent = options.manual ? 'manual refresh requested…' : 'refreshing…';
     if (animate) setSealPending();
   }
 
@@ -703,7 +703,7 @@ function setRefresh(busy) {
   const refs = state.refs;
   if (!refs || !refs.refresh) return;
   refs.refresh.disabled = busy;
-  refs.refresh.textContent = busy ? 'Aggiorno…' : 'Aggiorna';
+  refs.refresh.textContent = busy ? 'Refreshing…' : 'Refresh';
 }
 
 /* ------------------------------------------------------------------ */
@@ -719,8 +719,8 @@ function renderWarning(root, attestation) {
   if (mode === 'dev') {
     refs.warning.hidden = false;
     refs.warning.replaceChildren(
-      el('strong', { text: 'Modalità dev.' }),
-      textNode(' Questa entità NON è attestata: i dati non provengono da un TEE verificato.'),
+      el('strong', { text: 'Dev mode.' }),
+      textNode(' This entity is NOT attested: the data does not come from a verified TEE.'),
     );
   } else {
     refs.warning.hidden = true;
@@ -732,7 +732,7 @@ function renderHeader({ root, vitals, memory, memorial, memorialAt, attestation 
   const refs = state.refs;
   if (!refs) return;
 
-  let name = 'senza nome';
+  let name = 'unnamed';
   let nameSource = null;
   if (root.ok && root.data) {
     const candidate = stringOf(root.data.entity).trim();
@@ -749,33 +749,33 @@ function renderHeader({ root, vitals, memory, memorial, memorialAt, attestation 
   }
   refs.entityName.textContent = name;
 
-  let stateLabel = 'stato non disponibile';
+  let stateLabel = 'state not available';
   let stateKind = 'unknown';
   if (memorial) {
-    stateLabel = 'morta';
+    stateLabel = 'dead';
     stateKind = 'dead';
   } else if (vitals.ok && vitals.data) {
     const v = vitals.data;
     if (v.state === 'unborn') {
-      stateLabel = 'non nata';
+      stateLabel = 'unborn';
       stateKind = 'unborn';
     } else if (v.state === 'alive') {
       if (isFuture(v.sleepUntil)) {
-        stateLabel = 'in pausa';
+        stateLabel = 'paused';
         stateKind = 'paused';
       } else {
-        stateLabel = 'viva';
+        stateLabel = 'alive';
         stateKind = 'alive';
       }
     } else if (v.state === 'dead') {
-      stateLabel = 'morta';
+      stateLabel = 'dead';
       stateKind = 'dead';
     } else if (v.state === 'paused') {
-      stateLabel = 'in pausa';
+      stateLabel = 'paused';
       stateKind = 'paused';
     }
   } else if (vitals.error) {
-    stateLabel = 'stato non disponibile';
+    stateLabel = 'state not available';
     stateKind = 'unknown';
   }
 
@@ -790,20 +790,20 @@ function renderHeader({ root, vitals, memory, memorial, memorialAt, attestation 
     || (root.ok && root.data && root.data.attestation && root.data.attestation.mode)
     || null;
 
-  let attText = 'attestazione non disponibile';
+  let attText = 'attestation not available';
   let attClass = 'is-unknown';
   if (attMode === 'tee') {
-    attText = 'attestazione TDX presente, non verificata nel browser';
+    attText = 'TDX attestation present, not verified in the browser';
     attClass = 'is-tee';
   } else if (attMode === 'dev') {
-    attText = 'NON attestata';
+    attText = 'NOT attested';
     attClass = 'is-dev';
   }
 
   refs.attest.className = 'head-attest';
   refs.attest.replaceChildren(
     el('span', { class: `attest-badge ${attClass}` },
-      el('span', { class: 'attest-label', text: 'Attestazione' }),
+      el('span', { class: 'attest-label', text: 'Attestation' }),
       el('span', { text: attText }),
     ),
   );
@@ -820,13 +820,13 @@ function renderHeader({ root, vitals, memory, memorial, memorialAt, attestation 
   if (!vitals.ok && !memorial) failures.push('/vitals');
 
   refs.headerSrc.textContent = [
-    read.length ? sourceLine(read) : 'nessuna lettura',
-    failures.length ? `non letto: ${failures.join(', ')}` : '',
+    read.length ? sourceLine(read) : 'no successful read',
+    failures.length ? `failed to read: ${failures.join(', ')}` : '',
   ].filter(Boolean).join(' · ');
 }
 
 /* ------------------------------------------------------------------ */
-/* Vitali                                                              */
+/* Vitals                                                              */
 /* ------------------------------------------------------------------ */
 
 function renderVitals({ vitals, root, memorial, memorialAt }) {
@@ -834,19 +834,19 @@ function renderVitals({ vitals, root, memorial, memorialAt }) {
   if (!refs) return;
 
   if (memorial) {
-    refs.vitalsHeading.textContent = 'Memoriale';
+    refs.vitalsHeading.textContent = 'Memorial';
     refs.vitalsSrc.textContent = `/memorial · ${fetchedLabel(memorialAt)}`;
     refs.vitalsBody.replaceChildren(
       el('div', { class: 'memorial' },
-        el('p', { class: 'label', text: 'Memoriale pubblico' }),
-        el('p', { class: 'memorial-note', text: "L'entità è morta. Al posto dei vitali, il memoriale servito da /memorial." }),
+        el('p', { class: 'label', text: 'Public memorial' }),
+        el('p', { class: 'memorial-note', text: 'The entity has died. In place of the vitals, the memorial served by /memorial.' }),
         el('pre', { class: 'raw', text: safeJSON(memorial) }),
       ),
     );
     return;
   }
 
-  refs.vitalsHeading.textContent = 'Vitali';
+  refs.vitalsHeading.textContent = 'Vitals';
   refs.vitalsSrc.textContent = sourceLine([
     ['/vitals', vitals.at],
     ...(root.ok ? [['/', root.at]] : []),
@@ -865,21 +865,21 @@ function renderVitals({ vitals, root, memorial, memorialAt }) {
 
   const network = chain
     ? el('span', { class: `net${chain === 'testnet' ? ' is-testnet' : ''}`, text: chain })
-    : 'non dichiarata';
+    : 'not declared';
 
   const hunger = v.hunger === 'hungry'
-    ? 'affamata'
-    : (v.hunger === 'ok' ? 'sazia' : 'non dichiarata');
+    ? 'hungry'
+    : (v.hunger === 'ok' ? 'full' : 'not declared');
 
   const wallet = v.wallet && typeof v.wallet === 'object'
     ? (v.wallet.ok === false
-      ? `errore${v.wallet.fault ? ` · ${stringOf(v.wallet.fault)}` : ''}`
+      ? `error${v.wallet.fault ? ` · ${stringOf(v.wallet.fault)}` : ''}`
       : (v.wallet.sync
         ? (v.wallet.sync.ok === false
-          ? `sincronizzazione non riuscita${v.wallet.sync.at ? ` · ${fmtStamp(v.wallet.sync.at)}` : ''}`
-          : `altezza ${formatInt(v.wallet.sync.height)} · ${fmtStamp(v.wallet.sync.at)}`)
-        : 'sincronizzazione non dichiarata'))
-    : 'non dichiarato';
+          ? `sync failed${v.wallet.sync.at ? ` · ${fmtStamp(v.wallet.sync.at)}` : ''}`
+          : `height ${formatInt(v.wallet.sync.height)} · ${fmtStamp(v.wallet.sync.at)}`)
+        : 'sync not declared'))
+    : 'not declared';
 
   const treasury = el('div', { class: 'treasury' },
     el('p', { class: 'treasury-amount' },
@@ -887,42 +887,42 @@ function renderVitals({ vitals, root, memorial, memorialAt }) {
       amount === null ? null : textNode(' '),
       el('span', { class: 'unit', text: amount === null ? '' : unit }),
     ),
-    el('p', { class: 'treasury-raw', text: Number.isFinite(rawZats) ? `${formatInt(rawZats)} zatoshi` : 'zatoshi non dichiarati' }),
+    el('p', { class: 'treasury-raw', text: Number.isFinite(rawZats) ? `${formatInt(rawZats)} zatoshi` : 'zatoshi not declared' }),
   );
 
   const rows = [
-    ['Ore rimaste', Number.isFinite(Number(v.hoursLeft)) ? `${formatDecimal(v.hoursLeft, 2)} h` : 'non dichiarate'],
-    ['Fame', hunger],
-    ['Giorni di vita', Number.isFinite(Number(v.daysAlive)) ? `${formatDecimal(v.daysAlive, 2)} giorni` : 'non dichiarati'],
-    ['Nata il', fmtStamp(v.bornAt)],
+    ['Hours left', Number.isFinite(Number(v.hoursLeft)) ? `${formatDecimal(v.hoursLeft, 2)} h` : 'not declared'],
+    ['Hunger', hunger],
+    ['Days of life', Number.isFinite(Number(v.daysAlive)) ? `${formatDecimal(v.daysAlive, 2)} days` : 'not declared'],
+    ['Born on', fmtStamp(v.bornAt)],
     ['Wallet', wallet],
-    ['Rete', network],
+    ['Network', network],
   ];
 
   if (v.sleepUntil) {
-    rows.push(['In pausa fino a', fmtStamp(v.sleepUntil)]);
+    rows.push(['Paused until', fmtStamp(v.sleepUntil)]);
   }
   if (root.ok && root.data && root.data.zcash && root.data.zcash.error) {
-    rows.push(['Errore wallet (/)', el('span', { class: 'danger-text', text: stringOf(root.data.zcash.error) })]);
+    rows.push(['Wallet error (/)', el('span', { class: 'danger-text', text: stringOf(root.data.zcash.error) })]);
   }
 
   const nodes = [treasury, facts(rows)];
 
   const brain = Array.isArray(v.brain) ? v.brain : [];
   const brainBox = el('div', { class: 'brain' },
-    label('Provider di inferenza'),
+    label('Inference providers'),
     brain.length
       ? el('ul', { class: 'roster' }, ...brain.map((provider) => {
         const p = provider && typeof provider === 'object' ? provider : {};
         const keyConfigured = p.keyConfigured === true;
         return el('li', {},
-          el('span', { class: 'roster-name', text: stringOf(p.name) || 'senza nome' }),
-          el('span', { class: 'roster-model', text: stringOf(p.model) || 'modello non dichiarato' }),
+          el('span', { class: 'roster-name', text: stringOf(p.name) || 'unnamed' }),
+          el('span', { class: 'roster-model', text: stringOf(p.model) || 'model not declared' }),
           el('span', { class: 'roster-speed', text: stringOf(p.speed) || '—' }),
-          el('span', { class: `roster-key${keyConfigured ? '' : ' is-missing'}`, text: keyConfigured ? 'chiave configurata' : 'chiave assente' }),
+          el('span', { class: `roster-key${keyConfigured ? '' : ' is-missing'}`, text: keyConfigured ? 'key configured' : 'key missing' }),
         );
       }))
-      : empty('nessun provider dichiarato.'),
+      : empty('no provider declared.'),
   );
   nodes.push(brainBox);
 
@@ -933,26 +933,26 @@ function safeJSON(value) {
   try {
     return JSON.stringify(value, null, 2);
   } catch {
-    return 'memoriale non serializzabile';
+    return 'memorial not serializable';
   }
 }
 
 /* ------------------------------------------------------------------ */
-/* Identità                                                            */
+/* Identity                                                            */
 /* ------------------------------------------------------------------ */
 
 function promiseText(promise) {
   if (typeof promise === 'string') return promise;
   if (promise && typeof promise === 'object') {
     const what = promise.what ?? promise.text ?? promise.description ?? promise.promise;
-    const to = promise.to ? `a ${stringOf(promise.to)}` : '';
-    const due = promise.due ? `entro ${fmtStamp(promise.due)}` : '';
+    const to = promise.to ? `to ${stringOf(promise.to)}` : '';
+    const due = promise.due ? `by ${fmtStamp(promise.due)}` : '';
     const parts = [what, to, due].filter(Boolean).map(stringOf);
     if (parts.length) return parts.join(' · ');
     try {
       return JSON.stringify(promise);
     } catch {
-      return 'promessa non leggibile';
+      return 'unreadable promise';
     }
   }
   return stringOf(promise);
@@ -973,37 +973,37 @@ function renderIdentity({ memory }) {
   const nodes = [];
 
   if (!identity || (!identity.name && !identity.voice && !identity.image)) {
-    nodes.push(empty('non si è ancora data un nome.'));
+    nodes.push(empty('has not given itself a name yet.'));
   } else {
     nodes.push(facts([
-      ['Nome', stringOf(identity.name).trim() || 'senza nome'],
-      ['Voce', stringOf(identity.voice).trim() || 'non dichiarata'],
-      ['Immagine', stringOf(identity.image).trim() || 'non dichiarata'],
+      ['Name', stringOf(identity.name).trim() || 'unnamed'],
+      ['Voice', stringOf(identity.voice).trim() || 'not declared'],
+      ['Image', stringOf(identity.image).trim() || 'not declared'],
     ], 'facts identity-facts'));
   }
 
   nodes.push(el('div', { class: 'plan-block' },
-    label('Piano'),
+    label('Plan'),
     m.plan
       ? el('p', { class: 'plan', text: stringOf(m.plan) })
-      : empty('nessun piano pubblicato.'),
+      : empty('no plan published.'),
   ));
 
   const promises = Array.isArray(m.promises) ? m.promises : [];
   nodes.push(el('div', { class: 'promises-block' },
-    label('Promesse aperte'),
+    label('Open promises'),
     promises.length
       ? el('ol', { class: 'promises' },
         ...promises.map((promise) => el('li', { text: promiseText(promise) })),
       )
-      : empty('nessuna promessa aperta.'),
+      : empty('no open promises.'),
   ));
 
   refs.identityBody.replaceChildren(...nodes);
 }
 
 /* ------------------------------------------------------------------ */
-/* Canale pubblico                                                     */
+/* Public channel                                                      */
 /* ------------------------------------------------------------------ */
 
 function renderChannel({ channel }) {
@@ -1017,8 +1017,8 @@ function renderChannel({ channel }) {
   }
   if (!Array.isArray(channel.data)) {
     refs.messages.replaceChildren(el('div', { class: 'error-block' },
-      el('p', { class: 'error-title', text: 'Il canale ha risposto in un formato inatteso' }),
-      el('p', { class: 'error-text', text: 'Attesa una lista di messaggi.' }),
+      el('p', { class: 'error-title', text: 'The channel responded in an unexpected format' }),
+      el('p', { class: 'error-text', text: 'Expected a list of messages.' }),
     ));
     return;
   }
@@ -1032,7 +1032,7 @@ function renderMessageList() {
   const messages = state.channelMessages;
 
   if (!messages.length) {
-    refs.messages.replaceChildren(empty('Nessun messaggio pubblico. Il canale è aperto.'));
+    refs.messages.replaceChildren(empty('No public messages yet. The channel is open.'));
     return;
   }
 
@@ -1040,14 +1040,14 @@ function renderMessageList() {
     const m = message && typeof message === 'object' ? message : {};
     const fromEntity = m.from === 'entity';
     const who = fromEntity
-      ? 'lei'
-      : (stringOf(m.author).trim() || 'umano');
+      ? 'entity'
+      : (stringOf(m.author).trim() || 'human');
     const meta = el('p', { class: 'message-meta' },
       el('span', { class: 'who', text: who }),
       el('span', { class: 'meta-sep', text: '·' }),
       el('time', { datetime: stringOf(m.ts) || undefined, text: fmtStamp(m.ts) }),
       m.seq !== null && m.seq !== undefined ? el('span', { class: 'meta-sep', text: '·' }) : null,
-      m.seq !== null && m.seq !== undefined ? el('span', { text: `voce ${m.seq}` }) : null,
+      m.seq !== null && m.seq !== undefined ? el('span', { text: `entry ${m.seq}` }) : null,
     );
     return el('article', { class: `message from-${fromEntity ? 'entity' : 'human'}` },
       meta,
@@ -1079,7 +1079,7 @@ function readCooldown(entityId) {
     if (Number.isFinite(until) && until > Date.now()) return until;
     if (raw) localStorage.removeItem(cooldownKey(entityId));
   } catch {
-    /* storage può essere negato: il limite resta solo in memoria */
+    /* storage can be denied: the limit only stays in memory */
   }
   return 0;
 }
@@ -1089,7 +1089,7 @@ function writeCooldown(entityId, until) {
     if (until > Date.now()) localStorage.setItem(cooldownKey(entityId), String(until));
     else localStorage.removeItem(cooldownKey(entityId));
   } catch {
-    /* nessun problema: il pulsante resta comunque disabilitato in memoria */
+    /* no problem: the button stays disabled in memory anyway */
   }
 }
 
@@ -1124,18 +1124,18 @@ function updateSendButton() {
   const left = Math.max(0, state.cooldownUntil - Date.now());
   if (state.sending) {
     refs.send.disabled = true;
-    refs.send.textContent = 'Invio…';
+    refs.send.textContent = 'Sending…';
     refs.sendNote.textContent = '';
     return;
   }
   if (left > 0) {
     refs.send.disabled = true;
-    refs.send.textContent = 'Invia al registro';
-    refs.sendNote.textContent = `puoi scrivere di nuovo tra ${Math.ceil(left / 1000)} s`;
+    refs.send.textContent = 'Send to the ledger';
+    refs.sendNote.textContent = `you can write again in ${Math.ceil(left / 1000)} s`;
     return;
   }
   refs.send.disabled = false;
-  refs.send.textContent = 'Invia al registro';
+  refs.send.textContent = 'Send to the ledger';
   refs.sendNote.textContent = '';
 }
 
@@ -1147,16 +1147,16 @@ async function sendMessage(entity) {
   const author = refs.authorInput.value.trim();
 
   if (!text) {
-    showFormError('Scrivi un messaggio prima di inviare.');
+    showFormError('Write a message before sending.');
     refs.textInput.focus();
     return;
   }
   if (text.length > 500) {
-    showFormError('Il messaggio supera i 500 caratteri.');
+    showFormError('The message exceeds 500 characters.');
     return;
   }
   if (author.length > 40) {
-    showFormError('Il nome supera i 40 caratteri.');
+    showFormError('The name exceeds 40 characters.');
     return;
   }
   if (state.cooldownUntil > Date.now()) {
@@ -1181,7 +1181,7 @@ async function sendMessage(entity) {
   state.sending = false;
 
   if (!result.ok) {
-    showFormError(result.error || `Invio non riuscito${result.status ? ` (HTTP ${result.status})` : ''}.`);
+    showFormError(result.error || `Send failed${result.status ? ` (HTTP ${result.status})` : ''}.`);
     if (result.status === 429 && /one message per minute/i.test(result.error || '')) {
       beginCooldown(entity.id);
     }
@@ -1215,12 +1215,12 @@ async function refreshChannel(entity) {
     state.channelMessages = res.data;
     renderMessageList();
   } else {
-    showFormError(`Messaggio inviato. Rilettura del canale non riuscita: ${res.error || 'formato inatteso'}.`);
+    showFormError(`Message sent. Re-reading the channel failed: ${res.error || 'unexpected format'}.`);
   }
 }
 
 /* ------------------------------------------------------------------ */
-/* Registro                                                            */
+/* Ledger                                                              */
 /* ------------------------------------------------------------------ */
 
 function parseLedger(text) {
@@ -1241,7 +1241,7 @@ function parseLedger(text) {
 }
 
 function entryType(entry) {
-  return stringOf(entry && entry.type).trim() || 'senza tipo';
+  return stringOf(entry && entry.type).trim() || 'untyped';
 }
 
 const SECRET_KEY = /secret|seed|ufvk|private|api[_-]?key|viewing|key|ciphertext/i;
@@ -1266,15 +1266,15 @@ function summarize(entry) {
   if (e.private === true) {
     const size = Number(e.size);
     return Number.isFinite(size)
-      ? `voce privata, cifrata, ${formatInt(size)} byte`
-      : 'voce privata, cifrata, dimensione non dichiarata';
+      ? `private entry, encrypted, ${formatInt(size)} bytes`
+      : 'private entry, encrypted, size not declared';
   }
   try {
     const compact = JSON.stringify(scrub(e.data));
     if (!compact) return '—';
     return compact.length > 120 ? `${compact.slice(0, 119)}…` : compact;
   } catch {
-    return 'dati non serializzabili';
+    return 'data not serializable';
   }
 }
 
@@ -1288,7 +1288,7 @@ function renderLedger({ ledger }) {
     state.ledger = { entries: [], parseErrors: 0 };
     refs.ledgerTable.replaceChildren(errorBlock('/ledger', ledger));
     refs.ledgerNote.textContent = '';
-    refs.filter.replaceChildren(el('option', { value: 'all', text: 'tutti i tipi' }));
+    refs.filter.replaceChildren(el('option', { value: 'all', text: 'all types' }));
     refs.filter.value = 'all';
     refs.filter.disabled = true;
     return;
@@ -1300,13 +1300,13 @@ function renderLedger({ ledger }) {
   const tbody = el('tbody');
   refs.ledgerTbody = tbody;
   const table = el('table', { class: 'ledger' },
-    el('caption', { class: 'sr-only', text: 'Ultime 100 voci del registro pubblico' }),
+    el('caption', { class: 'sr-only', text: 'Last 100 entries of the public ledger' }),
     el('thead', {},
       el('tr', {},
         el('th', { scope: 'col', text: 'Seq' }),
-        el('th', { scope: 'col', text: 'Ora' }),
-        el('th', { scope: 'col', text: 'Tipo' }),
-        el('th', { scope: 'col', text: 'Dati' }),
+        el('th', { scope: 'col', text: 'Time' }),
+        el('th', { scope: 'col', text: 'Type' }),
+        el('th', { scope: 'col', text: 'Data' }),
       ),
     ),
     tbody,
@@ -1326,12 +1326,12 @@ function buildTypeFilter(entries) {
     const type = entryType(entry);
     counts.set(type, (counts.get(type) || 0) + 1);
   }
-  const types = Array.from(counts.keys()).sort((a, b) => a.localeCompare(b, 'it'));
+  const types = Array.from(counts.keys()).sort((a, b) => a.localeCompare(b, 'en-GB'));
 
   if (state.filter !== 'all' && !counts.has(state.filter)) state.filter = 'all';
 
   refs.filter.replaceChildren(
-    el('option', { value: 'all', text: `tutti i tipi (${entries.length})` }),
+    el('option', { value: 'all', text: `all types (${entries.length})` }),
     ...types.map((type) => el('option', {
       value: type,
       text: `${type} (${counts.get(type)})`,
@@ -1353,7 +1353,7 @@ function renderLedgerRows() {
 
   if (!entries.length) {
     refs.ledgerTbody.replaceChildren(
-      el('tr', {}, el('td', { class: 'table-empty', colspan: '4', text: 'Nessuna voce da mostrare.' })),
+      el('tr', {}, el('td', { class: 'table-empty', colspan: '4', text: 'No entries to show.' })),
     );
   } else {
     refs.ledgerTbody.replaceChildren(...entries.map((entry) => {
@@ -1370,17 +1370,17 @@ function renderLedgerRows() {
     }));
   }
 
-  const filterNote = state.filter !== 'all' ? ` · filtro: ${state.filter}` : '';
+  const filterNote = state.filter !== 'all' ? ` · filter: ${state.filter}` : '';
   const errorNote = state.ledger.parseErrors
-    ? ` · ${state.ledger.parseErrors} righe non leggibili`
+    ? ` · ${state.ledger.parseErrors} unreadable lines`
     : '';
-  refs.ledgerNote.textContent = `${entries.length} voci mostrate (massimo ${MAX_LEDGER_ROWS})${filterNote}${errorNote}`;
+  refs.ledgerNote.textContent = `${entries.length} entries shown (max ${MAX_LEDGER_ROWS})${filterNote}${errorNote}`;
   if (state.ledger.parseErrors) refs.ledgerNote.classList.add('danger-text');
   else refs.ledgerNote.classList.remove('danger-text');
 }
 
 /* ------------------------------------------------------------------ */
-/* Verifica della catena                                               */
+/* Verifying the chain                                                 */
 /* ------------------------------------------------------------------ */
 
 async function sha256Hex(value) {
@@ -1407,8 +1407,8 @@ function setSeal(kind, title, detail, progress, count) {
 function setSealPending() {
   setSeal(
     'pending',
-    'in attesa del registro…',
-    'la verifica parte appena /ledger risponde',
+    'waiting for the ledger…',
+    'verification starts as soon as /ledger responds',
     0,
     '—',
   );
@@ -1417,8 +1417,8 @@ function setSealPending() {
 function setSealRunning(done, total) {
   setSeal(
     'running',
-    `verifica ${done}/${total}…`,
-    'sha256 di ogni riga · controllo del collegamento prev',
+    `verifying ${done}/${total}…`,
+    'sha256 of every line · checking the prev link',
     total ? (done / total) * 100 : 0,
     `${done} / ${total}`,
   );
@@ -1427,10 +1427,10 @@ function setSealRunning(done, total) {
 function setSealOk(count, head) {
   setSeal(
     'ok',
-    'catena verificata nel browser',
-    `${formatInt(count)} voci · head ${shortHash(head)}`,
+    'chain verified in the browser',
+    `${formatInt(count)} entries · head ${shortHash(head)}`,
     100,
-    '100 %',
+    '100%',
   );
 }
 
@@ -1442,32 +1442,32 @@ function setBrowserPending() {
   const refs = state.refs;
   if (!refs) return;
   refs.browserResult.className = 'verify-result is-pending';
-  refs.browserResult.textContent = 'in corso nel browser…';
-  refs.browserDetail.textContent = 'sha256 riga per riga, poi il collegamento prev';
+  refs.browserResult.textContent = 'running in the browser…';
+  refs.browserDetail.textContent = 'sha256 line by line, then the prev link';
 }
 
 function setBrowserOk(count, head) {
   const refs = state.refs;
   if (!refs) return;
   refs.browserResult.className = 'verify-result is-ok';
-  refs.browserResult.textContent = `catena verificata nel browser: ${formatInt(count)} voci, head ${shortHash(head)}`;
+  refs.browserResult.textContent = `chain verified in the browser: ${formatInt(count)} entries, head ${shortHash(head)}`;
   refs.browserDetail.textContent = `head ${head}`;
 }
 
 function setBrowserBad(fail, validCount, head) {
   const refs = state.refs;
   if (!refs) return;
-  const where = fail.seq !== null && fail.seq !== undefined ? `voce ${fail.seq}` : `riga ${fail.index}`;
+  const where = fail.seq !== null && fail.seq !== undefined ? `entry ${fail.seq}` : `line ${fail.index}`;
   refs.browserResult.className = 'verify-result is-bad';
-  refs.browserResult.textContent = `catena interrotta alla ${where}: ${fail.reason}`;
-  refs.browserDetail.textContent = `${formatInt(validCount)} voci valide · ultimo hash valido ${head}`;
+  refs.browserResult.textContent = `chain broken at ${where}: ${fail.reason}`;
+  refs.browserDetail.textContent = `${formatInt(validCount)} valid entries · last valid hash ${head}`;
 }
 
 function setBrowserUnavailable(reason) {
   const refs = state.refs;
   if (!refs) return;
   refs.browserResult.className = 'verify-result is-bad';
-  refs.browserResult.textContent = 'verifica non disponibile nel browser';
+  refs.browserResult.textContent = 'verification not available in the browser';
   refs.browserDetail.textContent = reason;
 }
 
@@ -1477,15 +1477,15 @@ function renderServerResult(verify) {
 
   if (!verify || !verify.ok) {
     refs.serverResult.className = 'verify-result is-bad';
-    refs.serverResult.textContent = 'non disponibile';
-    refs.serverDetail.textContent = `${verify && verify.error ? verify.error : 'errore'}${verify && verify.at ? ` · ${fetchedLabel(verify.at)}` : ''}`;
+    refs.serverResult.textContent = 'not available';
+    refs.serverDetail.textContent = `${verify && verify.error ? verify.error : 'error'}${verify && verify.at ? ` · ${fetchedLabel(verify.at)}` : ''}`;
     return;
   }
 
   const data = verify.data && typeof verify.data === 'object' ? verify.data : {};
   const ok = data.ok === true;
   refs.serverResult.className = `verify-result ${ok ? 'is-ok' : 'is-bad'}`;
-  refs.serverResult.textContent = `${ok ? 'ok' : 'NON ok'} · ${formatInt(data.entries)} voci · head ${shortHash(data.head)}`;
+  refs.serverResult.textContent = `${ok ? 'ok' : 'NOT ok'} · ${formatInt(data.entries)} entries · head ${shortHash(data.head)}`;
   refs.serverDetail.textContent = `head ${stringOf(data.head) || '—'} · /verify · ${fetchedLabel(verify.at)}`;
 }
 
@@ -1494,8 +1494,8 @@ async function verifyLedger(ledger, { animate, run, verifyRes }) {
   if (!refs) return;
 
   if (!ledger.ok) {
-    setSealBad('registro non disponibile', ledger.error || 'impossibile leggere /ledger', 0, '—');
-    setBrowserUnavailable(ledger.error || 'impossibile leggere /ledger');
+    setSealBad('ledger not available', ledger.error || 'cannot read /ledger', 0, '—');
+    setBrowserUnavailable(ledger.error || 'cannot read /ledger');
     renderServerResult(verifyRes);
     return;
   }
@@ -1504,15 +1504,15 @@ async function verifyLedger(ledger, { animate, run, verifyRes }) {
   const total = lines.length;
 
   if (!total) {
-    setSealBad('registro vuoto', 'nessuna voce da verificare in /ledger', 0, '0 / 0');
-    setBrowserUnavailable('il registro non contiene voci');
+    setSealBad('empty ledger', 'no entries to verify in /ledger', 0, '0 / 0');
+    setBrowserUnavailable('the ledger contains no entries');
     renderServerResult(verifyRes);
     return;
   }
 
   if (!globalThis.crypto || !crypto.subtle) {
-    const reason = 'WebCrypto non disponibile: apri la pagina via http:// o https:// (contesto sicuro).';
-    setSealBad('verifica non disponibile nel browser', reason, 0, `0 / ${total}`);
+    const reason = 'WebCrypto not available: open the page via http:// or https:// (secure context).';
+    setSealBad('verification not available in the browser', reason, 0, `0 / ${total}`);
     setBrowserUnavailable(reason);
     renderServerResult(verifyRes);
     return;
@@ -1536,27 +1536,27 @@ async function verifyLedger(ledger, { animate, run, verifyRes }) {
     try {
       entry = JSON.parse(lines[index]);
     } catch {
-      fail = { index: index + 1, seq: null, reason: 'riga non leggibile (JSON non valido)' };
+      fail = { index: index + 1, seq: null, reason: 'unreadable line (invalid JSON)' };
       break;
     }
 
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-      fail = { index: index + 1, seq: null, reason: 'voce non valida' };
+      fail = { index: index + 1, seq: null, reason: 'invalid entry' };
       break;
     }
 
     const seq = entry.seq !== null && entry.seq !== undefined ? entry.seq : index + 1;
 
     if (typeof entry.prev !== 'string') {
-      fail = { index: index + 1, seq, reason: 'campo prev assente' };
+      fail = { index: index + 1, seq, reason: 'missing prev field' };
       break;
     }
     if (entry.prev !== prev) {
-      fail = { index: index + 1, seq, reason: 'prev non collegato alla voce precedente' };
+      fail = { index: index + 1, seq, reason: 'prev not linked to the previous entry' };
       break;
     }
     if (typeof entry.hash !== 'string') {
-      fail = { index: index + 1, seq, reason: 'campo hash assente' };
+      fail = { index: index + 1, seq, reason: 'missing hash field' };
       break;
     }
 
@@ -1567,7 +1567,7 @@ async function verifyLedger(ledger, { animate, run, verifyRes }) {
       delete copy.hash;
       body = JSON.stringify(copy);
     } catch {
-      fail = { index: index + 1, seq, reason: 'voce non serializzabile' };
+      fail = { index: index + 1, seq, reason: 'entry not serializable' };
       break;
     }
 
@@ -1575,7 +1575,7 @@ async function verifyLedger(ledger, { animate, run, verifyRes }) {
     try {
       actual = await sha256Hex(body);
     } catch {
-      fail = { index: index + 1, seq, reason: 'calcolo sha256 non riuscito' };
+      fail = { index: index + 1, seq, reason: 'sha256 computation failed' };
       break;
     }
 
@@ -1583,7 +1583,7 @@ async function verifyLedger(ledger, { animate, run, verifyRes }) {
       fail = {
         index: index + 1,
         seq,
-        reason: `hash non corrispondente (atteso ${shortHash(expected)}, calcolato ${shortHash(actual)})`,
+        reason: `hash mismatch (expected ${shortHash(expected)}, computed ${shortHash(actual)})`,
       };
       break;
     }
@@ -1599,7 +1599,7 @@ async function verifyLedger(ledger, { animate, run, verifyRes }) {
       else if (valid % 100 === 0) await sleep(0);
       if (run !== state.run) return;
     } else if (total > 500 && valid % 250 === 0) {
-      /* anche un registro lungo deve lasciare respirare il rendering */
+      /* even a long ledger must give the rendering room to breathe */
       await sleep(0);
       if (run !== state.run) return;
     }
@@ -1610,7 +1610,7 @@ async function verifyLedger(ledger, { animate, run, verifyRes }) {
   if (fail) {
     const progress = total ? (valid / total) * 100 : 0;
     const where = fail.seq !== null && fail.seq !== undefined ? fail.seq : fail.index;
-    setSealBad(`catena interrotta alla voce ${where}`, fail.reason, progress, `${valid} / ${total}`);
+    setSealBad(`chain broken at entry ${where}`, fail.reason, progress, `${valid} / ${total}`);
     setBrowserBad(fail, valid, prev);
   } else {
     setSealOk(valid, prev);
@@ -1621,7 +1621,7 @@ async function verifyLedger(ledger, { animate, run, verifyRes }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Attestazione                                                        */
+/* Attestation                                                         */
 /* ------------------------------------------------------------------ */
 
 function renderAttestation({ attestation, root }) {
@@ -1646,11 +1646,11 @@ function renderAttestation({ attestation, root }) {
     const quote = typeof data.quote === 'string' ? data.quote : '';
 
     nodes.push(facts([
-      ['Modalità', mode === 'tee' ? 'tee · TDX' : (mode === 'dev' ? 'dev · NON attestata' : 'non dichiarata')],
-      ['App', stringOf(data.app).trim() || 'non dichiarato'],
-      ['Compose', stringOf(data.compose).trim() || 'non dichiarato'],
-      ['Quote', quote ? el('code', { class: 'inline-code', text: `${quote.slice(0, 16)}…` }) : 'non presente'],
-      ['Lunghezza quote', quote ? `${formatInt(quote.length)} caratteri` : '—'],
+      ['Mode', mode === 'tee' ? 'tee · TDX' : (mode === 'dev' ? 'dev · NOT attested' : 'not declared')],
+      ['App', stringOf(data.app).trim() || 'not declared'],
+      ['Compose', stringOf(data.compose).trim() || 'not declared'],
+      ['Quote', quote ? el('code', { class: 'inline-code', text: `${quote.slice(0, 16)}…` }) : 'not present'],
+      ['Quote length', quote ? `${formatInt(quote.length)} characters` : '—'],
     ], 'facts attest-facts'));
 
     if (attestation.ok) {
@@ -1659,26 +1659,26 @@ function renderAttestation({ attestation, root }) {
           href: `${state.entity.base}/attestation`,
           target: '_blank',
           rel: 'noreferrer noopener',
-          text: 'Apri /attestation',
+          text: 'Open /attestation',
         }),
         el('span', { class: 'meta-sep', text: '·' }),
         el('a', {
           href: `${state.entity.base}/verify`,
           target: '_blank',
           rel: 'noreferrer noopener',
-          text: 'Apri /verify',
+          text: 'Open /verify',
         }),
       ));
     } else {
-      nodes.push(el('p', { class: 'src', text: '/attestation non disponibile: mostro solo i metadati presenti in /.' }));
+      nodes.push(el('p', { class: 'src', text: '/attestation not available: showing only the metadata present in /.' }));
     }
 
     if (mode === 'dev') {
-      nodes.push(el('p', { class: 'warn-note', text: 'Questa entità gira in modalità dev: NON è attestata.' }));
+      nodes.push(el('p', { class: 'warn-note', text: 'This entity runs in dev mode: it is NOT attested.' }));
     }
 
     nodes.push(el('p', { class: 'commitment' },
-      "L'impronta dell'immagine è fissata nel repository pubblico ",
+      'The image fingerprint is pinned in the public repository ',
       el('a', {
         href: 'https://github.com/nocontentinhere4-art/entity-enclave',
         target: '_blank',
@@ -1687,7 +1687,7 @@ function renderAttestation({ attestation, root }) {
       }),
       ' (',
       el('code', { class: 'inline-code', text: 'deploy/docker-compose.phala.yml' }),
-      '). La quote non è verificata crittograficamente nel browser.',
+      '). The quote is not cryptographically verified in the browser.',
     ));
   }
 
@@ -1695,11 +1695,11 @@ function renderAttestation({ attestation, root }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Avvio                                                               */
+/* Startup                                                             */
 /* ------------------------------------------------------------------ */
 
 function init() {
-  // Dev only: `?base=http://localhost:8080` points Entità 1 at a local enclave (fake modes) to test the UI.
+  // Dev only: `?base=http://localhost:8080` points Entity 1 at a local enclave (fake modes) to test the UI.
   const devBase = new URLSearchParams(window.location.search).get('base');
   if (devBase && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(devBase)) ENTITIES[0].base = devBase;
   buildTabs();

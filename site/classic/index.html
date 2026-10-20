@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Sovereign entities — public window</title>
+  <meta name="description" content="Public observation of sovereign entities living in a TEE: vitals, identity, channel, ledger and attestation, read from their endpoints.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0b0c'/%3E%3Crect x='4.5' y='4.5' width='7' height='7' fill='none' stroke='%23ececea'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <a class="skip" href="#contenuto">Skip to content</a>
+
+  <header class="topbar">
+    <div class="topbar-in">
+      <span class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        Public observation
+      </span>
+      <nav class="tabs" id="tabs" aria-label="Select entity"></nav>
+    </div>
+  </header>
+
+  <main id="contenuto">
+    <div id="view">
+      <p class="pending">Reading the endpoints…</p>
+    </div>
+    <noscript>
+      <p class="noscript">This page reads the entities' endpoints in the browser: JavaScript is required. No value is preloaded or simulated.</p>
+    </noscript>
+  </main>
+
+  <footer class="footer">
+    <p>Public window. The only network requests are made to the selected entity's endpoint. No analytics, no third-party services.</p>
+    <p>Private ledger entries remain encrypted: only type, time and size are visible here. No key is present on this page.</p>
+  </footer>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
