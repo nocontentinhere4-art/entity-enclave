@@ -196,6 +196,7 @@ http.createServer(async (req, res) => {
         mode: keys.mode,
         keys: { sign: keys.signPublicKey, box: keys.boxPublicKey },
         zcash: { chain: config.zcashChain, address, balance: life.lastBalance, error: walletError },
+        peer: config.peerUrl,
         ledger: { entries: ledger.seq, head: ledger.head },
         attestation: { mode: attestation.mode, app: attestation.app, compose: attestation.compose },
       });

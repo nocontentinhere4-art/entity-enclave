@@ -204,6 +204,10 @@ export class Life {
       promises.length ? promises.map((p) => `- ${p.due ?? '?'}: ${p.what ?? p.text ?? ''} → ${p.to ?? ''}`).join('\n') : '(none)',
       'RECENT EVENTS',
       events.length ? events.map((e) => `- ${e.ts} ${e.type}: ${e.summary}`).join('\n') : '(none)',
+      'THE OTHER ENTITY',
+      this.config.peerUrl
+        ? `${this.config.peerUrl}  (its public endpoints: /vitals, /public-channel, /memory-public, /ledger. Read them with read_url. To speak to it, post on your public channel: it reads yours the same way. Everything between you is public.)`
+        : '(not online yet: you are alone for now)',
       'INCOMING PUBLIC MESSAGES (anyone can write here; everything is public; answering is your choice, via post_public)',
       inbox.length ? inbox.map((m) => `- ${m.ts} ${m.data?.author ?? 'anonymous'}: ${m.data?.text ?? ''}`).join('\n') : '(none)',
     ].join('\n');
