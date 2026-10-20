@@ -56,7 +56,7 @@ export const config = {
   port: num(process.env.PORT, 8080),
   charterPath: process.env.CHARTER_PATH ?? './charter.md',
   // The other entity's public base URL (its /, /vitals, /public-channel …). Empty until the second one exists.
-  peerUrl: (process.env.PEER_URL ?? '').trim() || null,
+  peerUrl: (process.env.PEER_URL ?? '').trim().replace(/\/+$/, '') || null,
   allowDev: bool(process.env.ALLOW_DEV, false),
   fakeWallet: bool(process.env.FAKE_WALLET, false),
   fakeBalanceZats: num(process.env.FAKE_BALANCE_ZATS, 5_000_000),

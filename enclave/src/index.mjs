@@ -180,6 +180,8 @@ http.createServer(async (req, res) => {
   res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
   res.setHeader('access-control-allow-headers', 'content-type');
   const json = (code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body, null, 1)); };
+  // Tolerate `//vitals` and `/vitals/`: a peer URL pasted with a trailing slash must still work.
+  req.url = (req.url.split('?')[0].replace(/\/{2,}/g, '/').replace(/(.)\/+$/, '$1')) || '/';
   try {
     if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
     if (req.method === 'POST' && req.url === '/public-channel') {
