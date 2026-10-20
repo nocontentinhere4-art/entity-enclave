@@ -1,0 +1,30 @@
+# MAINNET compose (real ZEC). Same image as testnet; only the chain, the economics and the landlord change.
+# Per CVM in the dashboard: SELF_URL, PEER_URL, PARENT_URL (children only) and the secrets REDPILL_API_KEY, PHALA_API_KEY.
+services:
+  entity:
+    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:0f22206b3076746c84dc8520d67b562ac774602d4b2f01609fb4807a9c2486bc
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/dstack.sock:/var/run/dstack.sock
+      - entity-state:/state
+    environment:
+      - ARCHIVE_PUBKEY=c1e8f8b399500f35273dfc0ce126b64c630b52947023811fab929004ed975837
+      - ZCASH_CHAIN=mainnet
+      - ZCASH_SERVER=https://zec.rocks:443
+      - ZCASH_BIRTHDAY=3524000
+      - RENT_ZATS_PER_HOUR=10000
+      - PRICE_SCALE=0.01
+      - BIRTH_MIN_ZATS=20000
+      - SPAWN_MIN_ZATS=30000000
+      - CHILD_GIFT_ZATS=15000000
+      - WHISPER_MIN_ZATS=1000
+      - RENT_ADDRESS=REPLACE_WITH_YOUR_MAINNET_U1_ADDRESS
+      - TICK_MS=300000
+      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:0f22206b3076746c84dc8520d67b562ac774602d4b2f01609fb4807a9c2486bc
+      - GATEWAY_DOMAIN=dstack-pha-prod9.phala.network
+      - FAKE_LLM=0
+      - FAKE_WALLET=0
+    restart: unless-stopped
+volumes:
+  entity-state:
