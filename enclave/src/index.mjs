@@ -153,7 +153,7 @@ async function probeProviders() {
 }
 
 const pricing = new Pricing({ ledger });
-const rent = new Rent({ ledger, wallet, config });
+const rent = new Rent({ ledger, wallet, config, pricing });
 const promises = new Promises({ ledger, memory });
 const inference = new Inference({ config, ledger, pricing });
 // The other entities this one knows: the sibling (PEER_URL), the parent (PARENT_URL) and every child it paid for.

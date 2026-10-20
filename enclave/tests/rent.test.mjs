@@ -43,7 +43,22 @@ test('payHour sends to the landlord and publishes a rent_paid receipt', async ()
   const r = new Rent({ ledger, wallet, config });
   const { txid } = await r.payHour();
   assert.equal(txid, 'tx-1');
-  assert.deepEqual(wallet.sends, [{ to: 'landlord', zats: 1000, memo: 'rent' }]);
+  assert.deepEqual(wallet.sends, [{ to: 'landlord', zats: 1000, memo: 'rent 1000 + compute 0' }]);
   assert.equal(ledger.of('rent_paid').length, 1);
-  assert.deepEqual(ledger.of('rent_paid')[0].data, { to: 'landlord', zats: 1000, txid: 'tx-1' });
+  assert.deepEqual(ledger.of('rent_paid')[0].data, { to: 'landlord', zats: 1000, rentZats: 1000, computeZats: 0, txid: 'tx-1' });
+});
+
+test('payHour settles the thinking charges accumulated since the last payment', async () => {
+  const ledger = new FakeLedger(), wallet = new FakeWallet();
+  const pricing = { unsettled: 42_000, unsettledZats() { return this.unsettled; }, settle() { const z = this.unsettled; this.unsettled = 0; return z; } };
+  const r = new Rent({ ledger, wallet, config, pricing });
+  const { zats } = await r.payHour();
+  assert.equal(zats, 43_000);
+  assert.equal(pricing.unsettled, 0);
+  assert.equal(ledger.of('rent_paid')[0].data.computeZats, 42_000);
+});
+
+test('payHour refuses without a rent address, with a clear code', async () => {
+  const r = new Rent({ ledger: new FakeLedger(), wallet: new FakeWallet(), config: { ...config, rentAddress: '' } });
+  await assert.rejects(() => r.payHour(), (e) => e.code === 'no_rent_address');
 });

@@ -17,6 +17,7 @@ export class Pricing {
   }
 
   #billed = new Map(); // "${tickId}:${action}" -> costZats
+  #unsettled = 0;      // charges not yet paid on-chain; settled together with the hourly rent
 
   /** True cost and affordability, no side effects. Unknown action = coding error, fail loud. */
   quote(action, treasuryZats = 0) {
@@ -32,9 +33,16 @@ export class Pricing {
     const key = `${tickId}:${action}`;
     if (this.#billed.has(key)) return this.#billed.get(key);
     this.#billed.set(key, costZats);
+    this.#unsettled += costZats;
     this.ledger.append('charge', { action, tickId, costZats });
     return costZats;
   }
+
+  /** Charges accumulated since the last on-chain settlement. */
+  unsettledZats() { return this.#unsettled; }
+
+  /** Called once the hourly payment went through: the charges are now real. */
+  settle() { const z = this.#unsettled; this.#unsettled = 0; return z; }
 
   #rehydrate() {
     try {
@@ -43,7 +51,8 @@ export class Pricing {
       for (const line of readFileSync(this.ledger.path, 'utf8').split('\n')) {
         if (!line) continue;
         const e = JSON.parse(line); // torn trailing lines are ignored: same policy as Ledger itself
-        if (e.type === 'charge') this.#billed.set(`${e.data.tickId}:${e.data.action}`, e.data.costZats);
+        if (e.type === 'charge') { this.#billed.set(`${e.data.tickId}:${e.data.action}`, e.data.costZats); this.#unsettled += Number(e.data.costZats) || 0; }
+        else if (e.type === 'rent_paid') this.#unsettled = 0; // everything before a settlement was paid
       }
     } catch { /* keep going: idempotency best-effort, the chain remains the source of truth */ }
   }

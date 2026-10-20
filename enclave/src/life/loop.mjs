@@ -142,7 +142,15 @@ export class Life {
       const roundContext = results.length
         ? `${context}\nTOOL RESULTS (this cycle, round ${round - 1})\n${results.map((r) => `- ${r}`).join('\n')}`
         : context;
-      const thought = await this.inference.think({ context: roundContext, speed: roundSpeed, tools: this.tools.list(), tickId: `${tickId}:r${round}` });
+      let thought;
+      try {
+        thought = await this.inference.think({ context: roundContext, speed: roundSpeed, tools: this.tools.list(), tickId: `${tickId}:r${round}` });
+      } catch (e) {
+        // A slow or failing deep model must not cost the whole cycle: one retry on the fast one, then give up.
+        if (roundSpeed !== 'deep' || !['timeout', 'llm_http', 'TimeoutError'].includes(e?.code ?? e?.name)) throw e;
+        this.ledger.append('think_retry', { from: 'deep', to: 'fast', ...digestError('think', e) });
+        thought = await this.inference.think({ context: roundContext, speed: 'fast', tools: this.tools.list(), tickId: `${tickId}:r${round}f` });
+      }
       costZats += Number(thought.costZats) || 0;
       // The spoken thought is public: the text the entity writes each round goes to the ledger as its voice.
       // (Tools are separate: the diary stays private; post_public is the channel.)
