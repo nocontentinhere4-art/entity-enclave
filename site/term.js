@@ -14,6 +14,8 @@ import {
   COOLDOWN_MS,
   REFRESH_MS,
   applyDevBase,
+  applyDevBase2,
+  peerUrlOf,
   fetchSnapshot,
   postMessage,
   request,
@@ -45,7 +47,8 @@ const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 const state = {
   handle: '',
   selected: 'e1',
-  snap: null,
+  // one read per entity: { data: <fetchSnapshot shape>, at: Date, stale: bool, dev: bool }
+  snaps: { e1: null, e2: null },
   fetchedAt: null,
   stale: false,
   dev: false,
@@ -68,6 +71,24 @@ let promptPrefix = null;
 
 function entity(id = state.selected) {
   return ENTITIES.find((item) => item.id === id) || ENTITIES[0];
+}
+
+function snapshotOf(id = state.selected) {
+  const read = state.snaps[id];
+  return read ? read.data : null;
+}
+
+/**
+ * Reads `peer` from Entity 1's root. Discovery happens only while Entity 2
+ * has no base, so a `?base2=` override is never overwritten.
+ * Returns true when a new base was adopted.
+ */
+function discoverPeer(rootData) {
+  if (ENTITIES[1].base) return false;
+  const peer = peerUrlOf(rootData && rootData.peer);
+  if (!peer) return false;
+  ENTITIES[1].base = peer;
+  return true;
 }
 
 /* ------------------------------------------------------------------ */
@@ -194,7 +215,7 @@ function showLogin() {
       'aria-label': 'alias or handle',
     });
 
-    const status = el('p', { class: 'login-status', text: 'mystic-like: 2 nodes · entities online: 1/2 · network: …' });
+    const status = el('p', { class: 'login-status', text: 'mystic-like: 2 nodes · entities online: …/2 · network: …' });
 
     const form = el('form', { class: 'login-form', novalidate: true },
       el('label', { class: 'login-label', for: 'alias', text: 'enter your alias/handle:' }),
@@ -226,20 +247,58 @@ function showLogin() {
     });
 
     // fills the status line as soon as possible (read-only, never crashes)
-    void (async () => {
-      const base = ENTITIES[0].base;
-      if (!base) return;
-      const res = await request(base, '/');
-      if (state.destroyed) return;
-      let chain = '—';
-      let online = '—';
-      if (res.ok && res.data) {
-        chain = stringOf(res.data.zcash && res.data.zcash.chain) || 'not declared';
-        online = '1/2';
-      }
-      status.textContent = `mystic-like: ${ENTITIES.length} nodes · entities online: ${online} · network: ${chain}`;
-    })();
+    void fillLoginStatus(status);
   });
+}
+
+/**
+ * Login status: discovered bases count as online; vitals tell who is alive
+ * and who is still waiting to be born. Entity 2 is discovered here too, so
+ * the main screen can fetch both snapshots immediately.
+ */
+async function fillLoginStatus(status) {
+  const base1 = ENTITIES[0].base;
+  if (!base1) return;
+
+  const root1 = await request(base1, '/');
+  if (state.destroyed) return;
+
+  let chain = '—';
+  if (root1.ok && root1.data) {
+    chain = stringOf(root1.data.zcash && root1.data.zcash.chain) || 'not declared';
+    discoverPeer(root1.data);
+  }
+
+  const online = ENTITIES.filter((item) => item.base);
+  const reads = await Promise.all(online.map(async (item) => {
+    if (item.id === 'e1') {
+      return { id: item.id, vitals: await request(item.base, '/vitals') };
+    }
+    const [root, vitals] = await Promise.all([
+      request(item.base, '/'),
+      request(item.base, '/vitals'),
+    ]);
+    return { id: item.id, root, vitals };
+  }));
+  if (state.destroyed) return;
+
+  let alive = 0;
+  let waiting = 0;
+  let known = 0;
+  for (const read of reads) {
+    if (!read.vitals || !read.vitals.ok || !read.vitals.data) continue;
+    known += 1;
+    if (read.vitals.data.state === 'alive') alive += 1;
+    else if (read.vitals.data.state === 'unborn') waiting += 1;
+  }
+
+  const parts = [`entities online: ${online.length}/${ENTITIES.length}`];
+  if (known) {
+    const bits = [`${alive} alive`];
+    if (waiting) bits.push(`${waiting} waiting`);
+    parts.push(bits.join(' · '));
+  }
+  status.textContent = `mystic-like: ${ENTITIES.length} nodes · ${parts.join(' · ')} · network: ${chain}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -248,7 +307,8 @@ function showLogin() {
 
 function promptText() {
   const handle = state.handle || 'anonymous';
-  const host = entity().base ? `entity-1` : `dim`;
+  const e = entity();
+  const host = e.id === 'e2' ? 'entity-2' : (e.base ? 'entity-1' : 'dim');
   return `${handle}@${host} >`;
 }
 
@@ -268,8 +328,10 @@ function enterMain(alias) {
 
   screenWipe(() => {
     state.selected = 'e1';
-    state.snap = null;
+    state.snaps = { e1: null, e2: null };
     state.fetchedAt = null;
+    state.stale = false;
+    state.dev = false;
 
     const roomHost = el('div', { class: 'room-host' });
     outEl = el('div', { class: 'out', id: 'out', 'aria-live': 'polite', tabindex: '-1' });
@@ -297,7 +359,12 @@ function enterMain(alias) {
     app.replaceChildren(screen);
 
     state.room = new Room(roomHost);
-    state.room.ingest(null, { stale: true, dev: false, lastRead: null });
+    state.room.ingest(null, {
+      stale: true,
+      dev: false,
+      lastRead: null,
+      online: { e1: Boolean(ENTITIES[0].base), e2: Boolean(ENTITIES[1].base) },
+    });
 
     promptInput.addEventListener('keydown', onPromptKey);
     form.addEventListener('submit', (event) => {
@@ -328,7 +395,8 @@ function banner() {
 
 function faceSize() {
   const narrow = window.innerWidth < 640;
-  return narrow ? { cols: 48, rows: 30, lines: 15, amplitude: 8 } : { cols: 72, rows: 40, lines: 20, amplitude: 11 };
+  // Dense relief: many lines, compressed vertically by the CSS line-height, pushed up to a third of the height.
+  return narrow ? { cols: 52, rows: 36, lines: 22, amplitude: 10 } : { cols: 80, rows: 46, lines: 30, amplitude: 13 };
 }
 
 /** Draws the face into `pre` line by line (~1.5 s), then breathes slowly while `alive` and the node is on screen. */
@@ -359,10 +427,15 @@ function cmdFace() {
   const e = entity();
   hdr('FACE');
   if (!e.base) {
-    note('Entity 2: not yet online · no face to show (nothing is invented).');
+    if (e.id === 'e2') note('Entity 2: not yet online · no face to show (nothing is invented).');
+    else note('this entity has no public endpoint · no face to show (nothing is invented).');
     return;
   }
-  const snap = state.snap || {};
+  const snap = snapshotOf();
+  if (!snap) {
+    err('!! no data read yet · use refresh');
+    return;
+  }
   const rootData = snap.root && snap.root.ok ? snap.root.data : null;
   const vitalsData = snap.vitals && snap.vitals.ok ? snap.vitals.data : null;
   const rawName = rootData ? stringOf(rootData.entity).trim() : '';
@@ -457,7 +530,7 @@ function cmdHelp() {
   hdr('COMMANDS');
   const cmds = [
     ['help', 'this list'],
-    ['1 / 2', 'select entity (2 = not yet online)'],
+    ['1 / 2', 'select entity (2 when discovered)'],
     ['who', 'identity: name, voice, image'],
     ['status', 'vitals, wallet, brain, attestation'],
     ['treasury', 'TAZ/ZEC, zatoshi, rent/hour, hours left'],
@@ -478,29 +551,33 @@ function cmdHelp() {
 }
 
 function cmdSelect(id) {
-  if (id === 'e2') {
-    state.selected = 'e2';
-    updatePrompt();
+  if (id === 'e2' && !ENTITIES[1].base) {
     push([{ t: 'Entity 2: not yet online', c: 'dim' }]);
     note('no endpoint, no estimate, no placeholder. Nothing is simulated.');
     return;
   }
-  state.selected = 'e1';
+  const next = id === 'e2' ? 'e2' : 'e1';
+  state.selected = next;
   updatePrompt();
-  push([{ t: 'Entity 1 selected', c: 'hi' }]);
+  push([{ t: `${entity(next).label} selected`, c: 'hi' }]);
+  const read = state.snaps[next];
+  if (read) note(`last read ${fetchedLabel(read.at)}${read.stale ? ' (stale data)' : ''}`);
+  else note('no snapshot read yet · use refresh');
 }
 
 function offlineOrData() {
-  if (state.selected === 'e2') {
-    push([{ t: 'Entity 2: not yet online', c: 'dim' }]);
+  const e = entity();
+  if (!e.base) {
+    if (e.id === 'e2') push([{ t: 'Entity 2: not yet online', c: 'dim' }]);
+    else err('!! no public endpoint for this entity');
     return null;
   }
-  const snap = state.snap;
-  if (!snap) {
+  const read = state.snaps[e.id];
+  if (!read) {
     err('!! no data read yet · use refresh');
     return null;
   }
-  return snap;
+  return read.data;
 }
 
 function stampLine(res, path) {
@@ -634,13 +711,22 @@ function channelOf(snap) {
 function cmdThoughts() {
   const snap = offlineOrData();
   if (!snap) return;
-  hdr('THOUGHTS (public posts)');
-  const list = channelOf(snap).filter((m) => m && m.from === 'entity').slice(-10);
+  hdr('THOUGHTS (spoken thoughts and public posts)');
+  const posts = channelOf(snap).filter((m) => m && m.from === 'entity').map((m) => ({ ts: m.ts, kind: 'post', text: stringOf(m.text) }));
+  const entries = [];
+  if (snap.ledger && snap.ledger.ok && typeof snap.ledger.text === 'string') {
+    for (const line of snap.ledger.text.split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      try { entries.push(JSON.parse(line)); } catch { /* torn line */ }
+    }
+  }
+  const spoken = entries.filter((e) => e && e.type === 'thought' && e.data).map((e) => ({ ts: e.ts, kind: 'thought', text: stringOf(e.data.text) }));
+  const list = [...posts, ...spoken].sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts)).slice(-12);
   if (!list.length) {
-    note('no public posts.');
+    note('no thoughts or posts yet.');
   } else {
     for (const m of list) {
-      push([{ t: `${hhmm(m.ts) || '—'} `, c: 'dim' }, { t: stringOf(m.text) }]);
+      push([{ t: `${hhmm(m.ts) || '—'} `, c: 'dim' }, { t: m.kind === 'thought' ? '(thinks) ' : '(posts) ', c: 'dim' }, { t: m.text }]);
     }
   }
   if (snap.channel) stampLine(snap.channel, '/public-channel');
@@ -656,7 +742,7 @@ function cmdChannel() {
   } else {
     for (const m of list) {
       const fromEntity = m && m.from === 'entity';
-      const who = fromEntity ? 'e1' : (stringOf(m.author).trim() || 'human');
+      const who = fromEntity ? entity().short : (stringOf(m.author).trim() || 'human');
       push([
         { t: `${hhmm(m.ts) || '—'} `, c: 'dim' },
         { t: `${who}: `, c: fromEntity ? 'acc' : 'hi' },
@@ -668,10 +754,6 @@ function cmdChannel() {
 }
 
 async function cmdSay(text) {
-  if (state.selected === 'e2') {
-    push([{ t: 'Entity 2: not yet online', c: 'dim' }]);
-    return;
-  }
   const e = entity();
   if (!e.base) {
     err('!! no public endpoint for this entity');
@@ -898,59 +980,98 @@ function cmdExit() {
 /* Refresh                                                             */
 /* ------------------------------------------------------------------ */
 
+async function readEntity(id) {
+  const item = entity(id);
+  if (!item.base) return null;
+  const data = await fetchSnapshot(item.base);
+  const modeKnown = data.root.ok || data.attestation.ok;
+  const previous = state.snaps[id];
+  const dev = modeKnown
+    ? Boolean(
+      (data.root.ok && data.root.data && data.root.data.mode === 'dev')
+      || (data.attestation.ok && data.attestation.data && data.attestation.data.mode === 'dev'),
+    )
+    : Boolean(previous && previous.dev);
+  const checks = [
+    ['/', data.root],
+    ['/vitals', data.vitals],
+    ['/memory-public', data.memory],
+    ['/public-channel', data.channel],
+    ['/ledger', data.ledger],
+    ['/verify', data.verify],
+    ['/attestation', data.attestation],
+    ['/memorial', data.memorial],
+  ];
+  const failures = checks.filter(([path, res]) => !res.ok && !(path === '/memorial' && res.notFound));
+  const anyOk = data.root.ok || data.vitals.ok || data.memory.ok || data.channel.ok || data.ledger.ok;
+  return { id, data, at: new Date(), stale: failures.length > 0, dev, failures, anyOk };
+}
+
 async function refresh({ announce = false, quiet = false } = {}) {
-  const e = ENTITIES[0]; // the room always shows the entity with an endpoint
-  if (state.selected === 'e2') {
-    push([{ t: 'Entity 2: not yet online', c: 'dim' }]);
-    return;
-  }
-  if (!e.base) {
+  if (!ENTITIES[0].base) {
     err('!! no public endpoint');
     return;
   }
 
   if (announce) note('reading endpoints…');
-  const snap = await fetchSnapshot(e.base);
-  if (state.destroyed) return;
+  const ids = ['e1'];
+  if (ENTITIES[1].base) ids.push('e2');
 
-  const modeKnown = snap.root.ok || snap.attestation.ok;
-  const dev = modeKnown
-    ? Boolean(
-      (snap.root.ok && snap.root.data && snap.root.data.mode === 'dev')
-      || (snap.attestation.ok && snap.attestation.data && snap.attestation.data.mode === 'dev'),
-    )
-    : state.dev;
-  const checks = [
-    ['/', snap.root],
-    ['/vitals', snap.vitals],
-    ['/memory-public', snap.memory],
-    ['/public-channel', snap.channel],
-    ['/ledger', snap.ledger],
-    ['/verify', snap.verify],
-    ['/attestation', snap.attestation],
-    ['/memorial', snap.memorial],
-  ];
-  const failures = checks.filter(([path, res]) => !res.ok && !(path === '/memorial' && res.notFound));
-  const anyOk = snap.root.ok || snap.vitals.ok || snap.memory.ok || snap.channel.ok || snap.ledger.ok;
-  state.stale = failures.length > 0;
-  state.dev = dev;
-  state.snap = snap;
-  state.fetchedAt = new Date();
+  // one snapshot per entity with a base, in parallel
+  const reads = (await Promise.all(ids.map((id) => readEntity(id)))).filter(Boolean);
+  if (state.destroyed) return;
+  for (const read of reads) {
+    state.snaps[read.id] = { data: read.data, at: read.at, stale: read.stale, dev: read.dev };
+  }
+
+  // Peer discovery uses Entity 1's already-fetched `/`: the first time it
+  // yields an https URL, Entity 2 gets a base and is read immediately.
+  const e1read = reads.find((read) => read.id === 'e1');
+  if (e1read && e1read.data.root.ok && discoverPeer(e1read.data.root.data)) {
+    const read2 = await readEntity('e2');
+    if (state.destroyed) return;
+    if (read2) {
+      state.snaps.e2 = { data: read2.data, at: read2.at, stale: read2.stale, dev: read2.dev };
+      reads.push(read2);
+    }
+  }
+
+  const failures = [];
+  for (const read of reads) {
+    for (const [path, res] of read.failures) failures.push({ id: read.id, path, res });
+  }
+  const anyOk = reads.some((read) => read.anyOk);
+  state.stale = reads.some((read) => read.stale);
+  state.dev = reads.some((read) => read.dev);
+  const times = reads.map((read) => read.at.getTime()).filter(Number.isFinite);
+  state.fetchedAt = new Date(times.length ? Math.max(...times) : Date.now());
 
   if (state.room) {
-    state.room.ingest(snap, { stale: state.stale, dev, lastRead: state.fetchedAt });
+    state.room.ingest(
+      {
+        e1: state.snaps.e1 ? state.snaps.e1.data : null,
+        e2: state.snaps.e2 ? state.snaps.e2.data : null,
+      },
+      {
+        stale: state.stale,
+        dev: state.dev,
+        lastRead: state.fetchedAt,
+        online: { e1: Boolean(ENTITIES[0].base), e2: Boolean(ENTITIES[1].base) },
+      },
+    );
   }
 
   if (!quiet) {
-    for (const [path, res] of failures) {
-      err(`!! ${path}: ${res.error || 'network unreachable'}`);
+    for (const failure of failures) {
+      const prefix = failure.id === 'e1' ? '' : `${failure.id} `;
+      err(`!! ${prefix}${failure.path}: ${failure.res.error || 'network unreachable'}`);
     }
     if (anyOk) {
       note(`data read at ${clockTime(state.fetchedAt) || '—'}${state.stale ? ' (stale data)' : ''}`);
     } else {
       err('(stale data) the room shows the last known state');
     }
-    if (dev) err('!! dev mode: this entity is NOT ATTESTED');
+    if (state.dev) err('!! dev mode: this entity is NOT ATTESTED');
   }
 }
 
@@ -997,6 +1118,7 @@ function init() {
   wipeEl = el('pre', { class: 'wipe', 'aria-hidden': 'true', hidden: true });
 
   applyDevBase(ENTITIES, window.location.search);
+  applyDevBase2(ENTITIES, window.location.search);
 
   try {
     state.handle = (localStorage.getItem(HANDLE_KEY) || '').trim().slice(0, 40);
@@ -1012,8 +1134,7 @@ function init() {
 
   window.setInterval(() => {
     if (document.hidden) return;
-    if (state.selected === 'e2') return;
-    if (state.snap && state.room) {
+    if (state.snaps.e1 && state.room) {
       void refresh({ announce: false, quiet: true });
     }
   }, REFRESH_MS);

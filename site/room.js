@@ -4,8 +4,9 @@
  * The room is a grid of characters. Two layers, visibly distinct:
  *   - ambient: walking, sitting, looking outside; purely decorative (~ ambient);
  *   - real: mapped from data (/vitals, /ledger, /public-channel); every line carries [real].
- * Entity 2 is not deployed (base null): its desk stays empty and no body
- * is drawn. Nothing is invented.
+ * Entity 1 is always present. Entity 2 appears as soon as it has a base
+ * (discovered through Entity 1's `peer`, or forced with ?base2=): before that
+ * its desk stays empty and no body is drawn. Nothing is invented.
  *
  * It also exposes the small DOM helpers (el/textNode/append) reused by term.js:
  * no network text ever enters through innerHTML.
@@ -159,12 +160,20 @@ const LAYOUTS = {
     corridor: { x0: 6, x1: 70, y: 14 },
     spots: {
       desk: { x: 15, y: 5 },
+      desk2: { x: 47, y: 5 },
       read: { x: 4, y: 7 },
+      read2: { x: 18, y: 7 },
       window: { x: 62, y: 7 },
       center: { x: 30, y: 14 },
+      center2: { x: 46, y: 14 },
       rest: { x: 60, y: 17 },
+      rest2: { x: 67, y: 17 },
       vault: { x: 3, y: 13 },
       door: { x: 34, y: 14 },
+      walk2: { x: 56, y: 14 },
+      dead2: { x: 50, y: 14 },
+      face1: { x: 18, y: 15 },
+      face2: { x: 44, y: 15 },
     },
   },
   compact: {
@@ -187,12 +196,20 @@ const LAYOUTS = {
     corridor: { x0: 4, x1: 44, y: 14 },
     spots: {
       desk: { x: 6, y: 5 },
+      desk2: { x: 30, y: 5 },
       read: { x: 1, y: 7 },
+      read2: { x: 15, y: 7 },
       window: { x: 38, y: 7 },
       center: { x: 20, y: 14 },
+      center2: { x: 33, y: 14 },
       rest: { x: 28, y: 18 },
+      rest2: { x: 35, y: 18 },
       vault: { x: 2, y: 14 },
       door: { x: 18, y: 16 },
+      walk2: { x: 31, y: 14 },
+      dead2: { x: 26, y: 14 },
+      face1: { x: 14, y: 15 },
+      face2: { x: 29, y: 15 },
     },
   },
 };
@@ -201,6 +218,7 @@ const RANDOM_CHARS = '░▒▓█#$%@&*+=~<>/\\|_-.:;0123456789';
 const ASSEMBLY_MS = 1500;
 const FRAME_MS = 130;
 const AMBIENT_MS = 7000;
+const INTERACT_MS = 10000;
 
 function randChar() {
   return RANDOM_CHARS[Math.floor(Math.random() * RANDOM_CHARS.length)];
@@ -269,7 +287,7 @@ function fillFloor(g, L) {
   }
 }
 
-function paintBase(L, dev) {
+function paintBase(L, dev, e2Online = false) {
   const g = new Grid(L.w, L.h);
   drawBorder(g, L, dev);
   fillFloor(g, L);
@@ -281,11 +299,10 @@ function paintBase(L, dev) {
   g.block(L.chair1.x, L.chair1.y, B.chair, 'dim');
   g.block(L.desk1.x, L.desk1.y, B.desk, 'fg');
   g.block(L.chair2.x, L.chair2.y, B.chair, 'dim');
-  g.block(L.desk2.x, L.desk2.y, B.desk, 'dim');
-  // entity 2 screen: off, no activity
+  g.block(L.desk2.x, L.desk2.y, B.desk, e2Online ? 'fg' : 'dim');
+  // Entity 2's screen is off until it is typing there.
   g.put(L.screen2.x, L.screen2.y, '  ', 'dim');
-  // sign on the empty chair
-  g.put(L.sign2.x, L.sign2.y, '[absent · waiting]', 'dim');
+  if (!e2Online) g.put(L.sign2.x, L.sign2.y, '[absent · waiting]', 'dim');
   return g;
 }
 
@@ -316,30 +333,53 @@ function entryAge(entry) {
   return Number.isFinite(ts) ? Date.now() - ts : Infinity;
 }
 
-/**
- * Translates the snapshot into a drawable state. Pure: does not touch the DOM.
- * Returns { dev, e1:{ name, state, mode, real, bubble, envelope, hunger }, ticker }.
- */
-export function deriveRoom(data, meta = {}) {
-  const out = {
-    dev: Boolean(meta.dev),
-    stale: Boolean(meta.stale),
-    lastRead: meta.lastRead || null,
-    name: 'unnamed',
-    e1: {
-      state: 'alive',
-      mode: 'ambient',
-      real: null,
-      bubble: null,
-      envelope: false,
-      hunger: false,
-    },
-    ticker: { text: '~ ambient · e1 walks around the room', real: false },
+function emptyData() {
+  return {
+    root: null,
+    vitals: null,
+    memory: null,
+    channel: null,
+    entries: [],
+    channelEntries: [],
+    memorial: null,
   };
+}
+
+/**
+ * One entity's drawable state, from its own snapshot only.
+ * Pure: does not touch the DOM and never invents data.
+ */
+function deriveEntity(data, id, online) {
+  const out = {
+    id,
+    online: Boolean(online),
+    known: false,
+    name: 'unnamed',
+    state: 'ambient',
+    life: 'alive',
+    alive: false,
+    mode: 'ambient',
+    real: null,
+    bubble: null,
+    envelope: false,
+    hunger: false,
+    ticker: null,
+    eventAt: 0,
+  };
+  if (!data) return out;
 
   const root = data.root;
   const vitals = data.vitals;
   const memory = data.memory;
+  const hasData = Boolean(
+    (root && root.ok)
+    || (vitals && vitals.ok)
+    || (memory && memory.ok)
+    || (data.channel && data.channel.ok)
+    || (Array.isArray(data.entries) && data.entries.length),
+  );
+  if (!out.online || !hasData) return out;
+  out.known = true;
 
   // name: from / then from /memory-public
   let name = '';
@@ -354,26 +394,27 @@ export function deriveRoom(data, meta = {}) {
 
   // state from /memorial and /vitals (declared facts, never simulated)
   const dead = Boolean(data.memorial && data.memorial.ok);
-  let state = 'alive';
   let sleepUntil = null;
   let hunger = false;
 
   if (dead) {
-    state = 'dead';
+    out.life = 'dead';
   } else if (vitals && vitals.ok && vitals.data) {
     const v = vitals.data;
-    if (v.state === 'unborn') state = 'unborn';
-    else if (v.state === 'dead') state = 'dead';
+    if (v.state === 'unborn') out.life = 'unborn';
+    else if (v.state === 'dead') out.life = 'dead';
     else if (isFuture(v.sleepUntil)) {
-      state = 'sleeping';
+      out.life = 'sleeping';
       sleepUntil = v.sleepUntil;
     } else {
-      state = 'alive';
+      out.life = 'alive';
     }
     hunger = v.hunger === 'hungry';
   }
+  out.alive = out.life === 'alive';
+  out.hunger = hunger;
 
-  // real action from the ledger: the last useful entry within the window
+  // real action from this entity's ledger: the last useful entry within the window
   const entries = Array.isArray(data.entries) ? data.entries : [];
   const candidates = [];
 
@@ -411,6 +452,13 @@ export function deriveRoom(data, meta = {}) {
     candidates.push({ at: post.ts, kind: 'speak', text });
   }
 
+  // the spoken thought (public ledger entry `thought`): shown as a dim bubble, "thinks aloud"
+  const spoken = lastEntryOf(entries, ['thought']);
+  if (spoken && entryAge(spoken) <= TICK_WINDOW_MS) {
+    const d = spoken.data && typeof spoken.data === 'object' ? spoken.data : {};
+    candidates.push({ at: spoken.ts, kind: 'speak', aloud: true, text: stringOf(d.text) });
+  }
+
   const human = lastEntryOf(entries, ['human_message']);
   if (human && entryAge(human) <= TICK_WINDOW_MS) candidates.push({ at: human.ts, kind: 'envelope' });
 
@@ -418,79 +466,155 @@ export function deriveRoom(data, meta = {}) {
   const real = candidates[0] || null;
 
   // priority: death > unborn > sleeping > real action > hunger > ambient
-  if (state === 'dead') {
-    out.e1.state = 'dead';
-    out.e1.mode = 'real';
-    out.ticker = { text: `${out.name}: dead · [RIP] in the memorial [real]`, real: true };
+  if (out.life === 'dead') {
+    out.state = 'dead';
+    out.mode = 'real';
+    out.ticker = { text: `${id}: dead · [RIP] in the memorial [real]`, real: true };
     return out;
   }
-  if (state === 'unborn') {
-    out.e1.state = 'unborn';
-    out.e1.mode = 'real';
-    out.ticker = { text: `${out.name}: not yet born · waiting for the gift [real]`, real: true };
+  if (out.life === 'unborn') {
+    out.state = 'unborn';
+    out.mode = 'real';
+    out.ticker = { text: `${id}: not yet born · waiting for the gift [real]`, real: true };
     return out;
   }
-  if (state === 'sleeping') {
-    out.e1.state = 'rest';
-    out.e1.mode = 'real';
+  if (out.life === 'sleeping') {
+    out.state = 'rest';
+    out.mode = 'real';
     const until = hhmm(sleepUntil) || '—';
-    out.ticker = { text: `${hhmm(Date.now())} ${out.name} sleeps (until ${until}) [real]`, real: true };
+    out.ticker = { text: `${hhmm(Date.now())} ${id} sleeps (until ${until}) [real]`, real: true };
     return out;
   }
 
   if (real && real.kind === 'think') {
-    out.e1.state = 'type';
-    out.e1.mode = 'real';
-    out.e1.real = real;
+    out.state = 'type';
+    out.mode = 'real';
+    out.real = real;
+    out.eventAt = Date.parse(real.at) || 0;
     const bits = [real.deep ? 'deep' : 'fast'];
     if (real.tokens !== null) bits.push(`${formatInt(real.tokens)} tokens`);
     if (real.cost !== null) bits.push(`${formatDecimal(real.cost, 3)} TAZ`);
     out.ticker = {
-      text: `${hhmm(real.at) || '—'} e1 thinks (${bits.join(', ')}) [real]`,
+      text: `${hhmm(real.at) || '—'} ${id} thinks (${bits.join(', ')}) [real]`,
       real: true,
     };
     return out;
   }
   if (real && real.kind === 'read') {
-    out.e1.state = 'read';
-    out.e1.mode = 'real';
-    out.e1.real = real;
-    out.ticker = { text: `${hhmm(real.at) || '—'} e1 reads (tool read_url) [real]`, real: true };
+    out.state = 'read';
+    out.mode = 'real';
+    out.real = real;
+    out.eventAt = Date.parse(real.at) || 0;
+    out.ticker = { text: `${hhmm(real.at) || '—'} ${id} reads (tool read_url) [real]`, real: true };
     return out;
   }
   if (real && real.kind === 'speak') {
-    out.e1.state = 'sit';
-    out.e1.mode = 'real';
-    out.e1.real = real;
-    const bubble = real.text ? truncate(real.text, 60) : '';
-    out.e1.bubble = bubble;
+    out.state = 'sit';
+    out.mode = 'real';
+    out.real = real;
+    out.eventAt = Date.parse(real.at) || 0;
+    out.bubble = real.text ? truncate(real.text, 60) : '';
     out.ticker = {
-      text: `${hhmm(real.at) || '—'} e1 says: ${truncate(real.text || '(text unavailable)', 60)} [real]`,
+      text: `${hhmm(real.at) || '—'} ${id} ${real.aloud ? 'thinks aloud' : 'says'}: ${truncate(real.text || '(text unavailable)', 60)} [real]`,
       real: true,
     };
     return out;
   }
   if (real && real.kind === 'envelope') {
-    out.e1.state = 'sit';
-    out.e1.mode = 'real';
-    out.e1.real = real;
-    out.e1.envelope = true;
-    out.ticker = { text: `${hhmm(real.at) || '—'} e1 received a human message [✉] [real]`, real: true };
+    out.state = 'sit';
+    out.mode = 'real';
+    out.real = real;
+    out.eventAt = Date.parse(real.at) || 0;
+    out.envelope = true;
+    out.ticker = { text: `${hhmm(real.at) || '—'} ${id} received a human message [✉] [real]`, real: true };
     return out;
   }
 
   if (hunger) {
-    out.e1.state = 'walk';
-    out.e1.mode = 'real';
-    out.e1.hunger = true;
-    out.ticker = { text: `${hhmm(Date.now())} e1 is hungry · looking for gifts [real]`, real: true };
+    out.state = 'walk';
+    out.mode = 'real';
+    out.hunger = true;
+    out.ticker = { text: `${hhmm(Date.now())} ${id} is hungry · looking for gifts [real]`, real: true };
     return out;
   }
 
   // nothing real: ambient behaviour, declared as such
-  out.e1.state = 'ambient';
-  out.e1.mode = 'ambient';
-  out.ticker = { text: '~ ambient · e1 walks around the room', real: false };
+  out.state = 'ambient';
+  out.mode = 'ambient';
+  out.ticker = { text: `~ ambient · ${id} walks around the room`, real: false };
+  return out;
+}
+
+function latestEntityPost(data) {
+  if (!data || !Array.isArray(data.channelEntries)) return null;
+  for (let i = data.channelEntries.length - 1; i >= 0; i -= 1) {
+    const message = data.channelEntries[i];
+    if (message && message.from === 'entity') return message;
+  }
+  return null;
+}
+
+function mentions(post, name) {
+  const target = stringOf(name).trim();
+  if (!post || target.length < 2 || target.toLowerCase() === 'unnamed') return false;
+  return stringOf(post.text).toLowerCase().includes(target.toLowerCase());
+}
+
+/**
+ * Translates both snapshots into drawable state. Pure: does not touch the DOM.
+ * Returns { dev, stale, e1, e2, ticker, interaction }.
+ */
+export function deriveRoom(data, meta = {}) {
+  const source = data || {};
+  const online = meta.online || {};
+  const e1 = deriveEntity(source.e1, 'e1', online.e1 !== false);
+  const e2 = deriveEntity(source.e2, 'e2', Boolean(online.e2));
+
+  const out = {
+    dev: Boolean(meta.dev),
+    stale: Boolean(meta.stale),
+    lastRead: meta.lastRead || null,
+    e1,
+    e2,
+    ticker: { text: '~ ambient · the room is quiet', real: false },
+    interaction: null,
+  };
+
+  // The ticker carries the most recent REAL action of either entity.
+  const real = [e1, e2].filter((item) => item.online && item.known && item.mode === 'real');
+  if (real.length) {
+    real.sort((a, b) => (b.eventAt || 0) - (a.eventAt || 0));
+    out.ticker = real[0].ticker;
+  } else {
+    const known = [e1, e2].filter((item) => item.online && item.known);
+    if (known.length === 2) {
+      out.ticker = { text: '~ ambient · e1 and e2 move around the room', real: false };
+    } else if (known.length === 1) {
+      out.ticker = known[0].ticker || { text: `~ ambient · ${known[0].id} walks around the room`, real: false };
+    }
+  }
+
+  // Both alive and one's latest public post names the other: they face each other.
+  if (e1.alive && e2.alive && e1.known && e2.known) {
+    const post1 = latestEntityPost(source.e1);
+    const post2 = latestEntityPost(source.e2);
+    const found = [];
+    if (mentions(post1, e2.name)) found.push({ by: 'e1', post: post1 });
+    if (mentions(post2, e1.name)) found.push({ by: 'e2', post: post2 });
+    if (found.length) {
+      found.sort((a, b) => (Date.parse(b.post.ts) || 0) - (Date.parse(a.post.ts) || 0));
+      const winner = found[0];
+      const post = winner.post;
+      const seq = post.seq !== undefined && post.seq !== null ? post.seq : (post.ts || '');
+      out.interaction = {
+        key: `${winner.by}:${seq}:${stringOf(post.text).slice(0, 40)}`,
+        by: winner.by,
+        at: Date.parse(post.ts) || 0,
+        text: stringOf(post.text),
+      };
+    }
+  }
+
   return out;
 }
 
@@ -529,21 +653,29 @@ export class Room {
     this.layoutName = this.compact.matches ? 'compact' : 'wide';
     this.L = LAYOUTS[this.layoutName];
 
-    this.data = { root: null, vitals: null, memory: null, channel: null, entries: [], channelEntries: [], memorial: null };
-    this.meta = { stale: false, dev: false, lastRead: null };
+    this.data = { e1: emptyData(), e2: emptyData() };
+    this.meta = { stale: false, dev: false, lastRead: null, online: { e1: true, e2: false } };
     this.view = deriveRoom(this.data, this.meta);
 
-    this.agent = { x: 0, y: 0, state: 'alive', frame: 0, moving: false };
+    this.agents = {
+      e1: { x: 0, y: 0, state: 'alive', frame: 0, moving: false },
+      e2: { x: 0, y: 0, state: 'alive', frame: 0, moving: false },
+    };
     this.assembly = { start: null, cells: new Map() };
-    this.ambient = { index: 0, nextAt: 0 };
+    this.ambient = {
+      e1: { index: 0, nextAt: 0 },
+      e2: { index: 1, nextAt: 1500 },
+    };
+    this.interactionUntil = 0;
+    this.interactionKey = null;
 
     this.raf = null;
     this.lastTs = 0;
     this.destroyed = false;
 
     this.buildDom();
-    this.base = paintBase(this.L, this.view.dev);
-    this.resetAgent();
+    this.base = paintBase(this.L, this.view.dev, this.view.e2.online);
+    this.resetAgents();
     this.onResize = () => {
       const wanted = this.compact.matches ? 'compact' : 'wide';
       if (wanted !== this.layoutName) this.setLayout(wanted);
@@ -573,46 +705,82 @@ export class Room {
   setLayout(name) {
     this.layoutName = name;
     this.L = LAYOUTS[name];
-    this.base = paintBase(this.L, this.view.dev);
-    this.resetAgent();
+    this.base = paintBase(this.L, this.view.dev, this.view.e2.online);
+    this.resetAgents();
     this.render(this.lastTs);
   }
 
-  resetAgent() {
-    const spot = this.L.spots.desk;
-    this.agent.x = spot.x;
-    this.agent.y = spot.y;
-    this.agent.state = this.view.e1.state;
-    this.agent.frame = 0;
-    this.agent.moving = false;
+  resetAgents() {
+    this.resetAgent('e1');
+    this.resetAgent('e2');
     this.assembly.start = null;
     this.assembly.cells.clear();
   }
 
-  /** Absorbs a snapshot: keeps the last known state if a read fails. */
-  ingest(snapshot, meta = {}) {
-    const d = this.data;
-    if (snapshot) {
-      if (snapshot.root && snapshot.root.ok) d.root = snapshot.root;
-      if (snapshot.memory && snapshot.memory.ok) d.memory = snapshot.memory;
-      if (snapshot.vitals && snapshot.vitals.ok) d.vitals = snapshot.vitals;
-      // 200 = dead, 404 = alive: both are valid responses
-      if (snapshot.memorial && (snapshot.memorial.ok || snapshot.memorial.notFound)) d.memorial = snapshot.memorial;
-      if (snapshot.channel && snapshot.channel.ok) {
-        d.channel = snapshot.channel;
-        if (Array.isArray(snapshot.channel.data)) d.channelEntries = snapshot.channel.data;
-      }
-      if (snapshot.ledger && snapshot.ledger.ok && typeof snapshot.ledger.text === 'string') {
-        d.entries = parseLedger(snapshot.ledger.text).entries;
-      }
+  resetAgent(id) {
+    const spot = this.L.spots[id === 'e1' ? 'desk' : 'desk2'] || this.L.spots.desk;
+    const a = this.agents[id];
+    a.x = spot.x;
+    a.y = spot.y;
+    a.state = this.view[id].state;
+    a.frame = 0;
+    a.moving = false;
+  }
+
+  /** Absorbs the snapshots: keeps each entity's last known state if a read fails. */
+  ingest(snapshots, meta = {}) {
+    if (snapshots) {
+      this.mergeInto(this.data.e1, snapshots.e1);
+      this.mergeInto(this.data.e2, snapshots.e2);
     }
     this.meta = {
       stale: Boolean(meta.stale),
       dev: Boolean(meta.dev || this.meta.dev),
       lastRead: meta.lastRead || this.meta.lastRead,
+      online: meta.online || this.meta.online,
     };
     this.view = deriveRoom(this.data, this.meta);
-    this.base = paintBase(this.L, this.view.dev);
+    this.base = paintBase(this.L, this.view.dev, this.view.e2.online);
+    this.checkInteraction();
+  }
+
+  mergeInto(target, snapshot) {
+    if (!snapshot) return;
+    if (snapshot.root && snapshot.root.ok) target.root = snapshot.root;
+    if (snapshot.memory && snapshot.memory.ok) target.memory = snapshot.memory;
+    if (snapshot.vitals && snapshot.vitals.ok) target.vitals = snapshot.vitals;
+    // 200 = dead, 404 = alive: both are valid responses
+    if (snapshot.memorial && (snapshot.memorial.ok || snapshot.memorial.notFound)) target.memorial = snapshot.memorial;
+    if (snapshot.channel && snapshot.channel.ok) {
+      target.channel = snapshot.channel;
+      if (Array.isArray(snapshot.channel.data)) target.channelEntries = snapshot.channel.data;
+    }
+    if (snapshot.ledger && snapshot.ledger.ok && typeof snapshot.ledger.text === 'string') {
+      target.entries = parseLedger(snapshot.ledger.text).entries;
+    }
+  }
+
+  /** A new post that names the other entity starts a 10 s face-to-face scene. */
+  checkInteraction() {
+    const candidate = this.view.interaction;
+    if (!candidate) {
+      this.interactionUntil = 0;
+      this.interactionKey = null;
+      return;
+    }
+    if (candidate.key !== this.interactionKey) {
+      this.interactionKey = candidate.key;
+      this.interactionUntil = Date.now() + INTERACT_MS;
+    }
+  }
+
+  isInteracting() {
+    return Boolean(
+      this.interactionUntil > Date.now()
+      && this.view.e1.alive
+      && this.view.e2.alive
+      && this.view.e2.online,
+    );
   }
 
   /* ------------------------------ animation ------------------------------ */
@@ -628,14 +796,21 @@ export class Room {
 
   step(ts) {
     const reduced = this.reduced.matches;
-    const spot = this.desiredSpot(ts, reduced);
-    const a = this.agent;
-    // death and non-birth do not walk: they appear at once in their spot
-    const instant = reduced || this.view.e1.state === 'dead' || this.view.e1.state === 'unborn';
-
     if (this.assembly.start === null) {
       this.assembly.start = reduced ? ts - ASSEMBLY_MS : ts;
     }
+    this.stepAgent('e1', ts, reduced);
+    this.stepAgent('e2', ts, reduced);
+  }
+
+  stepAgent(id, ts, reduced) {
+    const v = this.view[id];
+    if (!v.online || !v.known) return;
+    const a = this.agents[id];
+    const spot = this.desiredSpot(id, ts, reduced);
+    const interacting = this.isInteracting();
+    // death and non-birth do not walk: they appear at once in their spot
+    const instant = reduced || v.state === 'dead' || v.state === 'unborn' || interacting;
 
     const tx = spot.x;
     const ty = spot.y;
@@ -649,52 +824,75 @@ export class Room {
       }
       a.moving = !instant;
       a.frame += 1;
-      a.state = instant ? this.view.e1.state : 'walk';
+      a.state = instant ? (interacting ? 'interact' : v.state) : 'walk';
     } else {
       a.moving = false;
-      a.state = this.view.e1.state === 'ambient' ? 'idle' : this.view.e1.state;
+      if (interacting) a.state = 'interact';
+      else a.state = v.state === 'ambient' ? 'idle' : v.state;
       if (a.state === 'idle') a.frame += 1;
     }
   }
 
-  /** Where e1 must be: if there is a real action we follow it, otherwise ambient. */
-  desiredSpot(ts, reduced) {
-    const v = this.view.e1;
+  /** Where an entity must be: a real action, the interaction, or ambient. */
+  desiredSpot(id, ts, reduced) {
+    const v = this.view[id];
+    if (this.isInteracting()) {
+      return this.L.spots[id === 'e1' ? 'face1' : 'face2'] || this.L.spots.center;
+    }
     if (v.mode === 'real') {
-      const map = {
-        type: 'desk',
-        sit: 'desk',
-        read: 'read',
-        rest: 'rest',
-        unborn: 'center',
-        dead: 'door',
-        walk: 'vault',
+      const maps = {
+        e1: {
+          type: 'desk',
+          sit: 'desk',
+          read: 'read',
+          rest: 'rest',
+          unborn: 'center',
+          dead: 'door',
+          walk: 'vault',
+        },
+        e2: {
+          type: 'desk2',
+          sit: 'desk2',
+          read: 'read2',
+          rest: 'rest2',
+          unborn: 'desk2',
+          dead: 'dead2',
+          walk: 'walk2',
+        },
       };
-      const key = map[v.state] || 'center';
+      const key = maps[id][v.state] || (id === 'e1' ? 'center' : 'desk2');
       return this.L.spots[key] || this.L.spots.desk;
     }
     // ambient
-    if (reduced) return this.L.spots.desk;
-    if (ts >= this.ambient.nextAt) {
-      this.ambient.index = (this.ambient.index + 1) % 5;
-      this.ambient.nextAt = ts + AMBIENT_MS;
+    if (reduced) return this.L.spots[id === 'e1' ? 'desk' : 'desk2'];
+    const amb = this.ambient[id];
+    if (ts >= amb.nextAt) {
+      amb.index = (amb.index + 1) % 5;
+      amb.nextAt = ts + AMBIENT_MS;
     }
-    const order = ['desk', 'window', 'read', 'center', 'pace'];
-    const pick = order[this.ambient.index];
+    const orders = {
+      e1: ['desk', 'window', 'read', 'center', 'pace'],
+      e2: ['desk2', 'read2', 'center2', 'walk2', 'pace'],
+    };
+    const pick = orders[id][amb.index];
     if (pick === 'pace') {
-      const step = (this.ambient.index + 1) * 7;
+      const offset = id === 'e2' ? 11 : 0;
+      const step = (amb.index + 1) * 7 + offset;
       const x = this.L.corridor.x0 + (step % Math.max(1, this.L.corridor.x1 - this.L.corridor.x0));
       return { x, y: this.L.corridor.y };
     }
-    return this.L.spots[pick] || this.L.spots.desk;
+    return this.L.spots[pick] || this.L.spots[id === 'e1' ? 'desk' : 'desk2'];
   }
 
   /* ------------------------------ drawing ------------------------------ */
 
   render(ts) {
     const g = cloneGrid(this.base);
-    this.drawDeskActivity(g);
-    this.drawEntity(g, ts);
+    this.drawDeskActivity(g, 'e1');
+    this.drawDeskActivity(g, 'e2');
+    this.drawEntity(g, ts, 'e1');
+    this.drawEntity(g, ts, 'e2');
+    if (this.isInteracting()) this.drawInteraction(g);
     if (this.view.stale) {
       const note = '(stale data)';
       g.put(2, this.L.h - 1, note, 'err');
@@ -703,16 +901,19 @@ export class Room {
     this.updateMeta();
   }
 
-  drawDeskActivity(g) {
-    const a = this.agent;
-    const desk = this.L.desk1;
-    const atDesk = a.x === this.L.spots.desk.x && a.y === this.L.spots.desk.y;
+  drawDeskActivity(g, id) {
+    const v = this.view[id];
+    if (!v.online || !v.known) return;
+    const a = this.agents[id];
+    const desk = id === 'e1' ? this.L.desk1 : this.L.desk2;
+    const spot = this.L.spots[id === 'e1' ? 'desk' : 'desk2'];
+    const atDesk = spot && a.x === spot.x && a.y === spot.y;
     const screenX = desk.x + 2;
     const screenY = desk.y + 1;
-    if (atDesk && (this.view.e1.state === 'type' || this.view.e1.state === 'sit' || a.state === 'sit' || a.state === 'type')) {
-      const typing = this.view.e1.state === 'type' && this.view.e1.real && this.view.e1.real.deep;
+    if (atDesk && (v.state === 'type' || v.state === 'sit' || a.state === 'sit' || a.state === 'type')) {
+      const typing = v.state === 'type' && v.real && v.real.deep;
       const blink = Math.floor(a.frame / 2) % 2 === 0;
-      const fast = this.view.e1.state === 'type' && this.view.e1.real && !this.view.e1.real.deep;
+      const fast = v.state === 'type' && v.real && !v.real.deep;
       if (this.reduced.matches) {
         g.put(screenX, screenY, typing ? '>_' : '...', 'acc');
       } else if (typing) {
@@ -725,12 +926,14 @@ export class Room {
     }
   }
 
-  drawEntity(g, ts) {
-    const v = this.view.e1;
-    const a = this.agent;
+  drawEntity(g, ts, id) {
+    const v = this.view[id];
+    if (!v.online || !v.known) return;
+    const a = this.agents[id];
+    const interacting = this.isInteracting();
     if (v.state === 'dead') {
       this.putSprite(g, a.x, a.y, [' ___', '[RIP]', '▀▀▀▀▀'], 'dim', ts);
-      const label = `† ${truncate(this.view.name, 16)}`;
+      const label = `† ${truncate(v.name, 16)}`;
       g.put(a.x, a.y - 1, label, 'dim');
       return;
     }
@@ -738,52 +941,88 @@ export class Room {
     let cls = v.mode === 'real' ? 'acc' : 'fg';
     let state = a.state;
     if (state === 'idle') state = 'sit';
-    if (v.mode === 'real' && ['type', 'read', 'rest', 'sit'].includes(v.state)) state = v.state;
+    if (v.mode === 'real' && ['type', 'read', 'rest', 'sit'].includes(v.state) && !interacting) state = v.state;
+    if (interacting) state = 'interact';
 
-    const lines = bodyLines(headOf('e1'), state, a.frame);
+    const lines = bodyLines(headOf(id), state, a.frame);
     if (v.mode === 'real' && v.state === 'unborn') cls = 'dim';
 
     // name line above the head (left to the speech bubble when speaking)
-    const tag = `▸ ${truncate(this.view.name, 12)}`;
-    if (!v.bubble) {
+    const tag = `▸ ${truncate(v.name, 12)}`;
+    if (!v.bubble || interacting) {
       g.put(a.x, a.y - 1, tag, 'dim');
       if (v.hunger) g.put(a.x + tag.length + 1, a.y - 1, '!', 'acc');
     }
 
-    // envelope on the desk
+    // envelope on its own desk
     if (v.envelope) {
-      const desk = this.L.desk1;
+      const desk = id === 'e1' ? this.L.desk1 : this.L.desk2;
       const blink = this.reduced.matches || Math.floor(a.frame / 3) % 2 === 0;
       if (blink) g.put(desk.x + 2, desk.y + 3, '[✉]', 'acc');
     }
 
     this.putSprite(g, a.x, a.y, lines, cls, ts);
 
-    // unborn: the sign next to the dotted body
-    if (v.state === 'unborn') g.put(a.x, a.y + 3, 'waiting for the gift', 'dim');
+    // unborn: dotted outline with the waiting sign
+    if (v.state === 'unborn') {
+      if (id === 'e2') g.put(this.L.sign2.x, this.L.sign2.y, 'waiting for the birth gift', 'dim');
+      else g.put(a.x, a.y + 3, 'waiting for the gift', 'dim');
+    }
 
     // speech bubble with the real text, beside the body
-    if (v.bubble) this.drawBubble(g, a.x + 5, a.y - 1, v.bubble);
-
-    // interaction: '~' line between the two if both are present (never today)
-    if (state === 'interact') g.put(a.x + 4, a.y + 1, '~', 'dim');
+    if (v.bubble && !interacting) {
+      this.drawBubble(g, a.x, a.y - 1, v.bubble, id === 'e2' ? 'left' : 'right');
+    }
   }
 
-  drawBubble(g, x, y, text) {
+  drawInteraction(g) {
+    const a = this.agents.e1;
+    const b = this.agents.e2;
+    const y = Math.min(a.y, b.y) + 1;
+    const from = Math.min(a.x, b.x) + 4;
+    const to = Math.max(a.x, b.x) - 1;
+    if (to >= from) g.put(from, y, '~'.repeat(to - from + 1), 'dim');
+  }
+
+  drawBubble(g, x, y, text, preferred = 'right') {
     const max = this.L.name === 'compact' ? 22 : 30;
     const lines = wrapText(text, max);
     const width = Math.max(...lines.map((line) => line.length));
     const dash = '─'.repeat(width);
-    g.put(x, y, `╭${dash}╮`, 'acc');
+    let bx = preferred === 'left' ? x - width - 2 : x + 5;
+    if (bx < 1) bx = x + 5;
+    if (bx + width + 2 > g.w) bx = x - width - 2;
+    if (bx < 1) bx = 1;
+    g.put(bx, y, `╭${dash}╮`, 'acc');
     lines.forEach((line, i) => {
-      g.put(x, y + 1 + i, `│${line.padEnd(width)}│`, 'acc');
+      g.put(bx, y + 1 + i, `│${line.padEnd(width)}│`, 'acc');
     });
-    g.put(x, y + 1 + lines.length, `╰${dash}╯`, 'acc');
+    g.put(bx, y + 1 + lines.length, `╰${dash}╯`, 'acc');
   }
 
-  putSprite(g, x, y, lines, cls, ts) {
+  /** Glitch: now and then (and whenever a real action starts) a sprite breaks into @#$%&* for a moment, then
+   *  settles again. Purely visual; never when the visitor prefers reduced motion. */
+  glitchLevel(ts, spriteKey) {
+    if (this.reduced.matches) return 0;
+    if (!this.glitch) this.glitch = new Map();
+    let gl = this.glitch.get(spriteKey);
+    if (!gl) { gl = { until: 0, nextAt: ts + 2000 + Math.random() * 6000 }; this.glitch.set(spriteKey, gl); }
+    if (ts >= gl.nextAt) { gl.until = ts + 250 + Math.random() * 400; gl.nextAt = ts + 5000 + Math.random() * 9000; }
+    if (ts < gl.until) return 0.35 + 0.4 * Math.random();
+    return 0;
+  }
+
+  /** Called when a real action changes: the sprite glitches right away. */
+  triggerGlitch(spriteKey, ts = performance.now()) {
+    if (!this.glitch) this.glitch = new Map();
+    const gl = this.glitch.get(spriteKey) || { until: 0, nextAt: ts + 5000 };
+    gl.until = ts + 500; this.glitch.set(spriteKey, gl);
+  }
+
+  putSprite(g, x, y, lines, cls, ts, spriteKey = `${x}:${y}`) {
     const reduced = this.reduced.matches;
     const t = reduced ? 1 : Math.min(1, (ts - this.assembly.start) / ASSEMBLY_MS);
+    const glitch = t >= 1 ? this.glitchLevel(ts, spriteKey) : 0;
     for (let j = 0; j < lines.length; j += 1) {
       let i = 0;
       for (const ch of lines[j]) {
@@ -801,6 +1040,7 @@ export class Room {
           }
           if (thr > t) out = randChar();
         }
+        if (glitch && Math.random() < glitch) out = randChar();
         g.set(cx, cy, out, cls);
       }
     }
@@ -839,12 +1079,21 @@ export class Room {
 
   updateMeta() {
     const readAt = clockTime(this.meta.lastRead);
-    const t = this.view.ticker;
+    const interacting = this.isInteracting();
+    const t = interacting
+      ? { text: '~ ambient · e1 and e2 face each other, a ~ line between them', real: false }
+      : this.view.ticker;
     const sig = [
-      this.view.name,
+      this.view.e1.name,
       this.view.e1.state,
       this.view.e1.mode,
+      this.view.e2.name,
+      this.view.e2.state,
+      this.view.e2.mode,
+      this.view.e2.online ? '1' : '0',
+      this.view.e2.known ? '1' : '0',
       t.text,
+      interacting ? '1' : '0',
       this.meta.stale ? '1' : '0',
       this.meta.dev ? '1' : '0',
       this.meta.lastRead instanceof Date ? this.meta.lastRead.getTime() : '',
@@ -856,9 +1105,15 @@ export class Room {
       el('span', { class: 'dim', text: '~ ambient' }),
       textNode(' · '),
       el('span', { class: 'acc', text: '[real]' }),
-      textNode(' · '),
-      el('span', { class: 'dim', text: 'e2: not yet online' }),
     ];
+    if (!this.view.e2.online) {
+      legendParts.push(textNode(' · '));
+      legendParts.push(el('span', { class: 'dim', text: 'e2: not yet online' }));
+    }
+    if (interacting) {
+      legendParts.push(textNode(' · '));
+      legendParts.push(el('span', { class: 'dim', text: '~ facing each other' }));
+    }
     if (readAt) {
       legendParts.push(textNode(' · '));
       legendParts.push(el('span', { class: 'dim', text: `read at ${readAt}` }));
@@ -871,8 +1126,7 @@ export class Room {
   }
 
   describe() {
-    const v = this.view.e1;
-    const where = {
+    const whereOf = (v) => ({
       desk: 'sits at the terminal',
       read: 'reads at the ledger',
       window: 'looks out of the window',
@@ -883,14 +1137,33 @@ export class Room {
       type: 'writes at the terminal',
       unborn: 'is not yet born',
       dead: 'is no longer here',
+      interact: 'faces the other entity',
       ambient: 'moves around the room',
-    }[v.state] || 'is in the room';
-    return [
-      `ASCII room, ${this.L.w} columns.`,
-      `Entity 1, ${this.view.name}, ${v.state === 'dead' ? 'dead' : 'alive'}: ${where}.`,
-      v.mode === 'real' ? 'Real action from data.' : 'Ambient movement, decorative.',
-      'Entity 2 is not deployed: its desk is empty.',
-    ].join(' ');
+    }[v.state] || 'is in the room');
+    const stateOf = (v) => {
+      if (v.life === 'dead') return 'dead';
+      if (v.life === 'unborn') return 'not yet born';
+      if (v.life === 'sleeping') return 'sleeping';
+      return 'alive';
+    };
+
+    const parts = [`ASCII room, ${this.L.w} columns.`];
+    for (const id of ['e1', 'e2']) {
+      const v = this.view[id];
+      const label = id === 'e1' ? 'Entity 1' : 'Entity 2';
+      if (!v.online) {
+        if (id === 'e2') parts.push('Entity 2 is not deployed: its desk is empty.');
+        continue;
+      }
+      if (!v.known) {
+        parts.push(`${label} is online; no data read yet.`);
+        continue;
+      }
+      parts.push(`${label}, ${v.name}, ${stateOf(v)}: ${whereOf(v)}.`);
+      parts.push(v.mode === 'real' ? 'Real action from data.' : 'Ambient movement, decorative.');
+    }
+    if (this.isInteracting()) parts.push('They face each other, with a ~ line between them.');
+    return parts.join(' ');
   }
 
   destroy() {

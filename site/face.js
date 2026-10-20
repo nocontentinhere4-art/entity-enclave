@@ -34,42 +34,59 @@ export function seedOf(text) {
 function skullParams(seed) {
   const r = rng(seed);
   return {
-    headW: 0.30 + r() * 0.05,      // cranium half-width
-    headH: 0.32 + r() * 0.05,      // cranium half-height
-    eyeDx: 0.11 + r() * 0.03,      // eye socket horizontal offset
-    eyeY: 0.52 + r() * 0.03,       // eye socket vertical position
-    eyeR: 0.055 + r() * 0.015,     // eye socket radius
-    jawW: 0.20 + r() * 0.04,       // jaw half-width
-    jawDrop: 0.78 + r() * 0.05,    // jaw bottom
-    teeth: 6 + Math.floor(r() * 3),
-    tilt: (r() - 0.5) * 0.04,      // slight asymmetry
+    headW: 0.33 + r() * 0.03,      // cranium half-width
+    headH: 0.33 + r() * 0.03,      // cranium half-height
+    eyeDx: 0.125 + r() * 0.015,    // eye socket horizontal offset
+    eyeY: 0.50 + r() * 0.02,       // eye socket vertical position
+    eyeR: 0.115 + r() * 0.01,      // eye socket radius (big, round, dark hollows)
+    jawW: 0.22 + r() * 0.02,       // mandible half-width
+    jawDrop: 0.93 + r() * 0.03,    // chin bottom
+    teeth: 8 + Math.floor(r() * 2),
+    tilt: (r() - 0.5) * 0.03,      // slight asymmetry
   };
 }
+
+const sstep = (x) => { const t = Math.max(0, Math.min(1, x)); return t * t * (3 - 2 * t); };
 
 function skullHeight(u, v, p) {
   const x = u - 0.5 + p.tilt * (v - 0.5);
   const y = v;
-  // cranium: a dome centred around v≈0.42
-  const cx = x / p.headW, cy = (y - 0.42) / p.headH;
-  let h = Math.max(0, 1 - (cx * cx + cy * cy));
-  h = Math.sqrt(h);
-  // jaw: a rounded block under the cranium, narrower
-  const jx = x / p.jawW, jy = (y - 0.66) / 0.16;
-  const jaw = Math.max(0, 1 - (jx * jx * 1.2 + jy * jy)) * (y < p.jawDrop ? 1 : 0);
-  h = Math.max(h, Math.sqrt(jaw) * 0.85);
-  // eye sockets: deep hollows
-  for (const s of [-1, 1]) {
-    const ex = (x - s * p.eyeDx) / p.eyeR, ey = (y - p.eyeY) / (p.eyeR * 1.1);
-    const d = ex * ex + ey * ey;
-    if (d < 1) { const k = d * d * (3 - 2 * d); h *= 0.2 + 0.8 * k; }
+  // 1. cranium: a dome, widest a bit above the eyes
+  const cx = x / p.headW, cy = (y - 0.40) / p.headH;
+  let dome = Math.max(0, 1 - (cx * cx + cy * cy));
+  dome = Math.pow(dome, 0.42);
+  // 2. brow ridge: a bar above the sockets, so the lines bunch over the eyes
+  const brow = Math.exp(-Math.pow((y - (p.eyeY - p.eyeR * 1.05)) / 0.035, 2)) * sstep((0.30 - Math.abs(x)) / 0.08) * 0.10;
+  // 3. cheekbones (zygomatic arches): bulges beside the sockets
+  const cheek = Math.exp(-Math.pow((Math.abs(x) - 0.265) / 0.06, 2) - Math.pow((y - 0.615) / 0.055, 2)) * 0.7;
+  // 4. maxilla + mandible: a squarish block under the sockets, rounded chin
+  const jx = Math.abs(x / p.jawW), jy = Math.abs((y - 0.76) / 0.19);
+  let jaw = Math.max(0, 1 - (Math.pow(jx, 2.6) + Math.pow(jy, 2.6)));
+  jaw = Math.pow(jaw, 0.45) * 0.8;
+  if (y > p.jawDrop) jaw = 0;
+  // nasal bone: a narrow vertical ridge between the sockets, down to the cavity
+  const nose = Math.exp(-Math.pow(x / 0.025, 2)) * sstep((y - 0.50) / 0.05) * sstep((0.64 - y) / 0.03) * 0.12;
+  let h = Math.min(1, Math.max(dome, jaw, cheek) + brow + nose);
+  // 5. eye sockets: deep hollows with a crisp rim (lines dip into them)
+  // Round bowls: the floor is flat and dark, the walls rise smoothly to a crisp rim, so the lines dip in
+  // concentric curves instead of breaking.
+  for (const sgn of [-1, 1]) {
+    const ex = (x - sgn * p.eyeDx) / p.eyeR, ey = (y - p.eyeY) / p.eyeR;
+    const d = Math.sqrt(ex * ex + ey * ey);
+    if (d < 1) h *= 0.04 + 0.96 * Math.pow(sstep((d - 0.55) / 0.45), 1.4);
   }
-  // nasal cavity: an inverted triangle
-  const nx = Math.abs(x) / 0.045, ny = (y - 0.66) / 0.06;
-  if (ny > -1 && ny < 0.6 && nx < 1 - Math.max(0, -ny)) h *= 0.35;
-  // teeth: a comb along the jaw line
-  if (y > 0.72 && y < p.jawDrop - 0.02 && Math.abs(x) < p.jawW * 0.8) {
-    h *= 0.85 + 0.15 * Math.cos(x * Math.PI * p.teeth * 2);
+  // 6. nasal cavity: an inverted triangle under the brow, dark
+  const ny = (y - 0.615) / 0.11;                       // 0 at the top of the cavity, 1 at its base
+  if (ny > 0 && ny < 1) {
+    const width = 0.02 + 0.06 * ny;                      // narrow at the top, wide at the bottom
+    const nx = Math.abs(x);
+    if (nx < width) h *= 0.15 + 0.85 * sstep((nx - width + 0.02) / 0.02);
   }
+  // 7. teeth: a row of bumps across the upper jaw, with the dark line between the rows
+  if (y > 0.775 && y < 0.90 && Math.abs(x) < p.jawW * 0.8) {
+    h *= 0.62 + 0.38 * Math.max(0, Math.cos(x * Math.PI * p.teeth * 2));
+  }
+  if (y > 0.835 && y < 0.85 && Math.abs(x) < p.jawW * 0.85) h *= 0.6;
   return Math.max(0, Math.min(1, h));
 }
 
@@ -80,6 +97,8 @@ function skullHeight(u, v, p) {
  */
 export function renderFace({ cols = 64, rows = 32, lines = 22, seed = 1, t = 0, amplitude = null, breathe = 0.6 } = {}) {
   const p = skullParams(seed);
+  // Density makes the form: at least seven lines per ten rows, whatever the caller asked for.
+  lines = Math.max(lines, Math.round(rows * 0.7));
   const amp = amplitude ?? rows * 0.35;
   const grid = Array.from({ length: rows }, () => Array(cols).fill(' '));
   const put = (r, c, ch) => { if (r >= 0 && r < rows && c >= 0 && c < cols) grid[r][c] = ch; };

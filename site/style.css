@@ -276,7 +276,7 @@ body { padding: 8px; }
 .face {
   margin: 0.4rem auto 0.8rem;
   color: #e3b341;
-  line-height: 1;
+  line-height: 0.8;
   font-size: clamp(5px, 1.15vw, 13px);
   white-space: pre;
   overflow: hidden;

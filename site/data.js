@@ -17,8 +17,11 @@ export const ENTITIES = [
     short: 'e1',
     base: 'https://ca42622c7ae63906602b873703a0efa769079dfa-8080.dstack-pha-prod9.phala.network',
   },
-  { id: 'e2', label: 'Entity 2', short: 'e2', base: null }, // not deployed yet
+  // discovered at runtime from Entity 1's `/` field `peer`, or forced with ?base2= (localhost only)
+  { id: 'e2', label: 'Entity 2', short: 'e2', base: null },
 ];
+
+const LOCAL_BASE_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 export const MISSING = [
   'second entity',
@@ -205,6 +208,25 @@ export async function request(base, path, options = {}) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * The `peer` field announced by Entity 1: a non-empty https URL, or null.
+ * Anything else (http, relative, credentials, unparsable) is ignored.
+ * The returned base has no trailing slash, so `base + '/vitals'` stays valid.
+ */
+export function peerUrlOf(value) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) return null;
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' || !url.hostname || url.username || url.password) return null;
+  const path = url.pathname.replace(/\/+$/, '');
+  return `${url.origin}${path}`;
 }
 
 export async function postMessage(base, payload) {
@@ -458,8 +480,26 @@ export function applyDevBase(entities, search) {
   } catch {
     devBase = null;
   }
-  if (devBase && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(devBase)) {
+  if (devBase && LOCAL_BASE_RE.test(devBase)) {
     entities[0].base = devBase;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * `?base2=http://localhost:PORT` forces Entity 2 for local development,
+ * with the same localhost-only validation as `?base=`.
+ */
+export function applyDevBase2(entities, search) {
+  let devBase = null;
+  try {
+    devBase = new URLSearchParams(search).get('base2');
+  } catch {
+    devBase = null;
+  }
+  if (devBase && LOCAL_BASE_RE.test(devBase)) {
+    entities[1].base = devBase;
     return true;
   }
   return false;
