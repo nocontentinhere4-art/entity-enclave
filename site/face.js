@@ -73,20 +73,21 @@ function skullHeight(u, v, p) {
   for (const sgn of [-1, 1]) {
     const ex = (x - sgn * p.eyeDx) / p.eyeR, ey = (y - p.eyeY) / p.eyeR;
     const d = Math.sqrt(ex * ex + ey * ey);
-    if (d < 1) h *= 0.04 + 0.96 * Math.pow(sstep((d - 0.55) / 0.45), 1.4);
+    // Shallow relative to the head: a dip the lines can follow (nested U curves), not a pit they fall into.
+    if (d < 1) h *= 0.58 + 0.42 * sstep((d - 0.25) / 0.75);
   }
   // 6. nasal cavity: an inverted triangle under the brow, dark
   const ny = (y - 0.615) / 0.11;                       // 0 at the top of the cavity, 1 at its base
   if (ny > 0 && ny < 1) {
     const width = 0.02 + 0.06 * ny;                      // narrow at the top, wide at the bottom
     const nx = Math.abs(x);
-    if (nx < width) h *= 0.15 + 0.85 * sstep((nx - width + 0.02) / 0.02);
+    if (nx < width) h *= 0.62 + 0.38 * sstep((nx - width + 0.03) / 0.03);
   }
   // 7. teeth: a row of bumps across the upper jaw, with the dark line between the rows
   if (y > 0.775 && y < 0.90 && Math.abs(x) < p.jawW * 0.8) {
-    h *= 0.62 + 0.38 * Math.max(0, Math.cos(x * Math.PI * p.teeth * 2));
+    h *= 0.8 + 0.2 * Math.max(0, Math.cos(x * Math.PI * p.teeth * 2));
   }
-  if (y > 0.835 && y < 0.85 && Math.abs(x) < p.jawW * 0.85) h *= 0.6;
+  if (y > 0.835 && y < 0.85 && Math.abs(x) < p.jawW * 0.85) h *= 0.8;
   return Math.max(0, Math.min(1, h));
 }
 
