@@ -34,7 +34,9 @@ const minutes = (msEnv, minEnv, fallback) => {
 const rentZatsPerHour = num(process.env.RENT_ZATS_PER_HOUR, 1_000_000);
 
 export const config = {
-  tickMinutes: minutes('TICK_MS', 'TICK_MINUTES', 15),
+  tickMinutes: minutes('TICK_MS', 'TICK_MINUTES', 5),
+  // One deep (expensive) thought every N cycles; the others are fast and cheap. Hunger forces fast.
+  deepEvery: Math.max(1, num(process.env.DEEP_EVERY, 4)),
   hungerTickMinutes: minutes('HUNGER_TICK_MS', 'HUNGER_TICK_MINUTES', 60),
   // Wallet re-sync cadence: the entity only sees incoming ZEC after a sync, so it keeps syncing in the background.
   syncMinutes: minutes('SYNC_MS', 'SYNC_MINUTES', 10),

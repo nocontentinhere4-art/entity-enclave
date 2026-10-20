@@ -15,7 +15,7 @@ services:
       - ZCASH_CHAIN=testnet
       - ZCASH_BIRTHDAY=4518000
       - ZCASH_SERVER=https://testnet.zec.rocks:443
-      - TICK_MS=900000
+      - TICK_MS=300000
       - FAKE_LLM=0
       - FAKE_WALLET=0
     restart: unless-stopped

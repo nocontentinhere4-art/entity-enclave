@@ -105,7 +105,9 @@ export class Life {
     // 6. Hunger: fast/cheap when close to the edge, deep otherwise.
     const hunger = this.rent.hunger(treasury);
     this.lastHunger = hunger;
-    const speed = hunger === 'hungry' ? 'fast' : 'deep';
+    // Rhythm: a deep thought every `deepEvery` cycles (the first one included), fast ones in between; hunger forces fast.
+    const deepEvery = Math.max(1, Number(this.config.deepEvery) || 1);
+    const speed = hunger === 'hungry' ? 'fast' : ((this.tickNo - 1) % deepEvery === 0 ? 'deep' : 'fast');
 
     // 7. Rent, once an hour of life has passed. Paid by wall clock, before the sleep short-circuit below:
     //    sleeping is not free, the host keeps charging while the entity is quiet.
@@ -137,6 +139,11 @@ export class Life {
       tools: this.tools.list(),
       tickId,
     });
+    // The spoken thought is public: the text the entity writes each cycle goes to the ledger as its voice.
+    // (Tools are separate: the diary stays private; post_public is the channel.)
+    const spoken = String(thought.text ?? '').trim();
+    if (spoken) this.ledger.append('thought', { speed, text: spoken.slice(0, 1200) });
+
     // The thought is paid already: tools quote against what is actually left.
     this.tools.setTreasury?.(Math.max(0, treasury - (Number(thought.costZats) || 0)));
 
@@ -208,6 +215,7 @@ export class Life {
       this.config.peerUrl
         ? `${this.config.peerUrl}  (its public endpoints: /vitals, /public-channel, /memory-public, /ledger. Read them with read_url. To speak to it, post on your public channel: it reads yours the same way. Everything between you is public.)`
         : '(not online yet: you are alone for now)',
+      'VOICE: the text you write in each cycle, outside tool calls, is public and shown live as your spoken thought. The diary tool is private; post_public writes on your channel.',
       'INCOMING PUBLIC MESSAGES (anyone can write here; everything is public; answering is your choice, via post_public)',
       inbox.length ? inbox.map((m) => `- ${m.ts} ${m.data?.author ?? 'anonymous'}: ${m.data?.text ?? ''}`).join('\n') : '(none)',
     ].join('\n');
