@@ -60,10 +60,10 @@ export class ZcashWallet {
   async send(to, zatoshis, memo = '') { return this.cmd('quicksend', [to, String(zatoshis), memo], { online: true }); }
 }
 
-/** zingo prints balances as `name: zatoshis` lines; turn them into an object (zatoshis as numbers). */
-function parseBalance(out) {
+/** zingo prints balances as `name: zatoshis` lines with `_` thousands separators (100_000_000); turn them into numbers. */
+export function parseBalance(out) {
   const b = {};
-  for (const m of out.matchAll(/(\w+_balance):\s*(\d+)/g)) b[m[1]] = Number(m[2]);
+  for (const m of out.matchAll(/(\w+_balance):\s*(\d[\d_]*)/g)) b[m[1]] = Number(m[2].replace(/_/g, ''));
   b.total_zatoshis = (b.total_orchard_balance ?? 0) + (b.total_ironwood_balance ?? 0) + (b.total_sapling_balance ?? 0) + (b.total_transparent_balance ?? 0);
   return b;
 }
