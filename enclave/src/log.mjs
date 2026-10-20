@@ -7,5 +7,7 @@ import { createHash } from 'node:crypto';
 export function digestError(scope, e) {
   const msg = String(e?.message ?? e ?? '');
   console.error(`[${scope}] ${msg}`);
-  return { code: e?.code ?? null, msgHash: createHash('sha256').update(msg).digest('hex').slice(0, 16) };
+  // DOMException (fetch abort/timeout) carries a numeric code; its name says more.
+  const code = e?.name === 'TimeoutError' ? 'timeout' : e?.name === 'AbortError' ? 'abort' : (typeof e?.code === 'string' ? e.code : (e?.name && e.name !== 'Error' ? e.name : e?.code ?? null));
+  return { code, msgHash: createHash('sha256').update(msg).digest('hex').slice(0, 16) };
 }
