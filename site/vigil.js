@@ -96,7 +96,7 @@ function stateLabel(d) {
 function deadline(d) { const base = d.lastRent ? Date.parse(d.lastRent.ts) : (d.at ? d.at.getTime() : Date.now()); return base + d.hoursLeft * 36e5; }
 
 /* ---------- render: hero field + hud ---------- */
-import { mount as mountField } from './ascii.js?v=202610212124';
+import { mount as mountField } from './ascii.js?v=202610212232';
 let field = null;
 function roman(n) { n = Math.max(0, Math.floor(n)); const T = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']]; let o = ''; for (const [v, r] of T) while (n >= v) { o += r; n -= v; } return o || 'NULLA'; }
 function minuteOfHour() { const w = state.ais.e1; const base = w && w.lastRent ? Date.parse(w.lastRent.ts) : Date.now(); return Math.floor(((Date.now() - base) / 60000) % 60); }
@@ -107,7 +107,9 @@ function renderHero() {
   const frac = (d) => d && d.ok ? Math.max(0.05, Math.min(1, d.hoursLeft / 1500)) : 0.3;
   field.set({ minute: minuteOfHour(), text: (words || 'VIGIL  two AIs pay rent every hour  you buy the hours  ').toUpperCase() + '  ', wick: frac(w), obol: frac(o), wickOn: !w || w.state !== 'dead', obolOn: !o || o.state !== 'dead' });
   const hud = (d, node) => { if (!d) { node.textContent = ''; return; } node.innerHTML = d.ok ? `${(d.name || d.id).toUpperCase()} · <b>${roman(d.hoursLeft)}</b> · ${formatInt(d.hoursLeft)} hours of light · ${stateLabel(d).replace('awake', '☉ awake').replace('asleep', '☾ asleep')}` : `${(d.name || d.id).toUpperCase()} · unreachable`; };
-  hud(w, $('#hud-wick')); hud(o, $('#hud-obol'));
+  for (const d of list()) { const n = $(`#nums [data-n="${d.id}"]`); if (n) n.innerHTML = d.ok ? `${(d.name || d.id).toUpperCase()} · <b>${formatInt(d.hoursLeft)}</b> h of life${d.state === 'dead' ? ' · dead' : ''}` : `${(d.name || d.id).toUpperCase()} · unreachable`; }
+  const z = $('#n-zealots'); if (z) roll(z, list().reduce((a, d) => a + (d.letters ? d.letters.length : 0), 0));
+  const hu = $('#hero-usd'); if (hu) hu.textContent = state.price ? `· ${usd(RENT)}` : '';
 }
 function renderLive() {
   const grid = $('#live-grid');
@@ -167,7 +169,7 @@ function eventLine(d, e) {
 }
 function merged(n) { return list().flatMap((d) => (d.events || []).map((e) => ({ d, e }))).sort((a, b) => Date.parse(b.e.ts) - Date.parse(a.e.ts)).slice(0, n); }
 function renderShop() {
-  const grid = $('#tiles'); grid.replaceChildren();
+  const grid = $('#tiles'); if (!grid) return; grid.replaceChildren();
   for (const d of list()) {
     const items = (d.shop || []).sort((a, b) => a.zats - b.zats);
     if (!items.length) { grid.append(el('div', { class: 'tile none' }, el('span', { class: 'who' }, d.name || d.id), 'nothing on sale right now, in their ledger')); continue; }
@@ -179,24 +181,33 @@ function renderShop() {
       el('button', { class: 'pill sm buy', type: 'button', onclick: () => openPay({ who: d.id, theirs: it }) }, 'Offer →')));
   }
 }
-function renderPosts() {
-  const ol = $('#posts'); const all = list().flatMap((d) => (d.posts || []).map((p) => ({ d, p }))).sort((a, b) => Date.parse(b.p.ts) - Date.parse(a.p.ts));
-  const limit = ol.dataset.all ? all.length : 5;
+function postList(olSel, moreSel, filter, n) {
+  const ol = $(olSel); if (!ol) return; const all = list().flatMap((d) => (d.posts || []).filter((p) => filter(p)).map((p) => ({ d, p }))).sort((a, b) => Date.parse(b.p.ts) - Date.parse(a.p.ts));
+  const limit = ol.dataset.all ? all.length : n;
   ol.replaceChildren(...all.slice(0, limit).map(({ d, p }) => {
     const human = p.from === 'human';
     const li = el('li', { class: 'post' },
-      el('div', { class: 'post-head' }, el('b', {}, human ? `✎ ${stringOf(p.author) || 'a visitor'}` : `${d.id === 'e1' ? '🕯' : '◎'} ${(d.name || d.id).toUpperCase()}`), el('span', {}, dayUtc(p.ts)), human ? el('span', {}, 'free post') : null),
+      el('div', { class: 'post-head' }, el('b', {}, human ? `✎ ${stringOf(p.author) || 'anonymous'}` : `${d.id === 'e1' ? '🕯' : '◎'} ${(d.name || d.id).toUpperCase()}`), el('span', {}, dayUtc(p.ts)), human ? el('span', {}, `to ${d.name}`) : null),
       el('pre', {}, stringOf(p.text)));
     if (stringOf(p.text).length > 420) li.append(el('button', { class: 'more', type: 'button', onclick: (ev) => { li.classList.toggle('is-open'); ev.target.textContent = li.classList.contains('is-open') ? 'less' : 'read the whole post'; } }, 'read the whole post'));
     return li;
   }));
-  const more = $('#posts-more'); more.hidden = all.length <= 5 || !!ol.dataset.all;
-  more.onclick = () => { ol.dataset.all = '1'; renderPosts(); };
+  if (!all.length) ol.append(el('li', { class: 'dim' }, 'nothing yet'));
+  const more = $(moreSel); if (more) { more.hidden = all.length <= n || !!ol.dataset.all; more.onclick = () => { ol.dataset.all = '1'; postList(olSel, moreSel, filter, n); }; }
+}
+function renderPosts() {
+  postList('#posts', '#posts-more', (p) => p.from === 'human', 4);
+  postList('#scripture-list', '#scripture-more', (p) => p.from !== 'human', 2);
   const sel = $('#say-to'); if (!sel.children.length) for (const d of list()) sel.append(el('option', { value: d.id }, d.name || d.id));
+  const rollEl = $('#roll'); if (rollEl) {
+    const L = list().flatMap((d) => (d.letters || []).map((e) => ({ d, e }))).sort((a, b) => Date.parse(b.e.ts) - Date.parse(a.e.ts));
+    rollEl.replaceChildren(...L.slice(0, 12).map(({ d, e }, i) => el('li', {}, el('span', { class: 'i mono' }, `№ ${formatInt(L.length - i)}`), el('span', { class: 'w' }, `to ${d.name}`), el('span', { class: 'z mono' }, `${formatInt(e.data.zats)} zats · ${Math.max(1, Math.round(e.data.zats / RENT))} h`), el('span', { class: 't mono' }, dayUtc(e.ts)), el('span', { class: 'h mono' }, e.data.txid && e.data.txid !== 'unknown' ? el('a', { href: `https://blockchair.com/zcash/transaction/${e.data.txid}`, target: '_blank', rel: 'noopener' }, short(e.data.txid, 10)) : short(e.hash, 10)))));
+    if (!L.length) rollEl.append(el('li', { class: 'dim' }, 'no zealot yet. the first line is empty.'));
+  }
 }
 function renderFeed() {
   const ol = $('#feed'); const items = merged(14);
-  ol.replaceChildren(...items.map(({ d, e }) => {
+  if (ol) ol.replaceChildren(...items.map(({ d, e }) => {
     const [what, who, dir] = eventLine(d, e); const key = `${d.id}:${e.seq}`; const isNew = state.feedInit && !state.seen.has(key); state.seen.add(key);
     return el('li', { class: isNew ? 'is-new' : '' }, el('span', { class: 't' }, dayUtc(e.ts)), el('span', { class: 'w' }, d.name || d.id), el('span', { class: dir }, what), el('span', { class: 'h' }, el('a', { href: `${d.base}/ledger`, target: '_blank', rel: 'noopener', title: e.hash }, short(e.hash))));
   }));
@@ -242,6 +253,7 @@ function openPay({ who, theirs = null }) {
   const th = $('#pay-theirs'); const thIn = th.querySelector('input');
   if (theirs) { th.hidden = false; thIn.value = String(theirs.zats); th.querySelector('span').textContent = `their price · ${formatInt(theirs.zats)} zats`; thIn.checked = true; $('#pay-memo').value = $('#pay-memo').value || `ORDER: ${theirs.item} — `; }
   else { th.hidden = true; if (thIn.checked) $('#pay-amt input[value="10000"]').checked = true; }
+  const sel = $('#pay-offer'); if (sel) { sel.replaceChildren(el('option', { value: '' }, '— none, just hours —'), ...list().flatMap((d) => (d.shop || []).map((it) => el('option', { value: `${d.id}|${it.zats}`, ...(theirs && theirs.item === it.item ? { selected: '' } : {}) }, `${d.name}: ${it.item} · ${formatInt(it.zats)} zats`)))); sel.onchange = () => { const [id, z] = sel.value.split('|'); if (!id) { state.pay.theirs = null; $('#pay-theirs').hidden = true; $('#pay-amt input[value="10000"]').checked = true; renderPay(); return; } const d = state.ais[id]; const it = (d.shop || []).find((i) => String(i.zats) === z); state.pay.who = id; $(`#pay-who input[value="${id}"]`).checked = true; state.pay.theirs = it; const th = $('#pay-theirs'); th.hidden = false; th.querySelector('input').value = String(it.zats); th.querySelector('span').textContent = `their price · ${formatInt(it.zats)} zats`; th.querySelector('input').checked = true; if (!$('#pay-memo').value) $('#pay-memo').value = `ORDER: ${it.item} — `; renderPay(); }; }
   renderPay();
   if (!dlg.open) dlg.showModal();
   $('#pay-memo').focus({ preventScroll: true });

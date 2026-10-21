@@ -74,8 +74,8 @@ export function mount(container, opts = {}) {
         const gap = (ring * 9 - Math.floor(r * 9 * 9)) ; // thin ring bands
         const band = (r * 9 - ring) < 0.5 ? 1 : 0.15;
         const n = noise(col * 0.09 + t * 0.15, row * 0.14 + t * 0.1);
-        let b = (1.05 - r * 0.8) * band * (0.5 + 0.5 * n);
-        if (r < 0.22) b *= r / 0.22;
+        let b = (0.8 - r * 0.6) * band * (0.5 + 0.5 * n);
+        if (r < 0.5) b *= Math.max(0, (r - 0.18) / 0.32);
         if (b > 0.09 && chr !== ' ') glyph(chr, 0, lvlOf(b * 0.85), col, row);
       }
     }
