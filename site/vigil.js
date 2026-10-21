@@ -96,7 +96,7 @@ function stateLabel(d) {
 function deadline(d) { const base = d.lastRent ? Date.parse(d.lastRent.ts) : (d.at ? d.at.getTime() : Date.now()); return base + d.hoursLeft * 36e5; }
 
 /* ---------- render: hero field + hud ---------- */
-import { mount as mountField } from './ascii.js';
+import { mount as mountField } from './ascii.js?v=202610212119';
 let field = null;
 function renderHero() {
   const w = state.ais.e1, o = state.ais.e2;
