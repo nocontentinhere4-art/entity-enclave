@@ -217,9 +217,8 @@ function buildHero() {
       pre.classList.add('hidden');
       pushTowers();
     }).catch(() => { /* the ASCII skull stays */ });
-    const relicHost = el('div', { class: 'relic', id: 'relic', 'aria-hidden': 'true' });
-    document.getElementById('hero').prepend(relicHost);
-    import('./skull3d.js').then((m) => m.mount(relicHost, { life: 1 })).then((r) => { if (r) state.relic = r; }).catch(() => {});
+    const relicHost = document.getElementById('relic');
+    if (relicHost) import('./skull3d.js').then((m) => m.mount(relicHost, { life: 1 })).then((r) => { if (r) { state.relic = r; pre.classList.add('hidden'); } }).catch(() => {});
   }
 }
 
@@ -714,7 +713,18 @@ function render() {
   if (state.lastEventAt !== undefined && newest > state.lastEventAt && state.relic) state.relic.glitch(0.5);
   state.lastEventAt = newest;
 }
+function wireFolds() {
+  for (const d of document.querySelectorAll('details.fold')) {
+    const pill = d.querySelector('.sum-open');
+    const sync = () => { if (pill) pill.textContent = d.open ? 'close' : 'open'; };
+    d.addEventListener('toggle', sync); sync();
+  }
+  // a hash link to a folded section opens it
+  const openHash = () => { const t = document.getElementById(location.hash.slice(1)); if (t && t.tagName === 'DETAILS') t.open = true; };
+  window.addEventListener('hashchange', openHash); openHash();
+}
 function init() {
+  wireFolds();
   applyDevBase(ENTITIES, window.location.search);
   applyDevBase2(ENTITIES, window.location.search);
   buildHero(); buildComposer(); buildSayBox(); buildProof();

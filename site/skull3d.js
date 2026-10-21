@@ -61,7 +61,7 @@ const LINE_FRAG = `
     // threads only once the dust has settled: lines between flying points would wash the whole hero
     float settled = smoothstep(0.75, 1.0, uAssemble) * pow(1.0 - clamp(uScatter, 0.0, 1.0), 3.0);
     float a = uAlpha * settled * vFade * (1.0 - 0.75 * vDepth) * (0.35 + 0.65 * uLife);
-    vec3 col = mix(vec3(0.89, 0.70, 0.25), vec3(1.0, 0.93, 0.75), 0.25 * (1.0 - vDepth));
+    vec3 col = mix(vec3(0.5, 0.36, 0.9), vec3(1.0, 0.72, 0.16), 0.35 * (1.0 - vDepth));   // violet threads, warmer up front
     gl_FragColor = vec4(col, a);
   }`;
 
@@ -71,7 +71,7 @@ const POINT_VERT = COMMON + `
     vec4 mv = modelViewMatrix * vec4(place(), 1.0);
     gl_Position = projectionMatrix * mv;
     vDepth = clamp((-mv.z - 2.4) / 2.2, 0.0, 1.0);
-    gl_PointSize = uPixel * 1.9 * (1.0 - 0.5 * vDepth) * (0.7 + 0.3 * uLife);
+    gl_PointSize = uPixel * 2.3 * (1.0 - 0.5 * vDepth) * (0.7 + 0.3 * uLife);
   }`;
 const POINT_FRAG = `
   uniform float uLife; uniform float uAlpha; uniform float uGlitch; varying float vDepth; varying float vFade; varying float vBand;
@@ -79,7 +79,11 @@ const POINT_FRAG = `
     if (uGlitch > 0.0 && vBand < uGlitch * 0.35) discard;
     vec2 c = gl_PointCoord - 0.5; float d = dot(c, c); if (d > 0.25) discard;
     float a = uAlpha * vFade * smoothstep(0.25, 0.04, d) * (1.0 - 0.7 * vDepth) * (0.4 + 0.6 * uLife);
-    gl_FragColor = vec4(vec3(1.0, 0.86, 0.55), a);
+    // three sparks: amber, violet, white; the mix is decided per point by its depth and tint
+    vec3 amber = vec3(1.0, 0.72, 0.16), violet = vec3(0.62, 0.45, 1.0), white = vec3(1.0);
+    float pick = fract(vBand * 7.31 + vDepth * 3.0);
+    vec3 col = pick < 0.55 ? amber : (pick < 0.85 ? violet : white);
+    gl_FragColor = vec4(col, a);
   }`;
 
 export async function mount(host, { seed = 7, life = 1 } = {}) {
@@ -122,8 +126,8 @@ export async function mount(host, { seed = 7, life = 1 } = {}) {
     uniforms: { ...uniforms, uAlpha: { value: alpha } }, vertexShader: vs, fragmentShader: fs,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   });
-  const wire = new THREE.LineSegments(lineGeo, mat(LINE_VERT, LINE_FRAG, 0.42));
-  const dots = new THREE.Points(geo, mat(POINT_VERT, POINT_FRAG, 0.9));
+  const wire = new THREE.LineSegments(lineGeo, mat(LINE_VERT, LINE_FRAG, 0.26));
+  const dots = new THREE.Points(geo, mat(POINT_VERT, POINT_FRAG, 1.0));
   const mats = [wire.material, dots.material];
 
   const group = new THREE.Group();
@@ -144,9 +148,9 @@ export async function mount(host, { seed = 7, life = 1 } = {}) {
     // the relic keeps to the right half on wide screens; the words keep the left
     const halfW = Math.tan((camera.fov / 2) * Math.PI / 180) * camera.position.z * camera.aspect;
     const wide = camera.aspect > 1.15;
-    group.position.x = 0;                             // the relic sits between the two towers of hours
-    group.scale.setScalar(wide ? Math.min(0.9, halfW * 0.55) : 0.7);
-    baseY = 0.05;
+    group.position.x = 0;                             // the relic is the hero's constellation
+    group.scale.setScalar(Math.min(1.15, halfW * 0.78));
+    baseY = 0.0;
     wire.material.uniforms.uAlpha.value = 0.42 * (wide ? 1 : 0.55);
     dots.material.uniforms.uAlpha.value = 0.9 * (wide ? 1 : 0.55);
   };

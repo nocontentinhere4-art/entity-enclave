@@ -21,9 +21,9 @@ class Tower {
     this.group.position.x = x;
     scene.add(this.group);
     const box = new THREE.BoxGeometry(BRICK, ROW_H, BRICK);
-    this.paid = new THREE.InstancedMesh(box, new THREE.MeshBasicMaterial({ color: 0xf0c75a, transparent: true, opacity: 0.95 }), 4000);
+    this.paid = new THREE.InstancedMesh(box, new THREE.MeshBasicMaterial({ color: 0xffb829, transparent: true, opacity: 0.95 }), 4000);
     this.paidEdges = new THREE.InstancedMesh(box, new THREE.MeshBasicMaterial({ color: WHITE, wireframe: true, transparent: true, opacity: 0.35 }), 4000);
-    this.ghost = new THREE.InstancedMesh(box, new THREE.MeshBasicMaterial({ color: 0x9a7a30, wireframe: true, transparent: true, opacity: 0.16 }), 6000);
+    this.ghost = new THREE.InstancedMesh(box, new THREE.MeshBasicMaterial({ color: 0x8052ff, wireframe: true, transparent: true, opacity: 0.16 }), 6000);
     for (const m of [this.paid, this.paidEdges, this.ghost]) { m.count = 0; m.frustumCulled = false; this.group.add(m); }
     this.lid = new THREE.Mesh(new THREE.PlaneGeometry(COLS * (BRICK + GAP) + 0.2, DEPTH * (BRICK + GAP) + 0.2), new THREE.MeshBasicMaterial({ color: RED, transparent: true, opacity: 0.4, side: THREE.DoubleSide }));
     this.lid.rotation.x = -Math.PI / 2;
@@ -95,7 +95,7 @@ export function mount(host, { onHover } = {}) {
   const towers = [new Tower(scene, -24), new Tower(scene, 24)];
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 }));
   floor.rotation.x = -Math.PI / 2; scene.add(floor);
-  const grid = new THREE.GridHelper(120, 40, 0x2a2416, 0x15120a);
+  const grid = new THREE.GridHelper(120, 40, 0x1c1c1c, 0x0e0e0e);
   grid.position.y = -0.01; scene.add(grid);
 
   let w = 1, h = 1, tallest = 10, mobile = false, camX = 0, camY = 0, lookY = 0;
