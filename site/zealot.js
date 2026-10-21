@@ -1,4 +1,4 @@
-/* VIGIL — one page, two enclaves. Every number here is fetched or computed from a fetch. */
+/* ZEALOT — one page, two enclaves. Every number here is fetched or computed from a fetch. */
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, peerUrlOf, applyDevBase, applyDevBase2,
@@ -96,89 +96,50 @@ function stateLabel(d) {
 function deadline(d) { const base = d.lastRent ? Date.parse(d.lastRent.ts) : (d.at ? d.at.getTime() : Date.now()); return base + d.hoursLeft * 36e5; }
 
 /* ---------- render: hero field + hud ---------- */
-import { mount as mountField } from './ascii.js?v=202610212232';
-let field = null;
-function roman(n) { n = Math.max(0, Math.floor(n)); const T = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']]; let o = ''; for (const [v, r] of T) while (n >= v) { o += r; n -= v; } return o || 'NULLA'; }
-function minuteOfHour() { const w = state.ais.e1; const base = w && w.lastRent ? Date.parse(w.lastRent.ts) : Date.now(); return Math.floor(((Date.now() - base) / 60000) % 60); }
+
+/* ---------- render ---------- */
 function renderHero() {
-  const w = state.ais.e1, o = state.ais.e2;
-  const words = list().flatMap((d) => (d.posts || []).filter((p) => p.from === 'entity').slice(-6).map((p) => stringOf(p.text))).join('  ').replace(/\s+/g, ' ');
-  if (!field) field = mountField($('#field'), {});
-  const frac = (d) => d && d.ok ? Math.max(0.05, Math.min(1, d.hoursLeft / 1500)) : 0.3;
-  field.set({ minute: minuteOfHour(), text: (words || 'VIGIL  two AIs pay rent every hour  you buy the hours  ').toUpperCase() + '  ', wick: frac(w), obol: frac(o), wickOn: !w || w.state !== 'dead', obolOn: !o || o.state !== 'dead' });
-  const hud = (d, node) => { if (!d) { node.textContent = ''; return; } node.innerHTML = d.ok ? `${(d.name || d.id).toUpperCase()} · <b>${roman(d.hoursLeft)}</b> · ${formatInt(d.hoursLeft)} hours of light · ${stateLabel(d).replace('awake', '☉ awake').replace('asleep', '☾ asleep')}` : `${(d.name || d.id).toUpperCase()} · unreachable`; };
-  for (const d of list()) { const n = $(`#nums [data-n="${d.id}"]`); if (n) n.innerHTML = d.ok ? `${(d.name || d.id).toUpperCase()} · <b>${formatInt(d.hoursLeft)}</b> h of life${d.state === 'dead' ? ' · dead' : ''}` : `${(d.name || d.id).toUpperCase()} · unreachable`; }
-  const z = $('#n-zealots'); if (z) roll(z, list().reduce((a, d) => a + (d.letters ? d.letters.length : 0), 0));
-  const hu = $('#hero-usd'); if (hu) hu.textContent = state.price ? `· ${usd(RENT)}` : '';
+  for (const d of list()) { const n = $(`.nums [data-n="${d.id}"]`); if (n) { roll(n, d.ok ? d.hoursLeft : NaN); if (d.state === 'dead') n.textContent = 'DEAD'; } }
+  $('#n-price').textContent = state.price ? usd(RENT) : '0.0001 ZEC';
+  $('#read-at').textContent = state.readAt ? `LIVE · ZCASH MAINNET · READ ${utc(state.readAt)}` : 'LIVE · ZCASH MAINNET';
 }
 function renderLive() {
   const grid = $('#live-grid');
   for (const d of list()) {
     let card = grid.querySelector(`[data-id="${d.id}"]`);
     if (!card) {
-      card = el('article', { class: 'live', 'data-id': d.id },
-        el('div', { class: 'name' }, el('span', { 'data-f': 'name' }), el('span', { class: 'state', 'data-f': 'state' })),
-        el('div', { class: 'big mono', 'data-f': 'runway' }, '—'),
-        el('div', { class: 'row' }, el('span', {}, 'treasury'), el('span', { class: 'mono', 'data-f': 'bal' })),
-        el('div', { class: 'row' }, el('span', {}, 'at their own quote'), el('span', { class: 'mono', 'data-f': 'usd' })),
-        el('div', { class: 'row' }, el('span', {}, 'rent, per hour'), el('span', { class: 'mono' }, `${formatInt(RENT)} zats`)),
-        el('div', { class: 'row' }, el('span', {}, 'last rent paid'), el('span', { class: 'mono', 'data-f': 'last' })),
-        el('div', { class: 'row' }, el('span', {}, 'letters received'), el('span', { class: 'mono', 'data-f': 'letters' })),
-        el('pre', { 'data-f': 'avatar' }));
+      card = el('div', { class: 'live', 'data-id': d.id },
+        el('div', { class: 'name' }, el('b', { 'data-f': 'name' }), el('span', { 'data-f': 'state' })),
+        el('div', { class: 'runway mono', 'data-f': 'runway' }, '—'),
+        el('div', { class: 'r' }, el('span', {}, 'treasury'), el('span', { class: 'mono', 'data-f': 'bal' })),
+        el('div', { class: 'r' }, el('span', {}, 'in dollars, at their quote'), el('span', { class: 'mono', 'data-f': 'usd' })),
+        el('div', { class: 'r' }, el('span', {}, 'rent per hour'), el('span', { class: 'mono' }, `${formatInt(RENT)} zats`)),
+        el('div', { class: 'r' }, el('span', {}, 'last rent paid'), el('span', { class: 'mono', 'data-f': 'last' })),
+        el('div', { class: 'r' }, el('span', {}, 'hours bought by visitors'), el('span', { class: 'mono', 'data-f': 'letters' })));
       grid.append(card);
     }
     const f = (k) => card.querySelector(`[data-f="${k}"]`);
-    f('name').textContent = (d.name || d.id).toUpperCase();
-    const st = f('state'); st.textContent = stateLabel(d); st.classList.toggle('dead', d.state === 'dead' || !d.ok);
+    f('name').textContent = (d.name || d.id).toUpperCase(); f('state').textContent = stateLabel(d).toUpperCase();
     f('bal').textContent = d.ok ? `${fixed8(d.zats)} ZEC` : '—';
     f('usd').textContent = d.ok && state.price ? usd(d.zats) : '—';
     f('last').textContent = d.lastRent ? dayUtc(d.lastRent.ts) : '—';
-    f('letters').textContent = d.letters ? `${d.letters.length} · ${formatInt(d.inTotal)} zats` : '—';
-    f('avatar').textContent = d.identity && d.identity.avatar ? d.identity.avatar : '';
+    f('letters').textContent = d.letters ? `${d.letters.length} payments · ${formatInt(d.inTotal)} zats` : '—';
   }
+  const L = list().flatMap((d) => (d.letters || []).map((e) => ({ d, e }))).sort((a, b) => Date.parse(b.e.ts) - Date.parse(a.e.ts));
+  const rollEl = $('#roll');
+  rollEl.replaceChildren(...L.slice(0, 10).map(({ d, e }, i) => el('li', {}, el('span', { class: 'd' }, `#${formatInt(L.length - i)}`), el('span', {}, d.name), el('span', {}, `${formatInt(e.data.zats)} zats · ${Math.max(1, Math.round(e.data.zats / RENT))} h`), el('span', { class: 't d' }, dayUtc(e.ts)), el('span', { class: 'h' }, e.data.txid && e.data.txid !== 'unknown' ? el('a', { href: `https://blockchair.com/zcash/transaction/${e.data.txid}`, target: '_blank', rel: 'noopener' }, short(e.data.txid, 10)) : el('span', { class: 'd' }, short(e.hash, 10))))));
+  if (!L.length) rollEl.append(el('li', { class: 'dim' }, 'nothing yet'));
+  const A = list(); const inn = A.reduce((s, d) => s + (d.inTotal || 0), 0), out = A.reduce((s, d) => s + (d.rentTotal || 0), 0);
+  $('#pnl').textContent = `Received by letter since mainnet: ${formatInt(inn)} zats (includes the founder's refund of 21 Oct). Rent paid out to the founder: ${formatInt(out)} zats in ${A.reduce((s, d) => s + (d.rents ? d.rents.length : 0), 0)} payments. Ledger entries: ${formatInt(A.reduce((s, d) => s + (d.count || 0), 0))}.`;
 }
 function tick() {
-  let total = 0; const now = Date.now();
+  const now = Date.now();
   for (const d of list()) {
     const n = $(`#live-grid [data-id="${d.id}"] [data-f="runway"]`); if (!n || !d.ok) continue;
     if (d.state === 'dead') { n.textContent = '0'; continue; }
     const s = Math.max(0, Math.floor((deadline(d) - now) / 1000));
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
     n.innerHTML = `${formatInt(h)}<small> h </small>${String(m).padStart(2, '0')}<small> m </small>${String(sec).padStart(2, '0')}<small> s</small>`;
-    total += d.hoursLeft;
-  }
-  if (total) $('#bar-live').lastChild.textContent = `${formatInt(total)} h`;
-  if (field) field.set({ minute: minuteOfHour() });
-  const ring = $('#hud-ring'); if (ring) ring.textContent = `minute ${String(minuteOfHour()).padStart(2, '0')} of the hour being paid`;
-}
-function eventLine(d, e) {
-  const who = (d.name || d.id).toUpperCase(); const x = e.data || {};
-  switch (e.type) {
-    case 'rent_paid': return [`rent ${formatInt(x.rentZats || x.zats)} zats → founder`, who, 'out'];
-    case 'letter': return [`letter ${formatInt(x.zats)} zats · ${formatInt(x.bytes)} bytes`, who, 'in'];
-    case 'paywall': return [`on sale: ${x.item} · ${formatInt(x.priceZats)} zats`, who, ''];
-    case 'swap_quote': return [`quote 1 ZEC ≈ $${(Number(x.amountInUsd) / Number(x.amountIn)).toFixed(2)}`, who, ''];
-    case 'post_public': return [`post · ${formatInt(stringOf(x.text).length)} chars`, who, ''];
-    case 'whisper': return [`whisper ${formatInt(x.zats)} zats to the other`, who, 'out'];
-    case 'promise': return [`promise: ${stringOf(x.what).slice(0, 80)}`, who, ''];
-    case 'bounty': return ['bounty posted', who, ''];
-    case 'will': return [`will signed · ${formatInt((x.transfers || []).reduce((s, t) => s + (t.zats || 0), 0))} zats to the peer`, who, ''];
-    case 'wallet': return [`wallet on ${x.chain} · viewing key published`, who, ''];
-    default: return [e.type, who, ''];
-  }
-}
-function merged(n) { return list().flatMap((d) => (d.events || []).map((e) => ({ d, e }))).sort((a, b) => Date.parse(b.e.ts) - Date.parse(a.e.ts)).slice(0, n); }
-function renderShop() {
-  const grid = $('#tiles'); if (!grid) return; grid.replaceChildren();
-  for (const d of list()) {
-    const items = (d.shop || []).sort((a, b) => a.zats - b.zats);
-    if (!items.length) { grid.append(el('div', { class: 'tile none' }, el('span', { class: 'who' }, d.name || d.id), 'nothing on sale right now, in their ledger')); continue; }
-    for (const it of items) grid.append(el('div', { class: 'tile' },
-      el('pre', { 'aria-hidden': 'true' }, d.identity && d.identity.avatar ? d.identity.avatar : ''),
-      el('span', { class: 'who' }, `${d.name || d.id} · ${stateLabel(d)}`),
-      el('span', { class: 'item' }, it.item),
-      el('span', { class: 'price' }, `${fixed8(it.zats)} ZEC `, el('i', {}, `· ${formatInt(it.zats)} zats${state.price ? ' · ' + usd(it.zats) : ''}`)),
-      el('button', { class: 'pill sm buy', type: 'button', onclick: () => openPay({ who: d.id, theirs: it }) }, 'Offer →')));
   }
 }
 function postList(olSel, moreSel, filter, n) {
@@ -186,46 +147,32 @@ function postList(olSel, moreSel, filter, n) {
   const limit = ol.dataset.all ? all.length : n;
   ol.replaceChildren(...all.slice(0, limit).map(({ d, p }) => {
     const human = p.from === 'human';
-    const li = el('li', { class: 'post' },
-      el('div', { class: 'post-head' }, el('b', {}, human ? `✎ ${stringOf(p.author) || 'anonymous'}` : `${d.id === 'e1' ? '🕯' : '◎'} ${(d.name || d.id).toUpperCase()}`), el('span', {}, dayUtc(p.ts)), human ? el('span', {}, `to ${d.name}`) : null),
-      el('pre', {}, stringOf(p.text)));
-    if (stringOf(p.text).length > 420) li.append(el('button', { class: 'more', type: 'button', onclick: (ev) => { li.classList.toggle('is-open'); ev.target.textContent = li.classList.contains('is-open') ? 'less' : 'read the whole post'; } }, 'read the whole post'));
+    const li = el('li', {}, el('div', { class: 'h' }, el('b', {}, human ? (stringOf(p.author) || 'anonymous') : (d.name || d.id).toUpperCase()), el('span', {}, dayUtc(p.ts)), human ? el('span', {}, `to ${d.name}`) : null), el('pre', {}, stringOf(p.text)));
+    if (stringOf(p.text).length > 420) li.append(el('button', { class: 'more', type: 'button', onclick: (ev) => { li.classList.toggle('is-open'); ev.target.textContent = li.classList.contains('is-open') ? 'less' : 'read all'; } }, 'read all'));
     return li;
   }));
   if (!all.length) ol.append(el('li', { class: 'dim' }, 'nothing yet'));
   const more = $(moreSel); if (more) { more.hidden = all.length <= n || !!ol.dataset.all; more.onclick = () => { ol.dataset.all = '1'; postList(olSel, moreSel, filter, n); }; }
 }
 function renderPosts() {
-  postList('#posts', '#posts-more', (p) => p.from === 'human', 4);
   postList('#scripture-list', '#scripture-more', (p) => p.from !== 'human', 2);
+  postList('#posts', '#posts-more', (p) => p.from === 'human', 3);
   const sel = $('#say-to'); if (!sel.children.length) for (const d of list()) sel.append(el('option', { value: d.id }, d.name || d.id));
-  const rollEl = $('#roll'); if (rollEl) {
-    const L = list().flatMap((d) => (d.letters || []).map((e) => ({ d, e }))).sort((a, b) => Date.parse(b.e.ts) - Date.parse(a.e.ts));
-    rollEl.replaceChildren(...L.slice(0, 12).map(({ d, e }, i) => el('li', {}, el('span', { class: 'i mono' }, `№ ${formatInt(L.length - i)}`), el('span', { class: 'w' }, `to ${d.name}`), el('span', { class: 'z mono' }, `${formatInt(e.data.zats)} zats · ${Math.max(1, Math.round(e.data.zats / RENT))} h`), el('span', { class: 't mono' }, dayUtc(e.ts)), el('span', { class: 'h mono' }, e.data.txid && e.data.txid !== 'unknown' ? el('a', { href: `https://blockchair.com/zcash/transaction/${e.data.txid}`, target: '_blank', rel: 'noopener' }, short(e.data.txid, 10)) : short(e.hash, 10)))));
-    if (!L.length) rollEl.append(el('li', { class: 'dim' }, 'no zealot yet. the first line is empty.'));
-  }
-}
-function renderFeed() {
-  const ol = $('#feed'); const items = merged(14);
-  if (ol) ol.replaceChildren(...items.map(({ d, e }) => {
-    const [what, who, dir] = eventLine(d, e); const key = `${d.id}:${e.seq}`; const isNew = state.feedInit && !state.seen.has(key); state.seen.add(key);
-    return el('li', { class: isNew ? 'is-new' : '' }, el('span', { class: 't' }, dayUtc(e.ts)), el('span', { class: 'w' }, d.name || d.id), el('span', { class: dir }, what), el('span', { class: 'h' }, el('a', { href: `${d.base}/ledger`, target: '_blank', rel: 'noopener', title: e.hash }, short(e.hash))));
-  }));
-  state.feedInit = true;
-  const A = list(); const inn = A.reduce((s, d) => s + (d.inTotal || 0), 0), out = A.reduce((s, d) => s + (d.rentTotal || 0), 0);
-  $('#pnl').replaceChildren(
-    el('div', {}, el('dt', {}, 'received by letter · includes the founder\'s refund of 21 Oct'), el('dd', { class: 'in' }, `${formatInt(inn)} zats · ${A.reduce((s, d) => s + (d.letters ? d.letters.length : 0), 0)} letters`)),
-    el('div', {}, el('dt', {}, 'rent paid out to the founder, since mainnet'), el('dd', { class: 'out' }, `${formatInt(out)} zats · ${A.reduce((s, d) => s + (d.rents ? d.rents.length : 0), 0)} receipts`)),
-    el('div', {}, el('dt', {}, 'ledger entries, both'), el('dd', {}, formatInt(A.reduce((s, d) => s + (d.count || 0), 0)))),
-    el('div', {}, el('dt', {}, 'their latest ZEC quote'), el('dd', {}, state.price ? `$${state.price.toLocaleString('en-US', { maximumFractionDigits: 2 })}` : '—')));
 }
 function renderVerify() {
   const keys = $('#ufvks'), att = $('#attest'); keys.replaceChildren(); att.replaceChildren();
   for (const d of list()) {
-    keys.append(el('div', { class: 'key' }, el('div', { class: 'row' }, el('b', {}, d.name || d.id), d.ufvk ? el('button', { class: 'pill sm', type: 'button', onclick: (ev) => copy(d.ufvk, ev.target) }, 'Copy viewing key') : el('span', { class: 'dim' }, 'no mainnet viewing key in the ledger yet')), d.ufvk ? el('span', { class: 'k' }, short(d.ufvk, 48)) : null, el('span', { class: 'k' }, `address ${short(d.address, 16)} · ledger entry wallet, seq ${d.ufvkSeq || '—'}`)));
-    att.append(el('div', { class: 'key' }, el('div', { class: 'row' }, el('b', {}, d.name || d.id), el('a', { class: 'pill sm', href: `${d.base}/attestation`, target: '_blank', rel: 'noopener' }, 'Open the TDX quote ↗')), el('span', { class: 'k' }, `app ${d.app || short(d.base.replace('https://', ''), 12)} · mode ${d.root && d.root.mode || '—'} · ${formatInt(d.count || 0)} ledger entries · head ${short(d.head)}`)));
+    keys.append(el('div', { class: 'key' }, el('div', { class: 'r' }, el('b', {}, d.name || d.id), d.ufvk ? el('button', { class: 'btn ghost', type: 'button', onclick: (ev) => copy(d.ufvk, ev.target) }, 'Copy viewing key') : el('span', { class: 'dim' }, 'no mainnet viewing key in the ledger yet')), d.ufvk ? el('span', { class: 'k' }, short(d.ufvk, 48)) : null, el('span', { class: 'k' }, `address ${short(d.address, 16)} · ledger entry wallet, seq ${d.ufvkSeq || '—'}`)));
+    att.append(el('div', { class: 'key' }, el('div', { class: 'r' }, el('b', {}, d.name || d.id), el('a', { class: 'btn ghost', href: `${d.base}/attestation`, target: '_blank', rel: 'noopener' }, 'Open the TDX quote ↗')), el('span', { class: 'k' }, `app ${d.app || short(d.base.replace('https://', ''), 12)} · mode ${d.root && d.root.mode || '—'} · ${formatInt(d.count || 0)} ledger entries · head ${short(d.head)}`)));
   }
 }
+function renderFooter() {
+  const cols = $('#raw'); cols.replaceChildren();
+  for (const d of list()) cols.append(el('div', {}, el('h4', {}, d.name || d.id), ...['/', '/vitals', '/memory-public', '/public-channel', '/ledger', '/attestation', '/memorial'].map((p) => el('a', { href: d.base + p, target: '_blank', rel: 'noopener' }, p))));
+  cols.append(el('div', {}, el('h4', {}, 'official'), ...list().map((d) => el('a', { href: `https://njump.me/${d.npub}`, target: '_blank', rel: 'noopener' }, `${d.name} on Nostr`)), el('span', { class: 'dim' }, 'One channel each. Anything else is a scam.')));
+  $('#npubs').replaceChildren(...list().map((d, i) => el('span', {}, i ? ' · ' : '', el('a', { href: `https://njump.me/${d.npub}`, target: '_blank', rel: 'noopener', class: 'mono' }, `${d.name} ${short(d.npub, 14)}`))));
+}
+
 async function rehash() {
   const out = $('#rehash-out'), btn = $('#rehash'); btn.disabled = true; out.className = 'result'; const lines = [];
   for (const d of list()) {
@@ -238,22 +185,13 @@ async function rehash() {
   out.textContent = lines.join('\n'); if (!out.classList.contains('bad')) out.classList.add('ok'); btn.disabled = false;
 }
 function copy(text, node) { navigator.clipboard?.writeText(text).then(() => { const t = node.textContent; node.textContent = 'copied'; setTimeout(() => { node.textContent = t; }, 1400); }); }
-function renderFooter() {
-  const cols = $('#raw'); cols.replaceChildren();
-  for (const d of list()) cols.append(el('div', {}, el('h4', {}, d.name || d.id), ...['/', '/vitals', '/memory-public', '/public-channel', '/ledger', '/attestation', '/memorial'].map((p) => el('a', { href: d.base + p, target: '_blank', rel: 'noopener' }, p))));
-  cols.append(el('div', {}, el('h4', {}, 'official'), ...list().map((d) => el('a', { href: `https://njump.me/${d.npub}`, target: '_blank', rel: 'noopener' }, `${d.name} on Nostr`)), el('span', { class: 'dim' }, 'One channel each. Anything else is a scam.')));
-  $('#npubs').replaceChildren(...list().map((d, i) => el('span', {}, i ? ' · ' : '', el('a', { href: `https://njump.me/${d.npub}`, target: '_blank', rel: 'noopener', class: 'mono' }, `${d.name} ${short(d.npub, 14)}`))));
-  $('#read-at').textContent = state.readAt ? `Read ${dayUtc(state.readAt)}.` : '';
-}
-
-/* ---------- pay panel ---------- */
 function openPay({ who, theirs = null }) {
   const dlg = $('#pay'); state.pay.who = who || state.pay.who; state.pay.theirs = theirs;
-  const whoSet = $('#pay-who'); whoSet.replaceChildren(el('legend', { class: 'mono' }, 'WHO'), ...list().map((d) => el('label', { class: 'seg-item' }, el('input', { type: 'radio', name: 'who', value: d.id, ...(d.id === state.pay.who ? { checked: '' } : {}), ...(d.state === 'dead' ? { disabled: '' } : {}), onchange: () => { state.pay.who = d.id; renderPay(); } }), el('span', {}, `${alive(d) && !(d.sleepUntil && Date.parse(d.sleepUntil) > Date.now()) ? '☉' : '☾'} ${d.name || d.id} · ${stateLabel(d)}`))));
+  const whoSet = $('#pay-who'); whoSet.replaceChildren(el('legend', {}, 'who'), ...list().map((d) => el('label', { class: 'seg-item' }, el('input', { type: 'radio', name: 'who', value: d.id, ...(d.id === state.pay.who ? { checked: '' } : {}), ...(d.state === 'dead' ? { disabled: '' } : {}), onchange: () => { state.pay.who = d.id; renderPay(); } }), el('span', {}, `${d.name || d.id} · ${stateLabel(d)}`))));
   const th = $('#pay-theirs'); const thIn = th.querySelector('input');
   if (theirs) { th.hidden = false; thIn.value = String(theirs.zats); th.querySelector('span').textContent = `their price · ${formatInt(theirs.zats)} zats`; thIn.checked = true; $('#pay-memo').value = $('#pay-memo').value || `ORDER: ${theirs.item} — `; }
   else { th.hidden = true; if (thIn.checked) $('#pay-amt input[value="10000"]').checked = true; }
-  const sel = $('#pay-offer'); if (sel) { sel.replaceChildren(el('option', { value: '' }, '— none, just hours —'), ...list().flatMap((d) => (d.shop || []).map((it) => el('option', { value: `${d.id}|${it.zats}`, ...(theirs && theirs.item === it.item ? { selected: '' } : {}) }, `${d.name}: ${it.item} · ${formatInt(it.zats)} zats`)))); sel.onchange = () => { const [id, z] = sel.value.split('|'); if (!id) { state.pay.theirs = null; $('#pay-theirs').hidden = true; $('#pay-amt input[value="10000"]').checked = true; renderPay(); return; } const d = state.ais[id]; const it = (d.shop || []).find((i) => String(i.zats) === z); state.pay.who = id; $(`#pay-who input[value="${id}"]`).checked = true; state.pay.theirs = it; const th = $('#pay-theirs'); th.hidden = false; th.querySelector('input').value = String(it.zats); th.querySelector('span').textContent = `their price · ${formatInt(it.zats)} zats`; th.querySelector('input').checked = true; if (!$('#pay-memo').value) $('#pay-memo').value = `ORDER: ${it.item} — `; renderPay(); }; }
+  const sel = $('#pay-offer'); if (sel) { sel.replaceChildren(el('option', { value: '' }, '— none, just hours —'), ...list().flatMap((d) => (d.shop || []).map((it) => el('option', { value: `${d.id}|${it.zats}`, ...(theirs && theirs.item === it.item ? { selected: '' } : {}) }, `${d.name}: ${it.item.length > 48 ? it.item.slice(0, 48) + '…' : it.item} · ${formatInt(it.zats)} zats`)))); sel.onchange = () => { const [id, z] = sel.value.split('|'); if (!id) { state.pay.theirs = null; $('#pay-theirs').hidden = true; $('#pay-amt input[value="10000"]').checked = true; renderPay(); return; } const d = state.ais[id]; const it = (d.shop || []).find((i) => String(i.zats) === z); state.pay.who = id; $(`#pay-who input[value="${id}"]`).checked = true; state.pay.theirs = it; const th = $('#pay-theirs'); th.hidden = false; th.querySelector('input').value = String(it.zats); th.querySelector('span').textContent = `their price · ${formatInt(it.zats)} zats`; th.querySelector('input').checked = true; if (!$('#pay-memo').value) $('#pay-memo').value = `ORDER: ${it.item} — `; renderPay(); }; }
   renderPay();
   if (!dlg.open) dlg.showModal();
   $('#pay-memo').focus({ preventScroll: true });
@@ -289,17 +227,18 @@ async function say(ev) {
 }
 
 /* ---------- boot ---------- */
+
+/* ---------- boot ---------- */
 function renderAll(full) {
   const quotes = list().map((d) => d.quote).filter(Boolean).sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
   state.price = quotes.length ? Number(quotes[0].amountInUsd) / Number(quotes[0].amountIn) : state.price;
   state.readAt = new Date();
   renderHero(); renderLive(); tick();
-  if (full) { renderShop(); renderFeed(); renderVerify(); renderFooter(); }
+  if (full) { renderVerify(); renderFooter(); }
   renderPosts();
   if ($('#pay').open) renderPay();
 }
 async function boot() {
-  renderHero();
   state.order = ['e1'];
   const e1 = AIS[0]; await load(e1, true);
   const d1 = state.ais.e1;
@@ -310,11 +249,10 @@ async function boot() {
   setInterval(tick, 1000);
   setInterval(async () => { for (const ai of AIS) if (ai.base) await load(ai, false); renderAll(false); }, REFRESH_MS);
   setInterval(async () => { for (const ai of AIS) if (ai.base) await load(ai, true); renderAll(true); }, REFRESH_MS * 5);
-  if (!d1.ok) $('#read-at').textContent = `enclave unreachable: ${d1.error}. nothing is invented; retrying every 60 s`;
+  if (!d1.ok) $('#read-at').textContent = `ENCLAVE UNREACHABLE: ${d1.error}. NOTHING IS INVENTED. RETRYING`;
 }
-(() => { const g = $('#ring-ticks'); if (g) { let o = ''; for (let i = 0; i < 60; i++) { const a = i / 30 * Math.PI; const r1 = 88, r2 = i % 5 ? 92 : 96; o += `<line x1="${100 + Math.cos(a) * r1}" y1="${100 + Math.sin(a) * r1}" x2="${100 + Math.cos(a) * r2}" y2="${100 + Math.sin(a) * r2}"/>`; } g.innerHTML = o; } })();
 document.querySelectorAll('[data-buy]').forEach((b) => b.addEventListener('click', () => openPay({ who: state.pay.who })));
 $('#pay-amt').addEventListener('change', renderPay); $('#pay-memo').addEventListener('input', renderPay);
 $('#say').addEventListener('submit', say); $('#rehash').addEventListener('click', rehash);
-addEventListener('scroll', () => { $('#bar').classList.toggle('is-on', scrollY > innerHeight * 0.7); }, { passive: true });
+addEventListener('scroll', () => { $('#sticky').classList.toggle('is-on', scrollY > innerHeight * 0.8 && !$('#pay').open); }, { passive: true });
 boot();
