@@ -3,9 +3,9 @@
    with Wick's flame and OBOL's coin standing in it, both sized by their real treasuries. */
 
 const RAMP = ' .,:;-~=+*xo#%@';
-const BLUE = ['#1a2152', '#2a3590', '#4452c9', '#7a86ff', '#b9c1ff'];
-const WARM = ['#3a2810', '#8a5a1a', '#d9962b', '#ffd27a', '#fff3cf'];
-const SILVER = ['#2a2e36', '#555c68', '#8d95a3', '#c6ccd6', '#f4f6fa'];
+const BLUE = ['#15120f', '#2a251e', '#4a4236', '#766a56', '#a89a80'];
+const WARM = ['#3a1206', '#8a2e0a', '#d9661a', '#ffb347', '#fff1c9'];
+const SILVER = ['#1f1d1a', '#4a4640', '#7d7870', '#b3ada2', '#ebe5d8'];
 const LIME = ['#2d3a0e', '#6c8a1e', '#a9d12c', '#d6f54a', '#f1ffb0'];
 
 export function mount(container, opts = {}) {
@@ -52,27 +52,30 @@ export function mount(container, opts = {}) {
     const { cols, rows, cw, ch } = st; if (!cols) return;
     st.t += reduced ? 0 : 1 / 30;
     st.mx += (st.tmx - st.mx) * 0.06; st.my += (st.tmy - st.my) * 0.06;
-    ctx.fillStyle = '#070a1a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#030303'; ctx.fillRect(0, 0, canvas.width, canvas.height);
     const aspect = ch / cw; const cx = cols / 2 + st.mx * cols * 0.08, cy = rows * 0.52 + st.my * rows * 0.08;
     const text = st.text; const tl = text.length; const t = st.t;
     const wide = cols > 90;
     // flame and coin anchors (cells)
-    const fx = wide ? cols * 0.22 : cols * 0.5, fy = wide ? rows * 0.93 : rows * 0.96;
-    const ox = wide ? cols * 0.78 : cols * 0.5, oy = wide ? rows * 0.5 : rows * 0.3;
-    const fh = (0.25 + 0.55 * st.wick) * rows, fw = (0.07 + 0.09 * st.wick) * cols;
-    const R = (wide ? 0.12 + 0.2 * st.obol : 0.08 + 0.12 * st.obol) * rows; const phi = t * 0.9; const cosp = Math.cos(phi);
-    // 1. the tunnel of words
+    const fx = wide ? cols * 0.5 : cols * 0.5, fy = wide ? rows * 0.99 : rows * 0.99;
+    const ox = wide ? cols * 0.8 : cols * 0.5, oy = wide ? rows * 0.5 : rows * 0.2;
+    const fh = (0.3 + 0.6 * st.wick) * rows, fw = (0.05 + 0.07 * st.wick) * cols;
+    const R = (wide ? 0.1 + 0.16 * st.obol : 0.07 + 0.1 * st.obol) * rows; const phi = t * 0.9; const cosp = Math.cos(phi);
+    // 1. the sigil: rings of their words, each turning against the next, a dark halo round the flame
+    const scx = wide ? cols * 0.5 : cols * 0.5, scy = wide ? rows * 0.5 : rows * 0.42;
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
-        const u = (col - cx), v = (row - cy) * aspect; const r = Math.sqrt(u * u + v * v) / (rows * aspect * 0.5); const a = Math.atan2(v, u);
-        const depth = 1 / (r + 0.08);
-        const ring = Math.floor(depth * 2.2 + t * 0.6);
-        const idx = Math.floor(a / (2 * Math.PI) * (28 + ring * 9) + ring * 17 + t * 2) ;
+        const u = (col - scx) + st.mx * cols * 0.03, v = ((row - scy) * aspect) + st.my * rows * 0.03; const rr = Math.sqrt(u * u + v * v); const r = rr / (rows * aspect * 0.5); const a = Math.atan2(v, u);
+        const ring = Math.floor(r * 9); if (ring < 1) continue;
+        const dir = ring % 2 ? 1 : -1; const circ = Math.max(12, Math.floor(ring * 14));
+        const idx = Math.floor(((a + Math.PI) / (2 * Math.PI)) * circ + dir * t * (0.9 + ring * 0.12) + ring * 31);
         const chr = text[((idx % tl) + tl) % tl];
-        const n = noise(col * 0.11 + t * 0.3, row * 0.17 - t * 0.2);
-        let b = (1.0 - r * 0.7) * (0.55 + 0.45 * n) * (0.65 + 0.35 * Math.sin(ring * 1.7 + t * 1.3));
-        if (r < 0.1) b *= r * 10; // dark centre for the wordmark
-        if (b > 0.1 && chr !== ' ') glyph(chr, 0, lvlOf(b * 0.9), col, row);
+        const gap = (ring * 9 - Math.floor(r * 9 * 9)) ; // thin ring bands
+        const band = (r * 9 - ring) < 0.5 ? 1 : 0.15;
+        const n = noise(col * 0.09 + t * 0.15, row * 0.14 + t * 0.1);
+        let b = (1.05 - r * 0.8) * band * (0.5 + 0.5 * n);
+        if (r < 0.22) b *= r / 0.22;
+        if (b > 0.09 && chr !== ' ') glyph(chr, 0, lvlOf(b * 0.85), col, row);
       }
     }
     // 2. Wick's flame: a heat buffer rising
