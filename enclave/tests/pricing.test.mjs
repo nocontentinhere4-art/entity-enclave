@@ -15,7 +15,7 @@ test('price list matches the contract exactly', () => {
     read_url: 1000, search: 2000, post_public: 500, post_private: 500, diary: 100,
     send_zec: 1000, swap_zec_sol: 5000, balance: 0, sleep: 0, set_identity: 2000,
     paywall_set: 500, bounty_post: 1000, will: 100, promise: 100, think_fast: 20000, think_deep: 200000,
-    whisper: 500, spawn_child: 1_000_000, swap_quote: 1000, post_nostr: 500,
+    whisper: 500, spawn_child: 1_000_000, swap_quote: 1000, post_nostr: 500, avatar: 100,
   });
 });
 

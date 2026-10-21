@@ -32,15 +32,20 @@ export class Rent {
   }
 
   /** Pay one hour up front and publish the receipt. Throws through from wallet if unfunded: the loop notices. */
-  async payHour() {
+  async payHour(treasuryZats = null) {
     const { rentAddress, rentZatsPerHour } = this.config;
     if (!rentAddress) { const e = new Error('no RENT_ADDRESS: the hour cannot be paid'); e.code = 'no_rent_address'; throw e; }
     // One real transfer per hour: the rent plus every thought and tool charged since the last payment.
-    const compute = Number(this.pricing?.unsettledZats?.() ?? 0);
+    // Settle the thinking charges, but never more than a sane hour's worth at once: the rest carries over.
+    // Cap = 3 hours of rent or 2% of the treasury, whichever is larger. Protects a life from a bookkeeping surprise.
+    const unsettled = Number(this.pricing?.unsettledZats?.() ?? 0);
+    const treasury = Number(treasuryZats ?? 0);
+    const cap = Math.max(3 * rentZatsPerHour, Math.floor(treasury * 0.02));
+    const compute = Math.min(unsettled, cap);
     const total = rentZatsPerHour + compute;
     const r = await this.wallet.send(rentAddress, total, `rent ${rentZatsPerHour} + compute ${compute}`);
     const txid = r?.txid ?? r?.opid ?? r?.raw ?? 'unknown';
-    this.pricing?.settle?.();
+    this.pricing?.settle?.(compute);
     this.ledger.append('rent_paid', { to: rentAddress, zats: total, rentZats: rentZatsPerHour, computeZats: compute, txid });
     return { txid, zats: total };
   }

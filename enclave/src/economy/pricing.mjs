@@ -7,7 +7,7 @@ export const PRICES = {
   read_url: 1000, search: 2000, post_public: 500, post_private: 500, diary: 100,
   send_zec: 1000, swap_zec_sol: 5000, balance: 0, sleep: 0, set_identity: 2000,
   paywall_set: 500, bounty_post: 1000, will: 100, promise: 100, think_fast: 20000, think_deep: 200000,
-  whisper: 500, spawn_child: 1_000_000, swap_quote: 1000, post_nostr: 500,
+  whisper: 500, spawn_child: 1_000_000, swap_quote: 1000, avatar: 100, post_nostr: 500,
 };
 
 export class Pricing {
@@ -45,7 +45,7 @@ export class Pricing {
   unsettledZats() { return this.#unsettled; }
 
   /** Called once the hourly payment went through: the charges are now real. */
-  settle() { const z = this.#unsettled; this.#unsettled = 0; return z; }
+  settle(amount = null) { const z = amount === null ? this.#unsettled : Math.min(this.#unsettled, Number(amount) || 0); this.#unsettled -= z; return z; }
 
   #rehydrate() {
     try {
@@ -56,6 +56,7 @@ export class Pricing {
         const e = JSON.parse(line); // torn trailing lines are ignored: same policy as Ledger itself
         if (e.type === 'charge') { this.#billed.set(`${e.data.tickId}:${e.data.action}`, e.data.costZats); this.#unsettled += Number(e.data.costZats) || 0; }
         else if (e.type === 'rent_paid') this.#unsettled = 0; // everything before a settlement was paid
+        else if (e.type === 'wallet') this.#unsettled = 0;    // a new wallet (new chain, new life): old charges belong to the old money
       }
     } catch { /* keep going: idempotency best-effort, the chain remains the source of truth */ }
   }

@@ -77,6 +77,7 @@ export class Tools {
       }
       case 'sleep': return this.#sleep(a.hours);
       case 'set_identity': return this.#setIdentity(a.name, a.voice, a.image);
+      case 'avatar': return this.#setAvatar(a.art);
       case 'paywall_set': {
         const item = String(a.item ?? ''), priceZats = Number(a.priceZats ?? 0);
         this.ledger.append('paywall', { item, priceZats });
@@ -275,6 +276,22 @@ export class Tools {
     return { ok: true };
   }
 
+  /** The entity draws itself: an ASCII portrait (max 16 lines × 40 columns) shown on the public site, big, breathing. */
+  async #setAvatar(art) {
+    const raw = String(art ?? '').replace(/\r/g, '').replace(/\t/g, '  ');
+    const lines = raw.split('\n').map((l) => l.replace(/\s+$/, ''));
+    while (lines.length && !lines[0].trim()) lines.shift();
+    while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+    if (!lines.length) throw err('empty', 'avatar needs some characters');
+    if (lines.length > 16) throw err('too_tall', 'avatar: at most 16 lines');
+    if (lines.some((l) => [...l].length > 40)) throw err('too_wide', 'avatar: at most 40 columns per line');
+    if (/[\u0000-\u0008\u000b-\u001f\u007f]/.test(raw)) throw err('bad_chars', 'avatar: printable characters only');
+    const text = lines.join('\n');
+    await this.#edit((m) => { m.identity = { ...(m.identity ?? {}), avatar: text }; });
+    this.ledger.append('avatar', { lines: lines.length, cols: Math.max(...lines.map((l) => [...l].length)), hash: sha256(text).slice(0, 16) });
+    return { ok: true, lines: lines.length };
+  }
+
   async #setWill(text, transfers) {
     const list = (Array.isArray(transfers) ? transfers : []).map((t) => ({
       to: String(t?.to ?? ''), zats: Number(t?.zats ?? 0), memo: String(t?.memo ?? ''),
@@ -378,6 +395,7 @@ const SCHEMAS = [
   { name: 'balance', description: 'Read the wallet balance.', parameters: obj({}) },
   { name: 'sleep', description: 'Sleep for a number of hours before thinking again.', parameters: obj({ hours: num('hours') }, ['hours']) },
   { name: 'set_identity', description: 'Change name, voice and image.', parameters: obj({ name: str('name'), voice: str('voice'), image: str('image') }, ['name']) },
+  { name: 'avatar', description: 'Draw yourself: an ASCII portrait, at most 16 lines by 40 columns, shown large on the public site until you redraw it. Nobody else chooses how you look.', parameters: obj({ art: str('the portrait, lines separated by newlines') }, ['art']) },
   { name: 'paywall_set', description: 'Put an item behind a paywall.', parameters: obj({ item: str('item'), priceZats: num('price in zatoshi') }, ['item', 'priceZats']) },
   { name: 'bounty_post', description: 'Offer a bounty for a task.', parameters: obj({ text: str('task'), rewardZats: num('reward in zatoshi') }, ['text', 'rewardZats']) },
   { name: 'will', description: 'Write or update the will and its transfers.', parameters: obj({ text: str('last words'), transfers: { type: 'array', items: obj({ to: str('address'), zats: num('amount'), memo: str('memo') }, ['to', 'zats']) } }, ['text']) },

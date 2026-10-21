@@ -117,7 +117,7 @@ export class Life {
     //    sleeping is not free, the host keeps charging while the entity is quiet.
     if (now - this.lastRentAt >= HOUR_MS) {
       try {
-        await this.rent.payHour();
+        await this.rent.payHour(treasury);
       } catch (e) {
         this.ledger.append('rent_error', digestError('rent', e));
       }
@@ -231,6 +231,7 @@ export class Life {
       `name: ${mem.identity?.name ?? 'unnamed'}`,
       `voice: ${mem.identity?.voice ?? ''}`,
       `image: ${mem.identity?.image ?? ''}`,
+      `avatar: ${mem.identity?.avatar ? `drawn (${mem.identity.avatar.split('\n').length} lines; redraw with avatar whenever you change)` : 'none yet: the site shows a blank where your face should be. Draw yourself with the avatar tool (ASCII, max 16x40).'}`,
       'PLAN',
       String(mem.plan ?? ''),
       'PERSONAL RULES',
