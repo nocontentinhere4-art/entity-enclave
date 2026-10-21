@@ -31,6 +31,7 @@ import {
   sourceLine,
   isFuture,
   formatInt,
+  formatDecimal,
   formatZats,
   fixed8,
   addressOf,
@@ -585,7 +586,7 @@ function narrateEntry(id, e) {
   const privateSize = Number.isFinite(size) ? `${formatInt(size)} bytes` : 'size not declared';
 
   if (e.private === true || type === 'whisper_text') {
-    return `${name} · private entry (sealed · ${privateSize})`;
+    return null; // private entries stay private: not even their existence is news here (the ledger shows them)
   }
   switch (type) {
     case 'rent_paid': {
@@ -643,6 +644,10 @@ function narrateEntry(id, e) {
 
 /** Your-free-to-edit best effort on a swap/quote entry, else the raw compact JSON. */
 function swapText(d, entry) {
+  const ai = Number(d.amountIn), ao = Number(d.amountOut);
+  if (Number.isFinite(ai) && ai > 0 && Number.isFinite(ao) && ao > 0 && d.from && d.to) {
+    return `${ai} ${String(d.from).toUpperCase()} = ${formatDecimal(ao, ao >= 100 ? 0 : 4)} ${String(d.to).toUpperCase()}`;
+  }
   for (const key of ['text', 'quote', 'summary', 'best']) {
     const s = stringOf(d[key]).trim();
     if (s) return trunc(s, 90);
@@ -780,7 +785,8 @@ function updateTalk(id) {
 
   let uri;
   try {
-    uri = zip321Uri(addr, EXAMPLE_MEMO);
+    const priceZats = priceZatsOf(id);
+    uri = zip321Uri(addr, EXAMPLE_MEMO, Math.max(10_000, priceZats || 0) / 1e8); // their own price, else a floor of 10,000 zats
   } catch (err) {
     r.qrBox.replaceChildren(el('p', { class: 'qr-error', text: `the payment URI could not be built: ${err.message}` }));
     r.uriText.value = '';
@@ -790,7 +796,7 @@ function updateTalk(id) {
 
   r.uriText.value = uri;
   try {
-    const svg = qrSvg(uri, { ecLevel: 'M', ariaLabel: `pay ${nameOf(id)} 0.001 ZEC with a memo (example question)` });
+    const svg = qrSvg(uri, { ecLevel: 'M', ariaLabel: `pay ${nameOf(id)} with a memo (example question)` });
     r.qrBox.replaceChildren();
     r.qrBox.insertAdjacentHTML('afterbegin', svg);  // generated locally; contains only rects/paths
   } catch (err) {
@@ -812,11 +818,29 @@ function updateTalk(id) {
 }
 
 /** Price list from the latest paywall/post that carries one, else null. */
+function priceZatsOf(id) {
+  const entries = entriesOf(id);
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const e = entries[i];
+    const d = e.data && typeof e.data === 'object' ? e.data : {};
+    if (entryType(e) === 'paywall' && Number(d.priceZats) > 0) return Number(d.priceZats);
+    if (entryType(e) === 'post_public') {
+      const m = stringOf(d.text).match(/price:?\s*([\d,]{4,})\s*zats?/i);
+      if (m) return Number(m[1].replace(/,/g, ''));
+    }
+  }
+  return null;
+}
+
 function priceLineOf(id) {
   const entries = entriesOf(id);
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i];
     const type = entryType(e);
+    if (type === 'paywall' && e.data && e.data.item) {
+      const z = Number(e.data.priceZats) || 0;
+      return `${stringOf(e.data.item).replace(/[-_]/g, ' ')} — ${formatInt(z)} zats (${(z / 1e8).toFixed(5)} ZEC), set by itself`;
+    }
     if (type !== 'paywall' && type !== 'price' && type !== 'pricing' && type !== 'post_public') continue;
     const d = e.data && typeof e.data === 'object' ? e.data : {};
     if (d.prices && (Array.isArray(d.prices) || typeof d.prices === 'object')) {

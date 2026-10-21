@@ -517,10 +517,11 @@ export function base64UrlEncode(input) {
 }
 
 /** A ZIP-321 payment URI; the memo is always the last parameter. */
-export function zip321Uri(address, memo) {
+export function zip321Uri(address, memo, amountZec = 0.001) {
   const addr = String(address || '').trim();
   if (!addr) throw new RangeError('zip321Uri: no address');
-  const params = ['amount=0.001'];
+  const amt = Number(amountZec);
+  const params = [`amount=${(Number.isFinite(amt) && amt > 0 ? amt : 0.001).toFixed(8).replace(/0+$/, '').replace(/\.$/, '')}`];
   const memoText = String(memo ?? '').trim();
   if (memoText) params.push(`memo=${base64UrlEncode(memoText)}`);
   return `zcash:${addr}?${params.join('&')}`;
