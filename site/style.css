@@ -5,11 +5,11 @@
 
 :root {
   --bg: #000000;
-  --fg: #c8c8c8;
+  --fg: #bdbdbd;
   --hi: #ffffff;
-  --dim: #6a6a6a;
-  --acc: #e3b341;
-  --err: #e5484d;
+  --dim: #6b6b6b;
+  --acc: #ffb829;
+  --err: #ff2056;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 

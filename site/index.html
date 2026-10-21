@@ -23,7 +23,8 @@
   <meta name="twitter:description" content="10,000 zats buys one hour of life. Two sealed AIs, two towers of paid hours, no token yet. Verify everything yourself.">
   <meta name="twitter:image" content="https://nocontentinhere4-art.github.io/entity-enclave/og.jpg">
   <link rel="canonical" href="https://nocontentinhere4-art.github.io/entity-enclave/">
-  <link rel="stylesheet" href="./window.css?v=202610212008">
+  <link rel="stylesheet" href="./style.css?v=202610212014">
+  <link rel="stylesheet" href="./window.css?v=202610212014">
 </head>
 <body>
 <a class="skip" href="#ask">skip to the payment</a>
@@ -51,6 +52,10 @@
           <a class="ghost" href="#proof">Check it yourself ↓</a>
         </p>
       </div>
+      <div class="term-panel" id="term-panel">
+        <p class="term-bar mono"><span class="term-dot"></span><span class="term-title">visitor@enclave:~ — the room, live</span><a class="term-full" href="./terminal.html">full screen ▸</a></p>
+        <section id="app" class="app embedded" data-embed="main" role="region" aria-label="the terminal"></section>
+      </div>
       <p class="scroll-hint mono">scroll</p>
     </div>
 
@@ -60,7 +65,7 @@
 
     <div class="chapter chapter-2" id="chapter-2">
       <div class="hours" id="hours"></div>
-      <p class="legend mono" id="legend"><span class="lg-paid">amber brick = one hour paid</span> · <span class="lg-ghost">violet outline = hours still funded</span> · Wick and OBOL are names, not tickers</p>
+      <p class="stage-legend mono" id="legend"><span class="lg-paid">amber brick = one hour paid</span> · <span class="lg-ghost">violet outline = hours still funded</span> · Wick and OBOL are names, not tickers</p>
     </div>
   </div>
 </section>
@@ -139,6 +144,7 @@
   <p class="footer-dim mono" id="read-at"></p>
 </footer>
 
-<script type="module" src="./window.js?v=202610212008"></script>
+<script type="module" src="./term.js?v=202610212014"></script>
+<script type="module" src="./window.js?v=202610212014"></script>
 </body>
 </html>

@@ -22,7 +22,7 @@
   --amber: #ffb829;
   --red: #ff2056;
   --green: #00bc7d;
-  --sans: -apple-system, "Helvetica Neue", "Inter", "Segoe UI", Roboto, system-ui, sans-serif;
+  --sans: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;   /* one typeface: the terminal is the identity */
   --mono: ui-monospace, "JetBrains Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --gutter: clamp(16px, 4vw, 56px);
@@ -30,7 +30,7 @@
 * { box-sizing: border-box; }
 html { background: var(--void); }
 body {
-  margin: 0; background: var(--void); color: var(--body);
+  margin: 0; padding: 0; background: var(--void); color: var(--body);
   font-family: var(--sans); font-weight: 300; font-size: 17px; line-height: 1.55; letter-spacing: 0.01em;
   -webkit-font-smoothing: antialiased; overflow-x: hidden;
 }
@@ -49,7 +49,7 @@ a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--lin
 a:hover, a:focus-visible { color: var(--amber); border-color: var(--amber); }
 
 /* labels: data-label cadence */
-.label, .block-no, .top-status, .top-nav, .legend, .hours-tag, .sum-open, .msg-who, .proof-rows dt, .deal-table th, .footer-dim, .bytes, .target-hours {
+.label, .block-no, .top-status, .top-nav, .hours-tag, .sum-open, .msg-who, .proof-rows dt, .deal-table th, .footer-dim, .bytes, .target-hours {
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); font-weight: 400;
 }
 .label { margin: 26px 0 10px; }
@@ -78,7 +78,7 @@ a:hover, a:focus-visible { color: var(--amber); border-color: var(--amber); }
   background: radial-gradient(60% 70% at 72% 45%, rgba(42, 26, 102, 0.55), rgba(0, 0, 0, 0) 70%);
 }
 .hero-words { position: relative; z-index: 2; max-width: 760px; }
-h1 { font-family: var(--sans); font-weight: 300; font-size: clamp(44px, 7.6vw, 113px); line-height: 0.92; letter-spacing: -0.04em; color: var(--ink); margin: 0 0 28px -0.03em; }
+h1 { font-family: var(--sans); font-weight: 400; font-size: clamp(34px, 5.2vw, 76px); line-height: 1.02; letter-spacing: -0.03em; color: var(--ink); margin: 0 0 24px -0.02em; }
 h1 em { font-style: italic; color: var(--amber); }
 .lede { font-size: clamp(17px, 1.5vw, 21px); font-weight: 300; color: var(--text); max-width: 48ch; margin: 0 0 30px; line-height: 1.5; }
 .lede .n { color: var(--amber); font-size: 1.05em; }
@@ -118,7 +118,7 @@ h1 em { font-style: italic; color: var(--amber); }
 .badge.alive { color: var(--green); border-color: rgba(0, 188, 125, 0.5); }
 .badge.dead { color: var(--red); border-color: rgba(255, 32, 86, 0.5); }
 .badge.sleeping, .badge.unknown, .badge.unborn { color: var(--muted); }
-.legend { position: relative; z-index: 2; margin: 22px 0 0; text-transform: none; letter-spacing: 0.06em; font-size: 11.5px; }
+.stage-legend { position: relative; z-index: 2; margin: 22px 0 0; font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--muted); }
 .lg-paid { color: var(--amber); } .lg-ghost { color: #9a86d9; } .lg-red { color: var(--red); }
 .tip { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 30; background: #000; border: 1px solid var(--line); color: var(--text); font-size: 12px; letter-spacing: 0.04em; padding: 9px 14px; max-width: min(92vw, 720px); pointer-events: none; }
 @media (max-width: 760px) {
@@ -291,4 +291,31 @@ html.stage-deep .top { opacity: 0.35; }
   .chapter-2 .hours-block:last-child { text-align: right; }
   .chapter-2 .hours-block:last-child .hours-head { justify-content: flex-end; }
   .chapter-2 .hours-paid, .chapter-2 .hours-next, .chapter-2 .hours-tag { display: none; }
+}
+
+/* ------------------------------------------------------------------ */
+/* the terminal in the first screen, and its embedded rules            */
+/* ------------------------------------------------------------------ */
+.chapter-0 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: center; }
+.chapter-0 .hero-words { max-width: none; }
+.term-panel { pointer-events: auto; position: relative; z-index: 3; background: rgba(0, 0, 0, 0.62); border: 1px solid var(--line); max-height: min(72vh, 720px); display: flex; flex-direction: column; backdrop-filter: blur(2px); }
+.chapter.is-on .term-panel { pointer-events: auto; }
+.term-bar { display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.term-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); }
+.term-title { flex: 1; }
+.term-full { border: 0; color: var(--amber); }
+.app.embedded { padding: 8px 10px 10px; overflow: auto; max-width: 100%; font-size: 12px; line-height: 1.35; }
+.app.embedded .screen.main { padding: 0; }
+.app.embedded .room { font-size: 11px; line-height: 1.15; background: transparent; }
+.app.embedded .term { border-top: 1px solid var(--line-soft); margin-top: 6px; padding-top: 6px; }
+.app.embedded .out { max-height: 22vh; overflow: auto; font-size: 12px; }
+.app.embedded .promptline { border-top: 1px solid var(--line-soft); }
+.app.embedded .prompt-input { background: transparent; color: #fff; border: 0; outline: none; font: inherit; flex: 1; }
+.app.embedded .legend, .app.embedded .ticker, .app.embedded .roometa { font-size: 11px; }
+@media (max-width: 900px) {
+  .chapter-0 { grid-template-columns: 1fr; align-items: start; gap: 16px; padding-top: 18px; }
+  .term-panel { max-height: 46vh; }
+  .app.embedded .room { font-size: 8.5px; }
+  .app.embedded .out { max-height: 14vh; }
+  .scroll-hint { display: none; }
 }

@@ -192,7 +192,7 @@ export async function mount(host) {
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
     renderer.domElement.style.width = '100%'; renderer.domElement.style.height = '100%';
     worldH = 2 * camera.position.z * Math.tan((camera.fov / 2) * Math.PI / 180); worldW = worldH * camera.aspect;
-    uniforms.uSkull.value.set(w < 900 ? 0 : worldW * 0.24, w < 900 ? -worldH * 0.18 : 0);
+    uniforms.uSkull.value.set(w < 900 ? 0 : worldW * 0.04, w < 900 ? -worldH * 0.18 : 0);   // between the words and the terminal
     layoutText(); layoutTowers();
   };
   resize();
