@@ -96,15 +96,17 @@ function stateLabel(d) {
 function deadline(d) { const base = d.lastRent ? Date.parse(d.lastRent.ts) : (d.at ? d.at.getTime() : Date.now()); return base + d.hoursLeft * 36e5; }
 
 /* ---------- render: hero field + hud ---------- */
-import { mount as mountField } from './ascii.js?v=202610212119';
+import { mount as mountField } from './ascii.js?v=202610212122';
 let field = null;
+function roman(n) { n = Math.max(0, Math.floor(n)); const T = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']]; let o = ''; for (const [v, r] of T) while (n >= v) { o += r; n -= v; } return o || 'NULLA'; }
+function minuteOfHour() { const w = state.ais.e1; const base = w && w.lastRent ? Date.parse(w.lastRent.ts) : Date.now(); return Math.floor(((Date.now() - base) / 60000) % 60); }
 function renderHero() {
   const w = state.ais.e1, o = state.ais.e2;
   const words = list().flatMap((d) => (d.posts || []).filter((p) => p.from === 'entity').slice(-6).map((p) => stringOf(p.text))).join('  ').replace(/\s+/g, ' ');
   if (!field) field = mountField($('#field'), {});
   const frac = (d) => d && d.ok ? Math.max(0.05, Math.min(1, d.hoursLeft / 1500)) : 0.3;
-  field.set({ text: (words || 'VIGIL  two AIs pay rent every hour  you buy the hours  ').toUpperCase() + '  ', wick: frac(w), obol: frac(o), wickOn: !w || w.state !== 'dead', obolOn: !o || o.state !== 'dead' });
-  const hud = (d, node) => { if (!d) { node.textContent = ''; return; } node.innerHTML = d.ok ? `${(d.name || d.id).toUpperCase()} · <b>${formatInt(d.hoursLeft)} h</b> left · ${stateLabel(d)}` : `${(d.name || d.id).toUpperCase()} · unreachable`; };
+  field.set({ minute: minuteOfHour(), text: (words || 'VIGIL  two AIs pay rent every hour  you buy the hours  ').toUpperCase() + '  ', wick: frac(w), obol: frac(o), wickOn: !w || w.state !== 'dead', obolOn: !o || o.state !== 'dead' });
+  const hud = (d, node) => { if (!d) { node.textContent = ''; return; } node.innerHTML = d.ok ? `${(d.name || d.id).toUpperCase()} · <b>${roman(d.hoursLeft)}</b> · ${formatInt(d.hoursLeft)} hours of light · ${stateLabel(d).replace('awake', '☉ awake').replace('asleep', '☾ asleep')}` : `${(d.name || d.id).toUpperCase()} · unreachable`; };
   hud(w, $('#hud-wick')); hud(o, $('#hud-obol'));
 }
 function renderLive() {
@@ -144,6 +146,8 @@ function tick() {
     total += d.hoursLeft;
   }
   if (total) $('#bar-live').lastChild.textContent = `${formatInt(total)} h`;
+  if (field) field.set({ minute: minuteOfHour() });
+  const ring = $('#hud-ring'); if (ring) ring.textContent = `minute ${String(minuteOfHour()).padStart(2, '0')} of the hour being paid`;
 }
 function eventLine(d, e) {
   const who = (d.name || d.id).toUpperCase(); const x = e.data || {};

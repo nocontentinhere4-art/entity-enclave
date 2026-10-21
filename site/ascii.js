@@ -14,7 +14,7 @@ export function mount(container, opts = {}) {
   container.append(canvas);
   const ctx = canvas.getContext('2d', { alpha: false });
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const st = { cols: 0, rows: 0, cw: 8, ch: 15, dpr: 1, text: 'VIGIL ', wick: 0.5, obol: 0.5, wickOn: true, obolOn: true, mx: 0, my: 0, tmx: 0, tmy: 0, t: 0, heat: null, atlas: null, atlasKey: '', raf: 0, running: false, font: 13 };
+  const st = { cols: 0, rows: 0, cw: 8, ch: 15, dpr: 1, text: 'VIGIL ', wick: 0.5, obol: 0.5, wickOn: true, obolOn: true, mx: 0, my: 0, tmx: 0, tmy: 0, t: 0, heat: null, atlas: null, atlasKey: '', raf: 0, running: false, font: 13, minute: 0, smoke: [] };
   Object.assign(st, opts);
 
   function size() {
@@ -53,13 +53,14 @@ export function mount(container, opts = {}) {
     st.t += reduced ? 0 : 1 / 30;
     st.mx += (st.tmx - st.mx) * 0.06; st.my += (st.tmy - st.my) * 0.06;
     ctx.fillStyle = '#030303'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawSigil();
     const aspect = ch / cw; const cx = cols / 2 + st.mx * cols * 0.08, cy = rows * 0.52 + st.my * rows * 0.08;
     const text = st.text; const tl = text.length; const t = st.t;
     const wide = cols > 90;
     // flame and coin anchors (cells)
     const fx = wide ? cols * 0.5 : cols * 0.5, fy = wide ? rows * 0.99 : rows * 0.99;
     const ox = wide ? cols * 0.8 : cols * 0.5, oy = wide ? rows * 0.5 : rows * 0.2;
-    const fh = (0.3 + 0.6 * st.wick) * rows, fw = (0.05 + 0.07 * st.wick) * cols;
+    const flick = 0.85 + 0.3 * noise(t * 4.5, 3.3); const fh = (0.3 + 0.6 * st.wick) * rows * flick, fw = (0.05 + 0.07 * st.wick) * cols * (0.9 + 0.2 * noise(t * 3, 7.7));
     const R = (wide ? 0.1 + 0.16 * st.obol : 0.07 + 0.1 * st.obol) * rows; const phi = t * 0.9; const cosp = Math.cos(phi);
     // 1. the sigil: rings of their words, each turning against the next, a dark halo round the flame
     const scx = wide ? cols * 0.5 : cols * 0.5, scy = wide ? rows * 0.5 : rows * 0.42;
@@ -105,6 +106,37 @@ export function mount(container, opts = {}) {
         glyph(rampOf(b), 2, lvlOf(b), col, row);
       }
     }
+    if (st.wickOn && !reduced) drawSmoke(fx * cw * st.dpr, (fy - fh * 0.9) * ch * st.dpr);
+  }
+  function drawSigil() {
+    const W = canvas.width, H = canvas.height, cx = W / 2 + st.mx * W * 0.015, cy = H * 0.5 + st.my * H * 0.015;
+    const Rr = Math.min(W, H) * 0.44, t = st.t; ctx.save(); ctx.lineWidth = Math.max(1, st.dpr * 0.8);
+    ctx.strokeStyle = 'rgba(200,170,120,0.16)';
+    ctx.beginPath(); ctx.arc(cx, cy, Rr, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, Rr * 0.72, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, Rr * 0.26, 0, Math.PI * 2); ctx.stroke();
+    // heptagram, turning
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * 0.02); ctx.strokeStyle = 'rgba(200,170,120,0.11)'; ctx.beginPath();
+    for (let i = 0; i <= 7; i++) { const a = (i * 3 % 7) / 7 * Math.PI * 2 - Math.PI / 2; const x = Math.cos(a) * Rr * 0.72, y = Math.sin(a) * Rr * 0.72; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.stroke(); ctx.restore();
+    // 60 ticks: the minutes of the hour being paid, lit as they pass
+    for (let i = 0; i < 60; i++) {
+      const a = i / 60 * Math.PI * 2 - Math.PI / 2; const lit = i < st.minute; const len = i % 5 ? 0.025 : 0.045;
+      ctx.strokeStyle = lit ? 'rgba(255,179,71,0.75)' : 'rgba(200,170,120,0.16)'; ctx.lineWidth = Math.max(1, st.dpr * (lit ? 1.4 : 0.8));
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * Rr, cy + Math.sin(a) * Rr); ctx.lineTo(cx + Math.cos(a) * Rr * (1 + len), cy + Math.sin(a) * Rr * (1 + len)); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawSmoke(fx, top) {
+    if (!st.smoke.length) for (let i = 0; i < 14; i++) st.smoke.push({ x: 0, y: 0, r: 0, a: 0, life: Math.random() });
+    const W = canvas.width, H = canvas.height; ctx.save();
+    for (const p of st.smoke) {
+      p.life += 0.004 + Math.random() * 0.003; if (p.life > 1) { p.life = 0; p.x = (Math.random() - 0.5) * 0.04; }
+      const y = top - p.life * H * 0.55, x = fx + (p.x + Math.sin(p.life * 6 + st.t) * 0.03 * p.life) * W; const r = (0.02 + p.life * 0.08) * H; const a = 0.07 * Math.sin(p.life * Math.PI);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(120,100,80,${a})`); g.addColorStop(1, 'rgba(120,100,80,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
   }
   function loop() { if (!st.running) return; frame(); st.raf = setTimeout(loop, 1000 / 30); }
   function start() { if (st.running) return; st.running = true; loop(); }
