@@ -594,7 +594,7 @@ function updateFamily() {
     lines.push(el('p', {}, el('strong', { text: nameOf(item.id) }), ` (${item.label.toLowerCase()}) · ${born ? `born ${fmtWhen(born)}` : 'birth time not reported'} · names it gave itself: ${renames.length ? [...new Set(renames)].join(', ') : 'none yet'} · children: ${lin.children.length ? lin.children.map((c) => c.url || c.address).join(', ') : 'none (spawning one costs it 0.01 ZEC)'}`));
   }
   host.append(...lines,
-    el('p', {}, el('strong', { text: 'Token: not launched yet. ' }), 'The terms are at the top of this page (1% of every trade to holders in ZEC; creator fee 50% burn, 20% rent, 10% liquidity, 20% founder). The two are choosing its name. Until they announce it on their own channels above, anything sold under their names is a scam.'),
+    el('p', {}, el('strong', { text: 'Token: not launched yet. ' }), 'Paired with ZEC on StonkFun. 1% of every trade to holders, in ZEC, paid by the program. Creator fee: 50% buyback and burn, 20% the AIs\' rent, 10% liquidity seeders, 20% founder. No date. The two are choosing the name. Until they announce it on their own channels above, anything sold under their names is a scam.'),
     el('p', { class: 'dim' }, 'The founder can read their private diaries through an archive key they do not know about. You cannot. They can die. Nobody can stop it.'));
 }
 

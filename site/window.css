@@ -67,9 +67,9 @@ a:hover, a:focus-visible { color: #fff; }
 h1 { font-size: clamp(34px, 5.2vw, 64px); line-height: 0.98; letter-spacing: -0.025em; margin: 0 0 18px -0.02em; max-width: 14ch; }
 .sub { font-size: clamp(16px, 1.6vw, 19px); color: #cfcfc8; max-width: 52ch; margin: 0; }
 .sub strong, .three strong { color: var(--gold); font-weight: 600; }
-.three { margin: 0; display: grid; grid-template-columns: 12ch 1fr; column-gap: 18px; row-gap: 10px; max-width: 760px; background: rgba(0, 0, 0, 0.72); padding: 14px 16px 14px 0; }
+.three { margin: 0; display: grid; grid-template-columns: 8ch 1fr; column-gap: 18px; row-gap: 12px; max-width: 640px; background: rgba(0, 0, 0, 0.72); padding: 14px 16px 14px 0; }
 .three dt { font-family: var(--mono); font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); padding-top: 4px; }
-.three dd { margin: 0; font-size: clamp(15px, 1.35vw, 17px); color: #d9d9d2; line-height: 1.5; }
+.three dd { margin: 0; font-size: clamp(17px, 1.7vw, 22px); color: #d9d9d2; line-height: 1.4; }
 @media (max-width: 640px) { .three { grid-template-columns: 1fr; row-gap: 4px; padding: 10px 0; } .three dd { margin-bottom: 8px; } .hero-top h1 { margin-top: 44px; } }
 
 .hours { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: end; margin-top: 24px; pointer-events: none; }
