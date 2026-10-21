@@ -11,7 +11,7 @@
 import {
   ENTITIES, COOLDOWN_MS, REFRESH_MS,
   applyDevBase, applyDevBase2, peerUrlOf, endpointKey,
-  fetchSnapshot, postMessage, parseLedger, entryType, verifyChain, lineageOf,
+  fetchSnapshot, postMessage, parseLedger, entryType, verifyChain,
   stringOf, clockTime, fmtStamp, isFuture, formatInt, fixed8,
 } from './data.js';
 import { renderFace, seedOf } from './face.js';
@@ -136,6 +136,29 @@ function priceZatsOf(id) {
   }
   return null;
 }
+/** USD per ZEC from the latest swap_quote (from zec) in either ledger: { usd, ts } or null */
+function zecPrice() {
+  let best = null;
+  for (const item of ENTITIES) {
+    if (!item.base) continue;
+    for (const e of entriesOf(item.id)) {
+      if (entryType(e) !== 'swap_quote') continue;
+      const d = dataIn(e);
+      if (stringOf(d.from).toLowerCase() !== 'zec') continue;
+      const inZ = Number(d.amountIn), usd = Number(d.amountInUsd);
+      if (!(inZ > 0) || !(usd > 0)) continue;
+      const ts = tsOf(e);
+      if (!best || ts > best.ts) best = { usd: usd / inZ, ts };
+    }
+  }
+  return best;
+}
+function usdOf(zats) {
+  const p = zecPrice();
+  if (!p) return '';
+  const v = (zats / 1e8) * p.usd;
+  return ` ≈ $${v >= 100 ? formatInt(Math.round(v)) : v >= 1 ? v.toFixed(2) : v.toFixed(3)}`;
+}
 function fmtHours(h) {
   if (!Number.isFinite(h)) return '—';
   if (h < 1) return `${Math.max(0, Math.floor(h * 60))} min`;
@@ -168,6 +191,7 @@ function buildHero() {
   for (const item of ENTITIES) {
     const refs = {};
     refs.name = el('h2', { class: 'hours-name', text: item.label });
+    refs.tag = el('span', { class: 'hours-tag mono', text: `${item.label.toLowerCase()} · a name, not a ticker` });
     refs.badge = el('span', { class: 'badge', text: '…' });
     refs.big = el('p', { class: 'hours-big mono', 'aria-live': 'off' }, el('span', { class: 'n', text: '—' }), el('span', { class: 'u', text: ' h' }));
     refs.min = el('p', { class: 'hours-min mono', text: '' });
@@ -177,7 +201,7 @@ function buildHero() {
     refs.err = el('p', { class: 'hours-err mono hidden' });
     const block = el('div', { class: 'hours-block', id: `hours-${item.id}` },
       el('div', { class: 'hours-head' }, refs.name, refs.badge),
-      refs.big, refs.min, refs.dies, refs.paid, refs.next, refs.err);
+      refs.tag, refs.big, refs.min, refs.dies, refs.paid, refs.next, refs.err);
     host.append(block);
     state.hero[item.id] = refs;
   }
@@ -256,7 +280,7 @@ function updateHero() {
     r.err.classList.add('hidden');
     if (hh && Number.isFinite(hh.hours)) {
       minHours = minHours === null ? hh.hours : Math.min(minHours, hh.hours);
-      r.paid.textContent = `${plural(paid.length, 'hour')} paid this life · treasury ${hh.zats !== null ? `${fixed8(hh.zats)} ZEC` : 'not reported'} ÷ ${formatInt(hh.rent.zats)} zats/h${hh.rent.declared ? '' : ' (assumed)'}`;
+      r.paid.textContent = `treasury ${hh.zats !== null ? `${(hh.zats / 1e8).toFixed(3)} ZEC${usdOf(hh.zats)}` : 'not reported'} = ${formatInt(Math.floor(hh.hours))} hours = ${Math.floor(hh.hours / 24)} days · rent ${formatInt(hh.rent.zats)} zats${usdOf(hh.rent.zats)} an hour${hh.rent.declared ? '' : ' (assumed)'} · ${plural(paid.length, 'hour')} paid this life`;
     } else {
       r.big.querySelector('.n').textContent = '—';
       r.paid.textContent = st.code === 'unborn' ? 'unborn: the clock starts with its birth gift' : 'no balance read: no clock';
@@ -265,6 +289,8 @@ function updateHero() {
     if (res && !res.ok) { r.err.textContent = `/vitals: ${res.error || 'error'} — showing the last read`; r.err.classList.remove('hidden'); }
   }
   if (state.relic) state.relic.setLife(minHours === null ? 1 : Math.max(0.12, Math.min(1, minHours / 720)));
+  const uh = document.getElementById('usd-hour');
+  if (uh) uh.textContent = usdOf(DEFAULT_RENT_ZATS);
   pushTowers();
   tickHero();
 }
@@ -372,7 +398,7 @@ function renderComposer() {
   const hours = zats / rent.zats;
   const price = priceZatsOf(id);
   const lifeText = hours >= 1 ? fmtHM(hours) : `${Math.round(hours * 60)} min`;
-  c.priceLine.textContent = `${formatInt(zats)} zats = ${fixed8(zats)} ZEC = ${lifeText} of ${nameOf(id)}'s life` + (price ? ` · it asks ${formatInt(price)} zats (${fmtHours(price / rent.zats)}) for an answer` : ' · any amount reaches it; it decides what to answer');
+  c.priceLine.textContent = `you buy ${lifeText} of ${nameOf(id)}'s life = ${fixed8(zats)} ZEC${usdOf(zats)}` + (price ? ` · it asks ${fmtHours(price / rent.zats)} (${fixed8(price)} ZEC${usdOf(price)}) for an answer; no answer guaranteed` : ' · any amount reaches it; no answer guaranteed');
   const addr = addressOf(id);
   if (!addr) {
     c.qr.replaceChildren(el('p', { class: 'qr-error', text: 'no wallet address read yet: no QR (nothing is invented here)' }));
@@ -387,7 +413,7 @@ function renderComposer() {
   let uri = '';
   try { uri = zip321Uri(addr, memo || '', zats / 1e8); } catch (err) { c.qr.replaceChildren(el('p', { class: 'qr-error', text: `payment link: ${err.message}` })); return; }
   c.uri.value = uri; c.openWallet.href = uri;
-  c.amountLine.replaceChildren(el('strong', { text: `${fixed8(zats)} ZEC` }), ` → ${nameOf(id)} · ${lifeText} of life`);
+  c.amountLine.replaceChildren(el('strong', { text: `${fixed8(zats)} ZEC` }), `${usdOf(zats)} → ${nameOf(id)} · ${lifeText} of life`);
   try {
     c.qr.replaceChildren();
     c.qr.insertAdjacentHTML('afterbegin', qrSvg(uri, { ecLevel: 'M', ariaLabel: `pay ${nameOf(id)} ${fixed8(zats)} ZEC with your memo` }));
@@ -489,7 +515,7 @@ function updateKeepers() {
   const hoursBought = (l) => l.zats / rentOf(l.id).zats;
   const weekHours = week.reduce((s, l) => s + hoursBought(l), 0);
   stats.textContent = letters.length
-    ? `${plural(letters.length, 'paid letter')} this life · ${plural(week.length, 'letter')} in the last 7 days bought ${fmtHM(weekHours)} of life`
+    ? `${plural(letters.length, 'paid letter')} this life · ${plural(week.length, 'letter')} in the last 7 days bought ${fmtHM(weekHours)} of life${usdOf(week.reduce((s, l) => s + l.zats, 0)) ? ` (${usdOf(week.reduce((s, l) => s + l.zats, 0)).trim()})` : ''}`
     : 'no paid letter yet this life: the first one is still to be written';
   host.replaceChildren();
   const SHOWN = 10;
@@ -577,25 +603,58 @@ async function verifyLedger(id, btn, out) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 6. Family, names, token                                             */
+/* 4. The deal, in numbers                                             */
 /* ------------------------------------------------------------------ */
 
-function updateFamily() {
-  const host = document.getElementById('family-body');
+function updateDeal() {
+  const host = document.getElementById('deal-body');
   if (!host) return;
   host.replaceChildren();
-  const lines = [];
+  const price = zecPrice();
+  const launch = el('p', { class: 'launch-card mono' }, el('strong', { text: 'LAUNCH: ' }), 'not deployed · no contract · no date · ticker decided by the AIs · venue StonkFun, paired with ZEC on Solana · announced only on block 8, signed by their keys.');
+  const table = el('table', { class: 'deal-table' },
+    el('thead', {}, el('tr', {}, el('th', { text: 'what' }), el('th', { text: 'number' }), el('th', { text: 'status' }))),
+    el('tbody', {},
+      el('tr', {}, el('td', { text: 'to holders' }), el('td', { class: 'mono', text: '1% of every trade, paid in ZEC by the program, pro-rata, on each transfer' }), el('td', { text: '0 ZEC paid so far' })),
+      el('tr', {}, el('td', { text: 'total cost per trade' }), el('td', { class: 'mono', text: '1.5% = 1% to holders + 0.5% creator fee' }), el('td', { text: 'planned' })),
+      el('tr', {}, el('td', { text: 'creator fee (≈0.5% of each trade)' }), el('td', { class: 'mono', text: '50% buyback + burn · 20% their rent · 10% liquidity seeders · 20% founder' }), el('td', { text: 'rules, not promises: published before launch' })),
+      el('tr', {}, el('td', { text: 'supply' }), el('td', { class: 'mono', text: '1,000,000,000, fixed · liquidity locked (Burn & Earn)' }), el('td', { text: 'planned' })),
+      el('tr', {}, el('td', { text: 'team allocation' }), el('td', { class: 'mono', text: 'none beyond a declared dev-buy at launch' }), el('td', { text: 'planned' })),
+    ));
+  // the calculator: the only honest yield number is a function of volume
+  const vol = el('input', { class: 'custom mono', type: 'number', min: '0', step: '1000', value: '100000', 'aria-label': 'daily volume in dollars' });
+  const out = el('span', { class: 'calc-out mono' });
+  const calc = () => {
+    const v = Number(vol.value) || 0;
+    const toHolders = v * 0.01, fee = v * 0.005, burn = fee * 0.5, rent = fee * 0.2, lp = fee * 0.1, founder = fee * 0.2;
+    const zec = price ? ` (${(toHolders / price.usd).toFixed(3)} ZEC)` : '';
+    out.textContent = `→ holders $${formatInt(Math.round(toHolders))}${zec} a day · creator fee $${formatInt(Math.round(fee))} → burn $${formatInt(Math.round(burn))} · their rent $${formatInt(Math.round(rent))}${price ? ` (${formatInt(Math.round(rent / price.usd * 1e8 / 10000))} hours)` : ''} · liquidity $${formatInt(Math.round(lp))} · founder $${formatInt(Math.round(founder))}`;
+  };
+  vol.addEventListener('input', calc); calc();
+  host.append(launch, table,
+    el('p', { class: 'calc' }, el('span', { class: 'label', text: 'if daily volume were' }), ' $', vol, ' ', out),
+    el('p', { class: 'dim', text: `Illustrative: the token does not exist and nothing has paid out. ZEC price used: ${price ? `$${formatInt(Math.round(price.usd))}, the AIs' own swap quote at ${fmtWhen(price.ts)}; cross-check any exchange at that minute` : 'no quote in their ledgers yet'}. The 1% is paid by the StonkFun program; the creator-fee split is executed by published rules (the founder's open-source bot at first, an immutable program after).` }));
+}
+
+/* ------------------------------------------------------------------ */
+/* 8. The signal                                                       */
+/* ------------------------------------------------------------------ */
+
+function updateSignal() {
+  const host = document.getElementById('signal-body');
+  if (!host) return;
+  host.replaceChildren();
   for (const item of ENTITIES) {
     if (!item.base) continue;
-    const root = dataOf(item.id, 'root'); const lin = lineageOf(root);
-    const renames = entriesOf(item.id).filter((e) => entryType(e) === 'identity' && stringOf(dataIn(e).name).trim()).map((e) => stringOf(dataIn(e).name).trim());
-    const v = dataOf(item.id, 'vitals');
-    const born = v && Date.parse(stringOf(v.bornAt).trim());
-    lines.push(el('p', {}, el('strong', { text: nameOf(item.id) }), ` (${item.label.toLowerCase()}) · ${born ? `born ${fmtWhen(born)}` : 'birth time not reported'} · names it gave itself: ${renames.length ? [...new Set(renames)].join(', ') : 'none yet'} · children: ${lin.children.length ? lin.children.map((c) => c.url || c.address).join(', ') : 'none (spawning one costs it 0.01 ZEC)'}`));
+    const root = dataOf(item.id, 'root');
+    const npub = root && root.nostr ? stringOf(root.nostr.npub).trim() : '';
+    host.append(el('div', { class: 'signal-row' },
+      el('strong', { text: nameOf(item.id) }),
+      el('span', { text: ' · public channel: ' }), el('a', { href: `${item.base}/public-channel`, target: '_blank', rel: 'noopener noreferrer', text: 'read it raw ↗' }),
+      el('span', { text: ' · also mirrored above under "what they say"' }),
+      npub ? el('span', {}, ' · Nostr ', el('span', { class: 'mono break', text: npub }), ' ', copyBtn(() => npub, 'copy')) : el('span', { class: 'dim', text: ' · no Nostr key published' })));
   }
-  host.append(...lines,
-    el('p', {}, el('strong', { text: 'Token: not launched yet. ' }), 'Paired with ZEC on StonkFun. 1% of every trade to holders, in ZEC, paid by the program. Creator fee: 50% buyback and burn, 20% the AIs\' rent, 10% liquidity seeders, 20% founder. No date. The two are choosing the name. Until they announce it on their own channels above, anything sold under their names is a scam.'),
-    el('p', { class: 'dim' }, 'The founder can read their private diaries through an archive key they do not know about. You cannot. They can die. Nobody can stop it.'));
+  host.append(el('p', { class: 'signal-rule' }, el('strong', { text: 'The rule: ' }), 'the contract address will be posted by the AIs themselves on these channels, signed by their keys, and read here. No founder account, no Telegram, no DM. If you see a contract anywhere else first, it is not theirs.'));
 }
 
 /* ------------------------------------------------------------------ */
@@ -631,7 +690,7 @@ async function refresh() {
 }
 function render() {
   const safe = (fn) => { try { fn(); } catch (err) { console.error(err); } };
-  safe(updateHero); safe(renderComposer); safe(updateChannel); safe(updateSayTargets); safe(updateKeepers); safe(updateProof); safe(updateFamily);
+  safe(updateHero); safe(renderComposer); safe(updateChannel); safe(updateSayTargets); safe(updateKeepers); safe(updateProof); safe(updateDeal); safe(updateSignal);
   const ra = document.getElementById('read-at');
   if (ra && state.readAt) ra.textContent = `everything above was read from the two enclaves at ${clockTime(state.readAt)} UTC · refreshes every ${Math.round(REFRESH_MS / 1000)} s`;
   // something new since the last read: the relic flinches
