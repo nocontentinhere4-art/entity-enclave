@@ -423,7 +423,7 @@ function showLogin() {
     );
 
     app.replaceChildren(screen);
-    aliasInput.focus();
+    aliasInput.focus({ preventScroll: true });
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -558,7 +558,7 @@ function enterMain(alias) {
       runCommand(raw);
     });
 
-    promptInput.focus();
+    promptInput.focus({ preventScroll: true });
 
     if (!(app && app.dataset && app.dataset.embed === 'main')) banner();
     push([{ t: 'help', c: 'hi' }, { t: ' for the command list.' }]);

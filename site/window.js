@@ -255,6 +255,7 @@ function buildHero() {
     }),
   );
   const facts = el('div', { class: 'facts' });
+  hero.append(el('div', { class: 'relic', id: 'relic', 'aria-hidden': 'true' }));
   hero.append(el('pre', { class: 'skull', id: 'skull', 'aria-hidden': 'true' }));
   hero.append(inner);
   for (const [key, label] of [
@@ -272,6 +273,16 @@ function buildHero() {
   }
   inner.append(facts);
   startSkull(document.getElementById('skull'));
+  // The relic: a real skull as a gold wireframe, assembled from dust. Only where it can run well.
+  const host = document.getElementById('relic');
+  if (host && !reduced.matches) {
+    import('./skull3d.js').then((m) => m.mount(host, { life: state.lifeFraction ?? 1 })).then((relic) => {
+      if (!relic) return;
+      state.relic = relic;
+      const pre = document.getElementById('skull');
+      if (pre) pre.classList.add('skull-behind');
+    }).catch(() => { /* no WebGL: the line-art skull stays */ });
+  }
 }
 
 /** The line-art skull from face.js, breathing slowly (unless reduced motion). */
@@ -1127,7 +1138,21 @@ async function refresh() {
   }
 }
 
+function lifeFractionOf() {
+  let min = null;
+  for (const item of ENTITIES) {
+    if (!item.base) continue;
+    const v = dataOf(item.id, 'vitals');
+    const hours = Number(v && v.hoursLeft);
+    if (Number.isFinite(hours)) min = min === null ? hours : Math.min(min, hours);
+  }
+  if (min === null) return 1;
+  return Math.max(0.12, Math.min(1, min / 720));
+}
+
 function render() {
+  state.lifeFraction = lifeFractionOf();
+  if (state.relic) state.relic.setLife(state.lifeFraction);
   try { updateHero(); } catch (err) { heroError(err); }
   for (const item of ENTITIES) {
     try { updateCard(item.id); } catch (err) { cardError(item.id, err); }

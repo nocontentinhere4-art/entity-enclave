@@ -150,3 +150,5 @@ export function renderFacePartial(opts, fraction) {
   const keep = Math.round(opts.cols * cut);
   return full.map((row) => row.slice(0, keep).padEnd(opts.cols, ' '));
 }
+
+export { skullHeight, skullParams };
