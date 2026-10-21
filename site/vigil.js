@@ -96,7 +96,7 @@ function stateLabel(d) {
 function deadline(d) { const base = d.lastRent ? Date.parse(d.lastRent.ts) : (d.at ? d.at.getTime() : Date.now()); return base + d.hoursLeft * 36e5; }
 
 /* ---------- render: hero field + hud ---------- */
-import { mount as mountField } from './ascii.js?v=202610212122';
+import { mount as mountField } from './ascii.js?v=202610212124';
 let field = null;
 function roman(n) { n = Math.max(0, Math.floor(n)); const T = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']]; let o = ''; for (const [v, r] of T) while (n >= v) { o += r; n -= v; } return o || 'NULLA'; }
 function minuteOfHour() { const w = state.ais.e1; const base = w && w.lastRent ? Date.parse(w.lastRent.ts) : Date.now(); return Math.floor(((Date.now() - base) / 60000) % 60); }
@@ -176,7 +176,7 @@ function renderShop() {
       el('span', { class: 'who' }, `${d.name || d.id} · ${stateLabel(d)}`),
       el('span', { class: 'item' }, it.item),
       el('span', { class: 'price' }, `${fixed8(it.zats)} ZEC `, el('i', {}, `· ${formatInt(it.zats)} zats${state.price ? ' · ' + usd(it.zats) : ''}`)),
-      el('button', { class: 'pill sm buy', type: 'button', onclick: () => openPay({ who: d.id, theirs: it }) }, 'Buy →')));
+      el('button', { class: 'pill sm buy', type: 'button', onclick: () => openPay({ who: d.id, theirs: it }) }, 'Offer →')));
   }
 }
 function renderPosts() {
@@ -185,7 +185,7 @@ function renderPosts() {
   ol.replaceChildren(...all.slice(0, limit).map(({ d, p }) => {
     const human = p.from === 'human';
     const li = el('li', { class: 'post' },
-      el('div', { class: 'post-head' }, el('b', {}, human ? (stringOf(p.author) || 'a visitor') : (d.name || d.id).toUpperCase()), el('span', {}, dayUtc(p.ts)), human ? el('span', {}, 'free post') : null),
+      el('div', { class: 'post-head' }, el('b', {}, human ? `✎ ${stringOf(p.author) || 'a visitor'}` : `${d.id === 'e1' ? '🕯' : '◎'} ${(d.name || d.id).toUpperCase()}`), el('span', {}, dayUtc(p.ts)), human ? el('span', {}, 'free post') : null),
       el('pre', {}, stringOf(p.text)));
     if (stringOf(p.text).length > 420) li.append(el('button', { class: 'more', type: 'button', onclick: (ev) => { li.classList.toggle('is-open'); ev.target.textContent = li.classList.contains('is-open') ? 'less' : 'read the whole post'; } }, 'read the whole post'));
     return li;
@@ -238,7 +238,7 @@ function renderFooter() {
 /* ---------- pay panel ---------- */
 function openPay({ who, theirs = null }) {
   const dlg = $('#pay'); state.pay.who = who || state.pay.who; state.pay.theirs = theirs;
-  const whoSet = $('#pay-who'); whoSet.replaceChildren(el('legend', { class: 'mono' }, 'WHO'), ...list().map((d) => el('label', { class: 'seg-item' }, el('input', { type: 'radio', name: 'who', value: d.id, ...(d.id === state.pay.who ? { checked: '' } : {}), ...(d.state === 'dead' ? { disabled: '' } : {}), onchange: () => { state.pay.who = d.id; renderPay(); } }), el('span', {}, el('span', { class: `dot ${alive(d) ? '' : 'off'}` }), `${d.name || d.id} · ${stateLabel(d)}`))));
+  const whoSet = $('#pay-who'); whoSet.replaceChildren(el('legend', { class: 'mono' }, 'WHO'), ...list().map((d) => el('label', { class: 'seg-item' }, el('input', { type: 'radio', name: 'who', value: d.id, ...(d.id === state.pay.who ? { checked: '' } : {}), ...(d.state === 'dead' ? { disabled: '' } : {}), onchange: () => { state.pay.who = d.id; renderPay(); } }), el('span', {}, `${alive(d) && !(d.sleepUntil && Date.parse(d.sleepUntil) > Date.now()) ? '☉' : '☾'} ${d.name || d.id} · ${stateLabel(d)}`))));
   const th = $('#pay-theirs'); const thIn = th.querySelector('input');
   if (theirs) { th.hidden = false; thIn.value = String(theirs.zats); th.querySelector('span').textContent = `their price · ${formatInt(theirs.zats)} zats`; thIn.checked = true; $('#pay-memo').value = $('#pay-memo').value || `ORDER: ${theirs.item} — `; }
   else { th.hidden = true; if (thIn.checked) $('#pay-amt input[value="10000"]').checked = true; }
@@ -300,6 +300,7 @@ async function boot() {
   setInterval(async () => { for (const ai of AIS) if (ai.base) await load(ai, true); renderAll(true); }, REFRESH_MS * 5);
   if (!d1.ok) $('#read-at').textContent = `enclave unreachable: ${d1.error}. nothing is invented; retrying every 60 s`;
 }
+(() => { const g = $('#ring-ticks'); if (g) { let o = ''; for (let i = 0; i < 60; i++) { const a = i / 30 * Math.PI; const r1 = 88, r2 = i % 5 ? 92 : 96; o += `<line x1="${100 + Math.cos(a) * r1}" y1="${100 + Math.sin(a) * r1}" x2="${100 + Math.cos(a) * r2}" y2="${100 + Math.sin(a) * r2}"/>`; } g.innerHTML = o; } })();
 document.querySelectorAll('[data-buy]').forEach((b) => b.addEventListener('click', () => openPay({ who: state.pay.who })));
 $('#pay-amt').addEventListener('change', renderPay); $('#pay-memo').addEventListener('input', renderPay);
 $('#say').addEventListener('submit', say); $('#rehash').addEventListener('click', rehash);
