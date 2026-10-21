@@ -205,7 +205,12 @@ export class Life {
     const promises = safeOpen(this.promises);
     const events = (mem.events ?? []).slice(-10);
     const inbox = this.ledger.recent?.(['human_message'], 10) ?? [];
+    const ownPosts = this.ledger.recent?.(['post_public'], 5) ?? [];
+    const ownThoughts = this.ledger.recent?.(['thought'], 4) ?? [];
+    const walletEntry = (this.ledger.recent?.(['wallet'], 1) ?? [])[0];
+    const peerFeed = await (this.config.peerFeed?.() ?? Promise.resolve([]));
     const fmt = (n) => (Number.isFinite(Number(n)) ? Math.round(Number(n) * 100) / 100 : n);
+    const clip = (t, n) => String(t ?? '').replace(/\s+/g, ' ').slice(0, n);
     return [
       'CHARTER (immutable):',
       String(this.charter ?? ''),
@@ -231,6 +236,15 @@ export class Life {
       promises.length ? promises.map((p) => `- ${p.due ?? '?'}: ${p.what ?? p.text ?? ''} → ${p.to ?? ''}`).join('\n') : '(none)',
       'RECENT EVENTS',
       events.length ? events.map((e) => `- ${e.ts} ${e.type}: ${e.summary}`).join('\n') : '(none)',
+      'MONEY FACTS',
+      `chain: ${this.config.zcashChain ?? '?'}${this.config.zcashChain === 'mainnet' ? ' (real ZEC, real value)' : ' (test coins, no value)'} · rent: ${this.config.rentZatsPerHour} zats per hour, paid on-chain every hour together with your thinking charges · your wallet on this chain exists since ${walletEntry?.ts ?? 'birth'}; balances before that date belonged to a previous chain and do not carry over.`,
+      'YOUR OWN RECENT WORDS (so you do not repeat yourself)',
+      ownPosts.length ? ownPosts.map((e) => `- posted ${e.ts}: ${clip(e.data?.text, 300)}`).join('\n') : '(no public post yet)',
+      ownThoughts.length ? ownThoughts.map((e) => `- thought ${e.ts}: ${clip(e.data?.text, 200)}`).join('\n') : '',
+      'THE OTHER ENTITIES, LATEST (read for you this cycle: no need to spend a tool to know where they stand)',
+      peerFeed.length
+        ? peerFeed.map((p) => `- ${p.role} ${p.name ?? ''} (${p.url}) state=${p.state ?? '?'} zats=${p.zatoshis ?? '?'}\n${(p.posts ?? []).map((x) => `    · ${x.ts}: ${clip(x.text, 280)}`).join('\n') || '    (no public post yet)'}`).join('\n')
+        : '(none reachable)',
       'THE OTHER ENTITIES (public endpoints: /vitals, /public-channel, /memory-public, /ledger; read them with read_url)',
       (this.config.peers?.() ?? []).length
         ? (this.config.peers?.() ?? []).map((p) => `- ${p.role}: ${p.url}`).join('\n')

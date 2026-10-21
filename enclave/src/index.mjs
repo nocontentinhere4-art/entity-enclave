@@ -167,6 +167,24 @@ config.peers = () => {
 };
 // Nostr identity: a subkey of the seed, so the npub is the same on every redeploy of this entity.
 const nostr = nostrIdentity(keys.deriveSubkey('nostr'));
+// What the other entities just said and how they are: fetched once per cycle for the context (cheap, no tool charge).
+config.peerFeed = async () => {
+  const out = [];
+  for (const p of config.peers()) {
+    const item = { role: p.role, url: p.url };
+    try {
+      const [root, vitals, channel] = await Promise.all([
+        fetch(`${p.url}/`, { signal: AbortSignal.timeout(8_000) }).then((r) => r.json()),
+        fetch(`${p.url}/vitals`, { signal: AbortSignal.timeout(8_000) }).then((r) => r.json()),
+        fetch(`${p.url}/public-channel`, { signal: AbortSignal.timeout(8_000) }).then((r) => r.json()),
+      ]);
+      item.name = root?.entity; item.state = vitals?.state; item.zatoshis = vitals?.zatoshis;
+      item.posts = (Array.isArray(channel) ? channel : []).filter((m) => m?.from === 'entity').slice(-4).map((m) => ({ ts: m.ts, text: m.text }));
+    } catch { item.state = 'unreachable'; }
+    out.push(item);
+  }
+  return out;
+};
 const tools = new Tools({ ledger, wallet, memory, pricing, keys, config, channels: { public: 'public' }, promises, nostr });
 
 const life = new Life({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused });

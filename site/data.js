@@ -48,17 +48,17 @@ export const MAX_LEDGER_ROWS = 100;
 /* ------------------------------------------------------------------ */
 
 const INT_FMT = new Intl.NumberFormat('en-GB');
-const TIME_FMT = new Intl.DateTimeFormat('en-GB', {
+const TIME_FMT = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC',
   hour: '2-digit', minute: '2-digit', second: '2-digit',
 });
-const SHORT_TIME_FMT = new Intl.DateTimeFormat('en-GB', {
+const SHORT_TIME_FMT = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC',
   hour: '2-digit', minute: '2-digit',
 });
-const STAMP_FMT = new Intl.DateTimeFormat('en-GB', {
+const STAMP_FMT = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC',
   day: '2-digit', month: 'short', year: 'numeric',
   hour: '2-digit', minute: '2-digit', second: '2-digit',
 });
-const SHORT_FMT = new Intl.DateTimeFormat('en-GB', {
+const SHORT_FMT = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC',
   day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
 });
 
