@@ -260,3 +260,35 @@ h3 { font-family: var(--sans); font-weight: 300; font-size: 24px; letter-spacing
 .footer-dim a { border: 0; color: var(--text); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto; } }
+
+/* ------------------------------------------------------------------ */
+/* the stage: one field, three chapters, scroll is the driver          */
+/* ------------------------------------------------------------------ */
+.stage { position: relative; height: 320vh; }
+.stage-sticky { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; background: radial-gradient(60% 70% at 70% 45%, rgba(42, 26, 102, 0.5), rgba(0, 0, 0, 0) 70%); }
+.field { position: absolute; inset: 0; z-index: 0; }
+.field canvas { display: block; }
+.chapter { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; justify-content: center; padding: 0 var(--gutter); opacity: 0; transform: translateY(14px); transition: opacity 0.6s var(--ease), transform 0.8s var(--ease); pointer-events: none; }
+.chapter.is-on { opacity: 1; transform: none; }
+.chapter.is-on a { pointer-events: auto; }
+.chapter-0 .hero-words { max-width: 700px; }
+.scroll-hint { position: absolute; left: var(--gutter); bottom: 22px; margin: 0; letter-spacing: 0.3em; text-transform: uppercase; color: var(--quiet); font-size: 10.5px; }
+.scroll-hint::after { content: ''; display: block; width: 1px; height: 36px; background: var(--quiet); margin: 8px 0 0 2ch; animation: drip 1.8s var(--ease) infinite; }
+@keyframes drip { 0% { transform: scaleY(0); transform-origin: top; } 60% { transform: scaleY(1); transform-origin: top; } 100% { transform: scaleY(0); transform-origin: bottom; } }
+.chapter-1 { justify-content: flex-end; padding-bottom: 28px; }
+.chapter-cap { margin: 0; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); background: rgba(0, 0, 0, 0.7); padding: 10px 14px; display: inline-block; align-self: flex-start; }
+.chapter-cap .k { color: var(--amber); }
+.chapter-2 { justify-content: flex-end; padding-bottom: 26px; }
+.chapter-2 .hours { pointer-events: none; }
+.stage .skull { right: auto; left: 50%; transform: translate(-50%, -50%); }
+html.stage-deep .top { opacity: 0.35; }
+@media (max-width: 760px) {
+  .stage { height: 300vh; }
+  .chapter-0 { justify-content: flex-start; padding-top: 24px; }
+  .chapter-0 .hero-words { max-width: none; }
+  .chapter-2 .hours { grid-template-columns: 1fr 1fr; gap: 14px; }
+  .chapter-2 .hours-big { font-size: 46px; }
+  .chapter-2 .hours-block:last-child { text-align: right; }
+  .chapter-2 .hours-block:last-child .hours-head { justify-content: flex-end; }
+  .chapter-2 .hours-paid, .chapter-2 .hours-next, .chapter-2 .hours-tag { display: none; }
+}

@@ -205,21 +205,52 @@ function buildHero() {
     host.append(block);
     state.hero[item.id] = refs;
   }
-  // the towers (WebGL) with the ASCII skull as the still fallback
-  const towersHost = document.getElementById('towers');
+  // the field (WebGL2) with the ASCII skull as the still fallback
   const pre = document.getElementById('skull');
   startAsciiSkull(pre);
-  if (!reduced.matches) {
-    import('./towers3d.js').then((m) => {
-      const t = m.mount(towersHost, { onHover: showTip });
-      if (!t) return;
-      state.towers = t;
+  const fieldHost = document.getElementById('field');
+  if (fieldHost && !reduced.matches) {
+    import('./field.js').then((m) => m.mount(fieldHost)).then((f) => {
+      if (!f) return;
+      state.field = f; window.__field = f;
       pre.classList.add('hidden');
-      pushTowers();
-    }).catch(() => { /* the ASCII skull stays */ });
-    const relicHost = document.getElementById('relic');
-    if (relicHost) import('./skull3d.js').then((m) => m.mount(relicHost, { life: 1 })).then((r) => { if (r) { state.relic = r; pre.classList.add('hidden'); } }).catch(() => {});
+      pushField();
+      startStage();
+    }).catch((err) => { console.error(err); });
   }
+}
+
+/** scroll drives the stage: 0 skull → 1 words → 2 towers; the DOM chapters follow */
+function startStage() {
+  const stage = document.getElementById('stage');
+  if (!stage) return;
+  let raf = 0;
+  const apply = () => {
+    raf = 0;
+    const rect = stage.getBoundingClientRect();
+    const span = stage.offsetHeight - window.innerHeight;
+    const p = Math.min(1, Math.max(0, -rect.top / Math.max(1, span)));
+    const prog = p * 2;
+    if (state.field) state.field.setProgress(prog);
+    const ch = prog < 0.5 ? 0 : prog < 1.5 ? 1 : 2;
+    for (let i = 0; i < 3; i++) document.getElementById(`chapter-${i}`)?.classList.toggle('is-on', i === ch);
+    document.documentElement.classList.toggle('stage-deep', prog > 0.3);
+  };
+  const onScroll = () => { if (!raf) raf = requestAnimationFrame(apply); };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll, { passive: true });
+  apply();
+}
+
+function pushField() {
+  if (!state.field) return;
+  state.field.setTowers(ENTITIES.map((item) => {
+    const paid = paidHoursOf(item.id); const hh = hoursOf(item.id);
+    return { paid: paid.length, funded: hh ? hh.hours : 0 };
+  }));
+  const words = ENTITIES.flatMap((e) => (e.base ? channelOf(e.id).filter((m) => m.from === 'entity') : [])).sort((a, b) => b.ts - a.ts).slice(0, 12)
+    .map((m) => `${nameOf(m.id).toUpperCase()}: ${m.text}`).join('   ·   ');
+  if (words) state.field.setWords(words);
 }
 
 function startAsciiSkull(pre) {
@@ -287,10 +318,10 @@ function updateHero() {
     const res = resOf(item.id, 'vitals');
     if (res && !res.ok) { r.err.textContent = `/vitals: ${res.error || 'error'} — showing the last read`; r.err.classList.remove('hidden'); }
   }
-  if (state.relic) state.relic.setLife(minHours === null ? 1 : Math.max(0.12, Math.min(1, minHours / 720)));
+  if (state.field) state.field.setLife(minHours === null ? 1 : Math.max(0.12, Math.min(1, minHours / 720)));
   const fh = document.getElementById('five-hours');
   if (fh) fh.textContent = minHours === null ? '—' : formatInt(Math.floor(minHours));
-  pushTowers();
+  pushField();
   tickHero();
 }
 
