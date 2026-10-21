@@ -86,10 +86,10 @@ export function mount(container, opts = {}) {
         const below = (row + 1) * cols; const i = row * cols + col;
         const drift = noise(col * 0.2, row * 0.3 + t * 3) > 0.5 ? 1 : -1;
         const src = Math.max(1, Math.min(cols - 2, col + (Math.random() < 0.35 ? drift : 0)));
-        const cool = (1 / Math.max(6, fh)) * (0.8 + 0.6 * noise(col * 0.3 + t, row * 0.3));
+        const cool = (0.8 / Math.max(6, fh)) * (0.7 + 0.6 * noise(col * 0.3 + t, row * 0.3));
         H[i] = Math.max(0, (H[below + src] * 0.985) - cool);
       }
-      for (let row = 0; row <= baseRow; row++) for (let col = 0; col < cols; col++) { const h = H[row * cols + col]; if (h > 0.06) glyph(rampOf(h), 1, lvlOf(h), col, row); }
+      for (let row = 0; row <= baseRow; row++) for (let col = 0; col < cols; col++) { const h = H[row * cols + col]; if (h > 0.05) { const hb = Math.min(1, h * 1.7); glyph(rampOf(hb), 1, lvlOf(hb), col, row); } }
       // the wick
       for (let row = baseRow + 1; row < Math.min(rows, baseRow + 3); row++) glyph('|', 2, 3, Math.round(fx), row);
     }
@@ -106,7 +106,7 @@ export function mount(container, opts = {}) {
       }
     }
   }
-  function loop() { if (!st.running) return; frame(); st.raf = setTimeout(() => requestAnimationFrame(loop), 1000 / 30); }
+  function loop() { if (!st.running) return; frame(); st.raf = setTimeout(loop, 1000 / 30); }
   function start() { if (st.running) return; st.running = true; loop(); }
   function stop() { st.running = false; clearTimeout(st.raf); }
   const onMove = (e) => { const r = container.getBoundingClientRect(); st.tmx = ((e.clientX - r.left) / r.width - 0.5) * 2; st.tmy = ((e.clientY - r.top) / r.height - 0.5) * 2; };
