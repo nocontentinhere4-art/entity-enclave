@@ -41,6 +41,7 @@ export const config = {
   // Wallet re-sync cadence: the entity only sees incoming ZEC after a sync, so it keeps syncing in the background.
   syncMinutes: minutes('SYNC_MS', 'SYNC_MINUTES', 10),
   initialTreasuryZats: num(process.env.INITIAL_TREASURY_ZATS, 100_000_000),
+  initialTreasuryPinned: process.env.INITIAL_TREASURY_ZATS !== undefined && process.env.INITIAL_TREASURY_ZATS !== '',
   hungerThreshold: 0.2,
   hungerRecover: 0.3,
   rentAddress: process.env.RENT_ADDRESS ?? '',

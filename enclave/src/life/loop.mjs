@@ -60,6 +60,8 @@ export class Life {
     // 3. Vital numbers.
     const bal = await this.wallet.balance();
     const treasury = Number(bal?.total_zatoshis ?? bal ?? 0);
+    // The hunger reference is the birth gift of THIS life, unless the operator pinned INITIAL_TREASURY_ZATS.
+    if (!this.config.initialTreasuryPinned && Number(mem?.initialTreasuryZats) > 0) this.config.initialTreasuryZats = Number(mem.initialTreasuryZats);
     this.lastBalance = treasury;
     // ISO timestamps: signals() parses `ts` with Date.parse, which a raw epoch number would defeat.
     this.history.push({ ts: new Date(now).toISOString(), zatoshis: treasury });
@@ -83,6 +85,7 @@ export class Life {
       }
       // First time over the threshold: remember it permanently, then live from the next tick on.
       mem.bornAt = new Date(now).toISOString();
+      mem.initialTreasuryZats = treasury; // hunger is measured against the gift that started this life
       await this.memory.save(mem);
       this.ledger.append('birth_gift', { zatoshis: treasury });
       this.state = 'alive';
