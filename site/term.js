@@ -560,7 +560,7 @@ function enterMain(alias) {
 
     promptInput.focus();
 
-    banner();
+    if (!(app && app.dataset && app.dataset.embed === 'main')) banner();
     push([{ t: 'help', c: 'hi' }, { t: ' for the command list.' }]);
     blank();
     void refresh({ announce: true });
@@ -1623,6 +1623,12 @@ function init() {
   }
 
   document.body.appendChild(wipeEl);
+
+  // Embedded in the single public page: no login screen, straight into the room with a default handle.
+  if (app && app.dataset && app.dataset.embed === 'main') {
+    enterMain(state.handle || 'visitor');
+    return;
+  }
 
   window.addEventListener('keydown', () => {
     state.skipType = true;

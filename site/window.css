@@ -1,0 +1,449 @@
+/*
+ * window.css — the public landing page ("the window").
+ * Black, serif display over golden monospace data; 1px gold rules; no
+ * shadows, no gradients, no webfonts, no third-party requests.
+ */
+
+:root {
+  --bg: #000;
+  --text: #e6e6e6;
+  --dim: #8a8a86;
+  --dimmer: #6a6a64;
+  --gold: #e3b341;
+  --gold-rule: #4a3b1c;
+  --danger: #e5484d;
+  --serif: "Iowan Old Style", "Palatino", Georgia, serif;
+  --mono: ui-monospace, Menlo, Consolas, "DejaVu Sans Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.55;
+  padding: 0 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1020px; margin: 0 auto; }
+
+a { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; }
+a:visited { color: var(--gold); }
+a:hover { color: #fff; }
+
+.mono { font-family: var(--mono); }
+.dim { color: var(--dim); }
+.danger { color: var(--danger); }
+.gold { color: var(--gold); }
+.hidden { display: none !important; }
+.break { word-break: break-all; overflow-wrap: anywhere; }
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--bg);
+  color: var(--gold);
+  padding: 8px 12px;
+  z-index: 10;
+}
+.skip:focus { left: 8px; top: 8px; }
+
+/* ------------------------------------------------------------------ */
+/* Sections                                                            */
+/* ------------------------------------------------------------------ */
+
+section { padding: 52px 0 56px; border-top: 1px solid var(--gold-rule); }
+section.no-rule { border-top: none; padding-top: 64px; }
+
+h2 {
+  font-size: clamp(24px, 3.4vw, 34px);
+  font-weight: 600;
+  margin: 0 0 6px;
+  letter-spacing: 0.2px;
+}
+.section-sub { color: var(--dim); margin: 0 0 28px; font-size: 15px; }
+
+/* ------------------------------------------------------------------ */
+/* 1. Hero                                                             */
+/* ------------------------------------------------------------------ */
+
+.hero { position: relative; overflow: hidden; padding: 96px 0 72px; }
+.hero-inner { position: relative; z-index: 1; }
+
+.skull {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  margin: 0;
+  color: var(--gold);
+  opacity: 0.32;
+  font-family: var(--mono);
+  font-size: min(10px, 1.55vw);
+  line-height: 1.04;
+  letter-spacing: 0;
+  white-space: pre;
+  pointer-events: none;
+  user-select: none;
+}
+
+h1 {
+  font-size: clamp(34px, 7vw, 60px);
+  line-height: 1.04;
+  font-weight: 600;
+  margin: 0 0 20px;
+  max-width: 15ch;
+}
+.sub {
+  font-size: clamp(17px, 2.4vw, 21px);
+  color: #d6d6cf;
+  max-width: 56ch;
+  margin: 0 0 40px;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 48px;
+  border-top: 1px solid var(--gold-rule);
+  padding-top: 22px;
+}
+.fact { min-width: 130px; }
+.fact-value {
+  display: block;
+  font-family: var(--mono);
+  font-size: clamp(20px, 3vw, 26px);
+  color: var(--gold);
+  line-height: 1.2;
+}
+.fact-label { display: block; color: var(--dim); font-size: 13.5px; margin-top: 4px; }
+.fact-read {
+  display: block;
+  color: var(--dimmer);
+  font-family: var(--mono);
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+/* ------------------------------------------------------------------ */
+/* 2. The two beings                                                   */
+/* ------------------------------------------------------------------ */
+
+.beings {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+}
+@media (min-width: 720px) {
+  .beings { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 44px; }
+}
+
+.being { min-width: 0; }
+.being-name {
+  font-size: clamp(22px, 3vw, 28px);
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+.being-id { color: var(--dimmer); font-family: var(--mono); font-size: 11.5px; }
+
+.avatar {
+  color: var(--gold);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.05;
+  white-space: pre;
+  overflow: hidden;
+  max-width: 100%;
+  margin: 18px 0 10px;
+  display: inline-block;
+  transform-origin: 50% 70%;
+  animation: breathe 7s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+
+.avatar-empty {
+  border: 1px dashed #3a3a36;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 13px;
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 30px 20px;
+  margin: 18px 0 10px;
+  max-width: 100%;
+}
+
+.image-sentence {
+  font-style: italic;
+  color: #c9c9c1;
+  font-size: 15px;
+  margin: 0 0 20px;
+}
+
+.clock {
+  display: block;
+  font-family: var(--mono);
+  font-size: clamp(30px, 5vw, 42px);
+  line-height: 1.1;
+  color: #fff;
+  letter-spacing: 1px;
+}
+.clock-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--danger);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.clock.dead { color: var(--danger); }
+.clock-note {
+  color: var(--dimmer);
+  font-family: var(--mono);
+  font-size: 12px;
+  margin: 6px 0 20px;
+}
+
+.treasury, .being-state-row { font-size: 15px; margin: 4px 0; }
+.treasury .k, .being-state-row .k { color: var(--dim); }
+.treasury .v { font-family: var(--mono); }
+
+.badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 2px 10px;
+  border: 1px solid currentColor;
+  color: var(--gold);
+}
+.badge.dead { color: var(--danger); }
+.badge.sleeping { color: var(--dim); }
+.badge.unborn { color: var(--dim); }
+
+.last-said {
+  margin: 18px 0 4px;
+  font-size: 15px;
+  color: #d6d6cf;
+}
+.last-said .k { color: var(--dim); }
+.last-said-src { color: var(--dimmer); font-size: 11px; font-family: var(--mono); }
+
+.card-read {
+  color: var(--dimmer);
+  font-family: var(--mono);
+  font-size: 11px;
+  margin: 14px 0 0;
+}
+.card-error { color: var(--danger); font-family: var(--mono); font-size: 12.5px; margin: 10px 0 0; }
+
+/* ------------------------------------------------------------------ */
+/* 3. Happening now                                                    */
+/* ------------------------------------------------------------------ */
+
+.live {
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  margin: 0 0 14px;
+}
+.live .dot { color: var(--gold); }
+
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+.feed li { margin: 3px 0; min-width: 0; }
+.feed .t { color: var(--dimmer); }
+.feed li.dim-line { color: var(--dim); }
+.now-error { color: var(--danger); font-family: var(--mono); font-size: 12.5px; margin: 12px 0 0; }
+
+/* ------------------------------------------------------------------ */
+/* 4. Talk / Pay                                                       */
+/* ------------------------------------------------------------------ */
+
+.talks {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 44px;
+}
+@media (min-width: 880px) {
+  .talks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.talk { min-width: 0; }
+.talk h3 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.talk p { margin: 6px 0; font-size: 14.5px; max-width: 60ch; }
+.talk .k { color: var(--dim); }
+.talk .note { color: var(--dim); font-size: 13px; }
+
+.qr { margin: 16px 0 10px; }
+.qr svg { display: block; width: 216px; max-width: 100%; height: auto; }
+.qr-error { color: var(--danger); font-family: var(--mono); font-size: 12.5px; }
+
+.uri-row { display: flex; gap: 8px; align-items: stretch; margin: 10px 0; max-width: 640px; }
+.uri-text {
+  flex: 1;
+  min-width: 0;
+  background: #0b0b0a;
+  color: var(--text);
+  border: 1px solid #2a2a27;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px;
+  word-break: break-all;
+  resize: vertical;
+}
+
+.btn {
+  background: #131310;
+  color: var(--gold);
+  border: 1px solid #4a3b1c;
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.btn:hover { background: var(--gold); color: #000; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn:disabled:hover { background: #131310; color: var(--gold); }
+
+.address-line { font-size: 14px; margin: 8px 0; max-width: 640px; }
+.network-line { color: var(--dim); font-size: 13px; margin: 4px 0 0; }
+
+.say-box {
+  margin-top: 44px;
+  border-top: 1px solid var(--gold-rule);
+  padding-top: 26px;
+}
+.say-box h3 { font-size: 19px; margin: 0 0 10px; font-weight: 600; }
+.say-rules { color: var(--dim); font-size: 13px; margin: 0 0 14px; }
+.say-grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.say-grid label {
+  display: block;
+  color: var(--dim);
+  font-size: 12px;
+  font-family: var(--mono);
+  margin-bottom: 4px;
+}
+.say-grid select, .say-grid input {
+  background: #0b0b0a;
+  color: var(--text);
+  border: 1px solid #2a2a27;
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 8px;
+}
+.say-grid input { width: 200px; }
+.say-text-wrap { flex: 1 1 320px; min-width: 0; }
+.say-text {
+  width: 100%;
+  background: #0b0b0a;
+  color: var(--text);
+  border: 1px solid #2a2a27;
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 8px;
+  resize: vertical;
+  min-height: 64px;
+}
+.say-count { color: var(--dimmer); font-family: var(--mono); font-size: 11px; }
+.say-status { font-family: var(--mono); font-size: 13px; margin: 12px 0 0; min-height: 1.2em; }
+
+/* ------------------------------------------------------------------ */
+/* 5. What is true                                                     */
+/* ------------------------------------------------------------------ */
+
+.truth {
+  list-style: none;
+  margin: 0 0 28px;
+  padding: 0;
+  font-size: 15px;
+}
+.truth li { margin: 10px 0; }
+.truth .k { color: var(--dim); }
+.truth .verify-result { font-family: var(--mono); font-size: 13px; }
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.link-btn:hover { color: #fff; }
+.link-btn:disabled { opacity: 0.6; cursor: default; }
+
+.truth-note { max-width: 64ch; margin: 0 0 12px; font-size: 15.5px; color: #d9d9d2; }
+.truth-note:last-child { margin-bottom: 0; }
+
+/* ------------------------------------------------------------------ */
+/* Footer                                                              */
+/* ------------------------------------------------------------------ */
+
+footer {
+  border-top: 1px solid var(--gold-rule);
+  padding: 26px 0 48px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  justify-content: space-between;
+  align-items: baseline;
+}
+footer .policy { color: var(--dim); font-family: var(--mono); font-size: 12.5px; }
+
+.noscript {
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 12px 14px;
+  margin: 16px 0;
+  max-width: 640px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion                                                      */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar { animation: none; }
+  * { scroll-behavior: auto; }
+}
+
+/* the terminal embedded in the single page */
+.app.embedded { max-width: 100%; margin: 0; }
+.app.embedded .screen.main { padding: 0; }
+.app.embedded .term { max-height: 46vh; }
+.app.embedded .out { max-height: 30vh; overflow: auto; }
+#watch .section-sub .mono { color: #e3b341; }
+.app.embedded, .app.embedded .out, .app.embedded .promptline, .app.embedded input, .app.embedded .legend, .app.embedded .ticker, .app.embedded .roometa {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+.app.embedded .out { font-size: 0.9rem; }

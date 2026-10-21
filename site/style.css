@@ -56,6 +56,14 @@ body { padding: 8px; }
 }
 .skip:focus { left: 8px; top: 8px; }
 
+.cross-link {
+  margin: 8px 0 0 12px;
+  font-family: var(--mono, monospace);
+  font-size: 13px;
+}
+.cross-link a { color: var(--dim); }
+.cross-link a:hover, .cross-link a:focus { color: var(--hi); }
+
 .noscript {
   color: var(--err);
   padding: 12px;
