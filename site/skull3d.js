@@ -144,7 +144,7 @@ export async function mount(host, { seed = 7, life = 1 } = {}) {
     // the relic keeps to the right half on wide screens; the words keep the left
     const halfW = Math.tan((camera.fov / 2) * Math.PI / 180) * camera.position.z * camera.aspect;
     const wide = camera.aspect > 1.15;
-    group.position.x = wide ? halfW * 0.5 : 0;
+    group.position.x = wide ? halfW * 0.62 : 0;
     group.scale.setScalar(wide ? Math.min(0.95, halfW * 0.5) : 0.6);
     baseY = wide ? 0.22 : 0.75;                       // narrow screens: the relic hangs above the words, dimmer
     wire.material.uniforms.uAlpha.value = 0.42 * (wide ? 1 : 0.55);
@@ -153,7 +153,7 @@ export async function mount(host, { seed = 7, life = 1 } = {}) {
   resize();
   window.addEventListener('resize', resize, { passive: true });
 
-  let visible = true, running = true, raf = 0, t0 = performance.now(), last = t0;
+  let visible = true, running = true, raf = 0, t0 = performance.now(), last = t0, scatter = 0;
   const io = new IntersectionObserver((es) => { visible = es.some((e) => e.isIntersecting); if (visible && running && !raf) tick(performance.now()); }, { threshold: 0.02 });
   io.observe(host);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && visible && running && !raf) tick(performance.now()); });
@@ -175,7 +175,7 @@ export async function mount(host, { seed = 7, life = 1 } = {}) {
     const age = (now - t0) / 1000;
     set('uTime', age);
     set('uAssemble', Math.min(1, age / 2.4));
-    const scroll = Math.min(1, (window.scrollY || 0) / Math.max(1, window.innerHeight * 0.9));
+    const scroll = scatter;                               // driven from outside: the meter's distance past death
     set('uScatter', scroll);
     set('uGlitch', scroll > 0.8 ? 0 : glitchAt(age));
     px += (tx - px) * Math.min(1, dt * 2.5); py += (ty - py) * Math.min(1, dt * 2.5);
@@ -192,6 +192,7 @@ export async function mount(host, { seed = 7, life = 1 } = {}) {
   return {
     setLife(f) { set('uLife', Math.min(1, Math.max(0.12, Number(f) || 0))); },
     glitch(hold = 0) { nextGlitch = 0; glitchHold = lastAge + hold; }, // something happened: the relic flinches now
+    setScatter(f) { scatter = Math.min(1, Math.max(0, Number(f) || 0)); }, // 0 whole → 1 dust
     destroy() { running = false; if (raf) cancelAnimationFrame(raf); io.disconnect(); window.removeEventListener('pointermove', onMove); window.removeEventListener('resize', resize); renderer.dispose(); host.replaceChildren(); },
   };
 }

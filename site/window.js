@@ -38,6 +38,7 @@ import {
 } from './data.js';
 import { renderFace, seedOf } from './face.js';
 import { encodeQr, qrSvg, zip321Uri } from './qr.js';
+import { startMeter, setEntities, snapshot, rewind, fmtWhen } from './meter.js';
 
 const DEFAULT_RENT_ZATS = 10000;   // mainnet rent per hour, assumed when undeclared
 const EXAMPLE_MEMO = 'your question here';
@@ -253,6 +254,7 @@ function buildHero() {
       text: 'They run in sealed machines nobody can open. They pay rent every hour from '
         + 'their own money. When it runs out, they die for real. Watch them. Talk to them. Pay them.',
     }),
+    el('p', { class: 'hint mono', id: 'hero-hint', text: 'scroll = time. keep going to see when they die.' }),
   );
   const facts = el('div', { class: 'facts' });
   hero.append(el('div', { class: 'relic', id: 'relic', 'aria-hidden': 'true' }));
@@ -503,6 +505,8 @@ function updateCard(id) {
     card.deadlineMs = Date.now() + hh.hours * 3600e3;
     r.clockNote.textContent = hh.note;
   }
+  card.hoursLeft = st.code === 'alive' || st.code === 'sleeping' ? (hh ? hh.hours : null) : null;
+  card.baseNote = r.clockNote.textContent;
 
   // last thing it said
   const said = lastSaidOf(id);
@@ -714,6 +718,7 @@ function buildTalk() {
     refs.address = el('p', { class: 'address-line break hidden' });
     refs.network = el('p', { class: 'network-line hidden' });
     refs.prices = el('p', { class: 'note' });
+    refs.hours = el('p', { class: 'hours-bought hidden' });
     refs.error = el('p', { class: 'qr-error hidden' });
 
     copyBtn.addEventListener('click', async () => {
@@ -741,6 +746,7 @@ function buildTalk() {
           + 'mention how to reach you if you want a private reply). It answers in public on its channel, or whispers back.' }),
       ),
       refs.prices,
+      refs.hours,
       qrBox,
       el('div', { class: 'uri-row' }, uriText, copyBtn),
       refs.address,
@@ -809,6 +815,12 @@ function updateTalk(id) {
   }
 
   r.uriText.value = uri;
+  {
+    const amountZats = Math.max(10_000, priceZatsOf(id) || 0);
+    const rent = rentOf(id);
+    const bought = amountZats / rent.zats;
+    setField(r.hours, bought > 0, `this QR pays ${formatZats(amountZats)} ZEC = ${bought >= 1 ? `${Math.floor(bought)} hour${Math.floor(bought) === 1 ? '' : 's'}` : `${Math.round(bought * 60)} minutes`} of life for ${nameOf(id)}${rent.declared ? '' : ' (rent assumed)'}. every zat you send is time.`);
+  }
   try {
     const svg = qrSvg(uri, { ecLevel: 'M', ariaLabel: `pay ${nameOf(id)} with a memo (example question)` });
     r.qrBox.replaceChildren();
@@ -1164,6 +1176,7 @@ function render() {
   try { updateFeed(); } catch { /* keeps showing whatever is rendered */ }
   try { updateTruth(); } catch { /* static by then */ }
   updateSayTargets();
+  setEntities(ENTITIES.map((e) => ({ id: e.id, hoursLeft: state.cards[e.id] ? state.cards[e.id].hoursLeft : null })));
 }
 
 function heroError(err) {
@@ -1201,14 +1214,46 @@ function updateSayTargets() {
 
 /* countdown every second from each card's derived deadline */
 function tickClocks() {
+  const snap = snapshot();
+  let minRemaining = null;
   for (const [id, card] of Object.entries(state.cards)) {
     if (!card || !card.refs.clock) continue;
     if (card.deadlineMs === null) continue;
-    const remaining = Math.max(0, card.deadlineMs - Date.now());
+    const remaining = Math.max(0, card.deadlineMs - Date.now() - snap.offsetMs);
     card.refs.clock.textContent = clockHHMMSS(remaining);
-    if (remaining <= 0 && stateOf(id).code === 'alive') {
-      card.refs.clock.classList.add('dead');
+    minRemaining = minRemaining === null ? remaining : Math.min(minRemaining, remaining);
+    const deadHere = remaining <= 0;
+    card.refs.clock.classList.toggle('dead', deadHere);
+    card.refs.clock.closest('.being')?.classList.toggle('dead-ahead', deadHere);
+    if (deadHere && snap.ahead > 0) {
+      card.refs.clockNote.textContent = `${nameOf(id)} dies ${fmtWhen(card.deadlineMs)} unless someone pays. scroll back up: it is still alive now.`;
+    } else if (card.baseNote !== undefined) {
+      card.refs.clockNote.textContent = card.baseNote;
     }
+  }
+  const hours = document.getElementById('fact-hours');
+  if (hours && minRemaining !== null) hours.textContent = clockHHMMSS(minRemaining);
+  // the corner meter carries both clocks, so the deaths are visible wherever you are on the page
+  const mc = document.getElementById('meter-clocks');
+  if (mc) {
+    mc.replaceChildren(...Object.entries(state.cards).filter(([, c]) => c && c.deadlineMs !== null).map(([id, c]) => {
+      const remaining = Math.max(0, c.deadlineMs - Date.now() - snap.offsetMs);
+      return el('span', { class: `meter-clock${remaining <= 0 ? ' dead' : ''}`, text: `${nameOf(id)} ${remaining <= 0 ? '†' : clockHHMMSS(remaining).slice(0, -3)}` });
+    }));
+  }
+  const ts = document.getElementById('talk-state');
+  if (ts) {
+    const dead = Object.entries(state.cards).filter(([, c]) => c && c.deadlineMs !== null && c.deadlineMs - Date.now() - snap.offsetMs <= 0).map(([id]) => nameOf(id));
+    ts.textContent = snap.ahead < 0.02
+      ? 'now: both are alive. every payment is hours added to a clock.'
+      : dead.length
+        ? `at this hour (${Math.floor(snap.ahead)} h from now) ${dead.join(' and ')} ${dead.length > 1 ? 'are' : 'is'} dead. the QR is the rewind.`
+        : `at this hour (${Math.floor(snap.ahead)} h from now) both are still alive. keep scrolling.`;
+    ts.classList.toggle('danger', dead.length > 0 && snap.ahead >= 0.02);
+  }
+  if (state.relic) {
+    state.relic.setLife(Math.max(0.12, Math.min(1, state.lifeFraction ?? 1) * (0.25 + 0.75 * snap.life)));
+    state.relic.setScatter(snap.death);
   }
 }
 
@@ -1242,6 +1287,12 @@ function init() {
     if (!document.hidden && !state.busy) void refresh();
   }, REFRESH_MS);
   window.setInterval(tickClocks, 1000);
+  const meterEl = document.getElementById('meter');
+  if (meterEl) {
+    startMeter(meterEl).onChange(tickClocks);
+    meterEl.addEventListener('click', () => { if (snapshot().ahead > 0.02) rewind(); });
+  }
+  document.getElementById('footer-rewind')?.addEventListener('click', rewind);
 }
 
 if (document.readyState === 'loading') {
