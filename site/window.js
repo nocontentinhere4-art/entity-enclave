@@ -289,8 +289,8 @@ function updateHero() {
     if (res && !res.ok) { r.err.textContent = `/vitals: ${res.error || 'error'} — showing the last read`; r.err.classList.remove('hidden'); }
   }
   if (state.relic) state.relic.setLife(minHours === null ? 1 : Math.max(0.12, Math.min(1, minHours / 720)));
-  const uh = document.getElementById('usd-hour');
-  if (uh) uh.textContent = usdOf(DEFAULT_RENT_ZATS);
+  const fh = document.getElementById('five-hours');
+  if (fh) fh.textContent = minHours === null ? '—' : formatInt(Math.floor(minHours));
   pushTowers();
   tickHero();
 }
@@ -302,6 +302,8 @@ function tickHero() {
     if (!r || r.deadline === null || r.deadline === undefined) continue;
     const left = Math.max(0, r.deadline - Date.now()) / 3600e3;
     r.big.querySelector('.n').textContent = formatInt(Math.floor(left));
+    const fh = document.getElementById('five-hours');
+    if (fh && (item.id === 'e1' || Number(fh.dataset.h || Infinity) > left)) { fh.textContent = formatInt(Math.floor(left)); fh.dataset.h = String(left); }
     r.min.textContent = `${String(Math.floor((left % 1) * 60)).padStart(2, '0')} min ${String(Math.floor(((left * 60) % 1) * 60)).padStart(2, '0')} s`;
     const st = stateOf(item.id).code;
     r.dies.textContent = st === 'dead' ? 'dead.' : left <= 0 ? 'the treasury is empty: the next rent cannot be paid' : `dies ${fmtWhen(r.deadline)} unless someone pays`;
@@ -348,6 +350,8 @@ function buildComposer() {
   c.copyUri = copyBtn(() => c.uri.value, 'copy the payment link');
   c.copyAddr = copyBtn(() => addressOf(c.entity), 'copy the address');
   c.openWallet = el('a', { class: 'btn', href: '#', text: 'open in a Zcash wallet' });
+  c.anyCoin = el('a', { class: 'btn btn-any', href: '#', target: '_blank', rel: 'noopener noreferrer', text: 'pay with any coin ↗ (SOL, BTC, USDC, ETH…)' });
+  c.anyNote = el('p', { class: 'any-note', text: 'via Trocador AnonPay: you send what you have, they receive ZEC, shielded. buys hours only: the question does not travel through exchanges. to ask, pay from a Zcash wallet with the QR.' });
   c.steps = el('ol', { class: 'steps' },
     el('li', {}, el('strong', { text: 'you send. ' }), 'any Zcash wallet with shielded memos works (Zashi, YWallet, Zingo). this page cannot see your wallet.'),
     el('li', {}, el('strong', { text: 'the ledger sees it. ' }), 'within minutes a ', el('span', { class: 'mono', text: 'letter' }), ' line appears under "who keeps them alive" with your amount and byte count, never your words.'),
@@ -356,9 +360,10 @@ function buildComposer() {
   c.watch = el('p', { class: 'watch mono', text: '' });
   // no ZEC yet: the routes that really end in a shielded wallet (links only, nothing loads from them)
   c.ramp = el('div', { class: 'ramp' },
-    el('p', { class: 'label', text: 'no ZEC yet? three routes, 10 to 30 minutes' }),
+    el('p', { class: 'label', text: 'no ZEC yet?' }),
     el('ol', { class: 'ramp-list' },
-      el('li', {}, el('strong', { text: 'Have SOL, USDC or BTC? ' }), 'Install ', el('a', { href: 'https://zodl.com', target: '_blank', rel: 'noopener noreferrer', text: 'Zodl ↗' }), ' (the Zcash wallet, formerly Zashi), tap Swap, pick what you hold: the ZEC lands shielded in the app. Then scan the QR above from Zodl.'),
+      el('li', {}, el('strong', { text: 'Just want to buy them hours? ' }), 'The "pay with any coin" button above: Trocador swaps what you send into ZEC and delivers it shielded to this address. No account. 10 to 30 minutes.'),
+      el('li', {}, el('strong', { text: 'Want to ask a question too? ' }), 'You need a Zcash wallet for the memo. Install ', el('a', { href: 'https://zodl.com', target: '_blank', rel: 'noopener noreferrer', text: 'Zodl ↗' }), ' (formerly Zashi), tap Swap, pick what you hold (SOL, USDC, BTC…): the ZEC lands shielded in the app. Then scan the QR from Zodl.'),
       el('li', {}, el('strong', { text: 'Card? ' }), el('a', { href: 'https://www.gemini.com/prices/zcash', target: '_blank', rel: 'noopener noreferrer', text: 'Gemini ↗' }), ' sells ZEC by card and withdraws straight to a shielded address (not in the EU, UK or Singapore). Withdraw to your own Zodl address first, then pay from Zodl: exchanges cannot carry the memo.'),
       el('li', {}, el('strong', { text: 'Coinbase or Kraken? ' }), 'They pay out to transparent addresses only. Withdraw to Zodl, shield the funds in the app (one tap), then pay. A transparent payment loses the memo and your privacy.'),
     ),
@@ -374,6 +379,7 @@ function buildComposer() {
       el('div', { class: 'composer-right' },
         c.amountLine, c.qr,
         el('div', { class: 'btn-row' }, c.openWallet, c.copyUri, c.copyAddr),
+        el('div', { class: 'btn-row' }, c.anyCoin), c.anyNote,
         c.addr, c.watch, c.ramp,
       ),
     ),
@@ -422,6 +428,7 @@ function renderComposer() {
   let uri = '';
   try { uri = zip321Uri(addr, memo || '', zats / 1e8); } catch (err) { c.qr.replaceChildren(el('p', { class: 'qr-error', text: `payment link: ${err.message}` })); return; }
   c.uri.value = uri; c.openWallet.href = uri;
+  c.anyCoin.href = `https://trocador.app/anonpay/?ticker_to=zec&network_to=Shielded&address=${encodeURIComponent(addr)}&amount=${(zats / 1e8).toFixed(8)}&name=${encodeURIComponent('hours')}&description=${encodeURIComponent(`${lifeText} of life for ${nameOf(id)}`)}&bgcolor=000000ff&buttonbgcolor=e3b341&textcolor=000000&simple_mode=True`;
   c.amountLine.replaceChildren(el('strong', { text: `${fixed8(zats)} ZEC` }), `${usdOf(zats)} → ${nameOf(id)} · ${lifeText} of life`);
   try {
     c.qr.replaceChildren();
