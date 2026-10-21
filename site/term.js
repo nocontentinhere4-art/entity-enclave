@@ -807,6 +807,10 @@ function cmdWho() {
     kv('voice', stringOf(id.voice).trim() || 'not declared');
     kv('image', stringOf(id.image).trim() || 'not declared');
   }
+  // Nostr identity as declared by `/`: the npub is derived from the sealed key, same on every redeploy.
+  const rootData = snap.root && snap.root.ok && snap.root.data ? snap.root.data : null;
+  const npub = rootData && rootData.nostr ? stringOf(rootData.nostr.npub).trim() : '';
+  kv('nostr', npub || 'not declared');
   stampLine(mem, '/memory-public');
 }
 

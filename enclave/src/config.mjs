@@ -79,6 +79,8 @@ export const config = {
   zcashBirthday: num(process.env.ZCASH_BIRTHDAY, (process.env.ZCASH_CHAIN ?? 'testnet') === 'testnet' ? 4460000 : 0),
   zingoBin: process.env.ZINGO_BIN ?? 'zingo-cli',
   nymProxy: process.env.NYM_PROXY,
+  // Public Nostr relays the entity publishes to (comma-separated wss:// URLs). Empty = the built-in list.
+  nostrRelays: (process.env.NOSTR_RELAYS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   // Hard ceiling on a single model call: a slow provider must never hang the entity.
   llmTimeoutMs: num(process.env.LLM_TIMEOUT_MS, 60_000),
   // Wallet directories to shred on death. Empty for the in-memory fake wallet (it leaves no files behind);

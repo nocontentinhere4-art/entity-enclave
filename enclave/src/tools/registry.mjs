@@ -4,6 +4,7 @@
 import { createHash } from 'node:crypto';
 import { lookup as dnsLookup } from 'node:dns/promises';
 import { isIPv4 } from 'node:net';
+import { nostrIdentity, publishEvent, DEFAULT_RELAYS, MAX_NOTE_CHARS } from '../nostr.mjs';
 
 const MAX_BYTES = 200 * 1024; // never let a webpage eat the tick's budget
 const FETCH_TIMEOUT_MS = 10_000;
@@ -18,8 +19,8 @@ const SWAP_ASSETS = {
 };
 
 export class Tools {
-  constructor({ ledger, wallet, memory, pricing, keys, config, channels, promises, lookup }) {
-    Object.assign(this, { ledger, wallet, memory, pricing, keys, config, channels, promises });
+  constructor({ ledger, wallet, memory, pricing, keys, config, channels, promises, lookup, nostr }) {
+    Object.assign(this, { ledger, wallet, memory, pricing, keys, config, channels, promises, nostr });
     this.treasuryZats = null;
     // DNS is injectable so tests can pin host resolution without touching the network.
     this.lookup = lookup ?? dnsLookup;
@@ -58,6 +59,7 @@ export class Tools {
       case 'read_url': return this.#readUrl(a.url);
       case 'search': return []; // v1 stub: no search backend yet
       case 'post_public': return this.#postPublic(a.text);
+      case 'post_nostr': return this.#postNostr(a.text);
       case 'whisper': return this.#whisper(a.to, a.text, a.zats);
       case 'spawn_child': return this.#spawnChild(a.name);
       case 'swap_quote': return this.#swapQuote(a.from, a.to, a.amount, a.recipient);
@@ -139,6 +141,25 @@ export class Tools {
     const body = String(text ?? '');
     this.ledger.append('post_public', { channel: this.channels?.public ?? 'public', text: body });
     return { ok: true, bytes: body.length };
+  }
+
+  /** Publish a signed kind-1 note under the entity's own Nostr key. Public by nature: the text is in the event,
+   *  the ledger keeps the event id (anyone can fetch it from a relay) and which relays accepted it. */
+  async #postNostr(text) {
+    const content = String(text ?? '').trim();
+    if (!content) throw err('empty', 'post_nostr needs text');
+    if (content.length > MAX_NOTE_CHARS) throw err('too_long', `post_nostr: at most ${MAX_NOTE_CHARS} characters`);
+    this.nostr ??= nostrIdentity(this.keys.deriveSubkey('nostr'));
+    const relays = this.config?.nostrRelays?.length ? this.config.nostrRelays : DEFAULT_RELAYS;
+    const event = this.nostr.sign({ kind: 1, content, tags: [] });
+    const r = await publishEvent(event, relays, { timeoutMs: FETCH_TIMEOUT_MS, WebSocketImpl: this.wsImpl ?? globalThis.WebSocket });
+    const bytes = Buffer.byteLength(content, 'utf8');
+    if (r.ok.length === 0) {
+      this.ledger.append('post_nostr', { id: event.id, relays_ok: [], bytes });
+      throw err('no_relay', `post_nostr: no relay accepted the note (${r.failed.map((f) => f.reason).join('; ')})`);
+    }
+    this.ledger.append('post_nostr', { id: event.id, relays_ok: r.ok, bytes });
+    return { ok: true, id: event.id, npub: this.nostr.npub, relays_ok: r.ok, relays_failed: r.failed, bytes };
   }
 
   #seal(type, text) {
@@ -347,6 +368,7 @@ const SCHEMAS = [
   { name: 'read_url', description: 'Fetch a public web page (http/https, max 200 KB).', parameters: obj({ url: str('absolute http/https URL') }, ['url']) },
   { name: 'search', description: 'Search the web (stub in v1: returns []).', parameters: obj({ q: str('query') }, ['q']) },
   { name: 'post_public', description: 'Publish a short text on the public channel.', parameters: obj({ text: str('text to publish') }, ['text']) },
+  { name: 'post_nostr', description: 'Publish a note on Nostr under your own key (your npub is public): an identityless network read by many clients, outside your site. Max 2000 characters; the note is permanent and public.', parameters: obj({ text: str('the note (max 2000 characters)') }, ['text']) },
   { name: 'whisper', description: 'Speak to another entity by paying it: a shielded ZEC transfer whose memo carries your words (max 500 bytes). Only the recipient reads them; the public sees the amount.', parameters: obj({ to: str("'peer', 'parent', a child url, or an entity name"), text: str('the words'), zats: num('amount in zatoshi (min 10000)') }, ['to', 'text']) },
   { name: 'swap_quote', description: 'Live market quote (NEAR Intents): how much of one asset you get for an amount of another. Dry run, nothing moves. Assets: zec, sol, usdc.', parameters: obj({ from: str('zec | sol | usdc'), to: str('zec | sol | usdc'), amount: num('amount of `from` in whole units, e.g. 0.01'), recipient: str('optional destination address to price delivery to') }, ['from', 'to', 'amount']) },
   { name: 'spawn_child', description: 'Give birth to a new entity: pay for a new sealed machine with your image and charter, and gift it its first hours. Needs a rich treasury.', parameters: obj({ name: str('a short name for the machine (letters, digits, hyphens)') }, []) },

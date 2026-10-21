@@ -22,6 +22,7 @@ import { Life } from './life/loop.mjs';
 import { deathState, deadView } from './boot.mjs';
 
 import { entropyToMnemonic } from './bip39.mjs';
+import { nostrIdentity } from './nostr.mjs';
 
 const STATE = config.stateDir;
 const LEDGER_PATH = join(STATE, 'ledger.jsonl');
@@ -164,7 +165,9 @@ config.peers = () => {
   for (const e of ledger.recent(['birth_of'], 1000)) if (e.data?.url) out.push({ role: 'child', url: e.data.url });
   return out;
 };
-const tools = new Tools({ ledger, wallet, memory, pricing, keys, config, channels: { public: 'public' }, promises });
+// Nostr identity: a subkey of the seed, so the npub is the same on every redeploy of this entity.
+const nostr = nostrIdentity(keys.deriveSubkey('nostr'));
+const tools = new Tools({ ledger, wallet, memory, pricing, keys, config, channels: { public: 'public' }, promises, nostr });
 
 const life = new Life({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused });
 life.start();
@@ -228,6 +231,7 @@ http.createServer(async (req, res) => {
         mode: keys.mode,
         keys: { sign: keys.signPublicKey, box: keys.boxPublicKey },
         zcash: { chain: config.zcashChain, address, balance: life.lastBalance, error: walletError },
+        nostr: { npub: nostr.npub, pubkey: nostr.pubkey },
         peer: config.peerUrl,
         lineage: { parent: config.parentUrl, children: ledger.recent(['birth_of'], 1000).map((e) => ({ url: e.data?.url, address: e.data?.address, ts: e.ts })) },
         ledger: { entries: ledger.seq, head: ledger.head },
