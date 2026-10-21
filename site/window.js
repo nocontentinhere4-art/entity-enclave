@@ -572,6 +572,9 @@ function updateFeed() {
 
   rows.sort((a, b) => b.at - a.at);
   const list = rows.slice(0, 30);
+  // something new happened since the last read: the relic flinches
+  if (list.length && state.lastFeedAt !== undefined && list[0].at > state.lastFeedAt && state.relic) state.relic.glitch(0.5);
+  if (list.length) state.lastFeedAt = list[0].at;
   if (!list.length) {
     feed.append(el('li', {
       class: 'dim-line',

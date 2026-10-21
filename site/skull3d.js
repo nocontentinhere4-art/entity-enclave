@@ -28,9 +28,10 @@ async function loadSkull(url) {
 
 const COMMON = `
   attribute vec3 aStart; attribute float aDelay;
-  uniform float uAssemble; uniform float uScatter; uniform float uTime; uniform float uLife;
-  varying float vDepth; varying float vFade;
+  uniform float uAssemble; uniform float uScatter; uniform float uTime; uniform float uLife; uniform float uGlitch;
+  varying float vDepth; varying float vFade; varying float vBand;
   float ease(float t) { t = clamp(t, 0.0, 1.0); return 1.0 - pow(1.0 - t, 3.0); }
+  float hash(float x) { return fract(sin(x * 12.9898) * 43758.5453); }
   vec3 place() {
     float t = ease((uAssemble - aDelay) / 0.55);
     vec3 p = mix(aStart, position, t);
@@ -38,6 +39,11 @@ const COMMON = `
     float s = clamp(uScatter - aDelay * 0.6, 0.0, 1.0);
     p += (aStart * 0.35 + vec3(0.0, 0.4, 0.0)) * s * s;
     p *= 1.0 + 0.008 * sin(uTime * 0.8 + position.y * 3.0);   // a faint breath
+    // the glitch: horizontal bands tear sideways for a few frames, like the terminal's @#$% flicker
+    float band = floor(position.y * 14.0 + floor(uTime * 24.0) * 0.37);
+    float hb = hash(band + floor(uTime * 24.0));
+    p.x += (hb - 0.5) * uGlitch * 0.5 * step(0.45, hash(band * 3.1 + floor(uTime * 24.0)));
+    vBand = hb;
     vFade = 1.0 - s;
     return p;
   }`;
@@ -49,8 +55,9 @@ const LINE_VERT = COMMON + `
     vDepth = clamp((-mv.z - 2.4) / 2.2, 0.0, 1.0);
   }`;
 const LINE_FRAG = `
-  precision highp float; uniform float uLife; uniform float uAlpha; uniform float uAssemble; uniform float uScatter; varying float vDepth; varying float vFade;
+  uniform float uLife; uniform float uAlpha; uniform float uAssemble; uniform float uScatter; uniform float uGlitch; varying float vDepth; varying float vFade; varying float vBand;
   void main() {
+    if (uGlitch > 0.0 && vBand < uGlitch * 0.35) discard;   // torn-out bands
     // threads only once the dust has settled: lines between flying points would wash the whole hero
     float settled = smoothstep(0.75, 1.0, uAssemble) * pow(1.0 - clamp(uScatter, 0.0, 1.0), 3.0);
     float a = uAlpha * settled * vFade * (1.0 - 0.75 * vDepth) * (0.35 + 0.65 * uLife);
@@ -67,8 +74,9 @@ const POINT_VERT = COMMON + `
     gl_PointSize = uPixel * 1.9 * (1.0 - 0.5 * vDepth) * (0.7 + 0.3 * uLife);
   }`;
 const POINT_FRAG = `
-  precision highp float; uniform float uLife; uniform float uAlpha; varying float vDepth; varying float vFade;
+  uniform float uLife; uniform float uAlpha; uniform float uGlitch; varying float vDepth; varying float vFade; varying float vBand;
   void main() {
+    if (uGlitch > 0.0 && vBand < uGlitch * 0.35) discard;
     vec2 c = gl_PointCoord - 0.5; float d = dot(c, c); if (d > 0.25) discard;
     float a = uAlpha * vFade * smoothstep(0.25, 0.04, d) * (1.0 - 0.7 * vDepth) * (0.4 + 0.6 * uLife);
     gl_FragColor = vec4(vec3(1.0, 0.86, 0.55), a);
@@ -108,7 +116,7 @@ export async function mount(host, { seed = 7, life = 1 } = {}) {
 
   const uniforms = {
     uAssemble: { value: 0 }, uScatter: { value: 0 }, uTime: { value: 0 }, uLife: { value: life },
-    uPixel: { value: renderer.getPixelRatio() }, uAlpha: { value: 1 },
+    uPixel: { value: renderer.getPixelRatio() }, uAlpha: { value: 1 }, uGlitch: { value: 0 },
   };
   const mat = (vs, fs, alpha) => new THREE.ShaderMaterial({
     uniforms: { ...uniforms, uAlpha: { value: alpha } }, vertexShader: vs, fragmentShader: fs,
@@ -151,6 +159,16 @@ export async function mount(host, { seed = 7, life = 1 } = {}) {
   document.addEventListener('visibilitychange', () => { if (!document.hidden && visible && running && !raf) tick(performance.now()); });
 
   const set = (k, v) => { for (const m of mats) m.uniforms[k].value = v; };
+  // glitch schedule: a burst every 5–12 s, 0.15–0.4 s long, in two or three stutters
+  const grnd = mulberry(seed ^ 0x6111c4);
+  let nextGlitch = 4 + grnd() * 4, glitchEnd = 0, glitchAmp = 0, glitchHold = 0, lastAge = 0;
+  function glitchAt(age) {
+    lastAge = age;
+    if (age >= nextGlitch) { glitchAmp = 0.5 + grnd() * 0.5; glitchEnd = Math.max(glitchHold, age + 0.15 + grnd() * 0.25); nextGlitch = glitchEnd + 5 + grnd() * 7; }
+    if (age >= glitchEnd) return 0;
+    const stutter = Math.sin(age * 55) > -0.2 ? 1 : 0;        // not every frame: it stutters
+    return glitchAmp * stutter * (0.6 + 0.4 * Math.sin(age * 23));
+  }
   function tick(now) {
     if (!running || !visible || document.hidden) { raf = 0; return; }
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -159,6 +177,7 @@ export async function mount(host, { seed = 7, life = 1 } = {}) {
     set('uAssemble', Math.min(1, age / 2.4));
     const scroll = Math.min(1, (window.scrollY || 0) / Math.max(1, window.innerHeight * 0.9));
     set('uScatter', scroll);
+    set('uGlitch', scroll > 0.8 ? 0 : glitchAt(age));
     px += (tx - px) * Math.min(1, dt * 2.5); py += (ty - py) * Math.min(1, dt * 2.5);
     group.rotation.y += dt * 0.12;
     group.rotation.x = py * 0.6 + scroll * 0.3;
@@ -172,6 +191,7 @@ export async function mount(host, { seed = 7, life = 1 } = {}) {
 
   return {
     setLife(f) { set('uLife', Math.min(1, Math.max(0.12, Number(f) || 0))); },
+    glitch(hold = 0) { nextGlitch = 0; glitchHold = lastAge + hold; }, // something happened: the relic flinches now
     destroy() { running = false; if (raf) cancelAnimationFrame(raf); io.disconnect(); window.removeEventListener('pointermove', onMove); window.removeEventListener('resize', resize); renderer.dispose(); host.replaceChildren(); },
   };
 }
