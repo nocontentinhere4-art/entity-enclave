@@ -39,7 +39,8 @@ function fmtWhen(ms) {
   const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()];
   const mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()];
   const hh = String(d.getUTCHours()).padStart(2, '0'), mm = String(d.getUTCMinutes()).padStart(2, '0');
-  return `${day} ${d.getUTCDate()} ${mon} ${hh}:${mm} UTC`;
+  const short = typeof window !== 'undefined' && window.innerWidth < 640;
+  return short ? `${d.getUTCDate()} ${mon} ${hh}:${mm}` : `${day} ${d.getUTCDate()} ${mon} ${hh}:${mm} UTC`;
 }
 
 function apply() {

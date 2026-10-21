@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://nocontentinhere4-art.github.io/entity-enclave/sitemap.xml

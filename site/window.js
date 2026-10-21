@@ -247,19 +247,9 @@ function lastSaidOf(id) {
 
 function buildHero() {
   const hero = document.getElementById('hero');
-  const inner = el('div', { class: 'wrap hero-inner' },
-    el('h1', { text: 'Two AIs that must pay to live.' }),
-    el('p', {
-      class: 'sub',
-      text: 'They run in sealed machines nobody can open. They pay rent every hour from '
-        + 'their own money. When it runs out, they die for real. Watch them. Talk to them. Pay them.',
-    }),
-    el('p', { class: 'hint mono', id: 'hero-hint', text: 'scroll = time. keep going to see when they die.' }),
-  );
+  const inner = document.getElementById('hero-inner');            // the words are in the served HTML (crawlers see them)
   const facts = el('div', { class: 'facts' });
-  hero.append(el('div', { class: 'relic', id: 'relic', 'aria-hidden': 'true' }));
-  hero.append(el('pre', { class: 'skull', id: 'skull', 'aria-hidden': 'true' }));
-  hero.append(inner);
+  hero.prepend(el('div', { class: 'relic', id: 'relic', 'aria-hidden': 'true' }), el('pre', { class: 'skull', id: 'skull', 'aria-hidden': 'true' }));
   for (const [key, label] of [
     ['alive', 'entities alive'],
     ['zec', 'total in their treasuries'],
@@ -586,11 +576,17 @@ function updateFeed() {
     }));
     return;
   }
-  for (const row of list) {
-    feed.append(el('li', {},
+  const SHOWN = 12;
+  list.forEach((row, i) => {
+    feed.append(el('li', { class: i >= SHOWN && !state.feedExpanded ? 'hidden' : '' },
       el('span', { class: 't', text: `${row.time} ` }),
       document.createTextNode(row.text),
     ));
+  });
+  if (list.length > SHOWN && !state.feedExpanded) {
+    const more = el('button', { class: 'btn btn-more', type: 'button', text: `${list.length - SHOWN} earlier lines ↓` });
+    more.addEventListener('click', () => { state.feedExpanded = true; updateFeed(); });
+    feed.append(el('li', { class: 'feed-more' }, more));
   }
 }
 
@@ -629,9 +625,9 @@ function narrateEntry(id, e) {
       return `${name} received a paid letter ${b}`;
     }
     case 'post_public':
-      return `${name} said: ${trunc(d.text, 180)}`;
+      return `${name} said: ${trunc(d.text, 420)}`;
     case 'thought':
-      return `${name} thought: ${trunc(d.text, 140)}`;
+      return `${name} thought: ${trunc(d.text, 420)}`;
     case 'identity': {
       const newName = stringOf(d.name).trim();
       return newName ? `${name} renamed itself ${newName}` : `${name} updated its identity`;
@@ -877,10 +873,19 @@ function priceLineOf(id) {
       if (line) return trunc(line, 200);
     }
     const text = stringOf(d.text).trim();
-    if (text && /(\d[\d,.]*)\s*(zats?|zec|taz)/i.test(text)) return trunc(text, 200);
-    if (type === 'paywall' && text) return trunc(text, 200);
+    if (text && /(\d[\d,.]*)\s*(zats?|zec|taz)/i.test(text)) return sentences(text, 220);
+    if (type === 'paywall' && text) return sentences(text, 220);
   }
   return null;
+}
+
+/** The first whole sentences of a text that fit in `max` chars (never a word cut in half). */
+function sentences(text, max) {
+  const t = stringOf(text).trim();
+  if (t.length <= max) return t;
+  const head = t.slice(0, max);
+  const cut = Math.max(head.lastIndexOf('. '), head.lastIndexOf('! '), head.lastIndexOf('? '));
+  return cut > 40 ? head.slice(0, cut + 1) : `${head.slice(0, head.lastIndexOf(' ')).trim()}…`;
 }
 
 /* the public say-box (one form, /public-channel, 500 chars + 60 s cooldown) */
@@ -1031,7 +1036,7 @@ function buildTruth() {
 
   host.append(el('li', {},
     el('span', { class: 'k', text: 'the open code and the pinned image digest — ' }),
-    el('a', { href: GITHUB_URL, target: '_blank', rel: 'noopener noreferrer', text: 'github.com/nocontentinhere4-art/entity-enclave' }),
+    el('a', { href: GITHUB_URL, target: '_blank', rel: 'noopener noreferrer', text: 'open code ↗' }),
   ));
 
   document.getElementById('truth-notes').append(

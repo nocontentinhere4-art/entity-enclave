@@ -49,6 +49,12 @@ body {
 a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; transition: color 0.2s var(--ease); }
 a:visited { color: var(--accent); }
 a:hover { color: #fff; }
+.truth a, .footer-link, .section-sub a {
+  text-decoration: none;
+  background: linear-gradient(currentColor, currentColor) no-repeat 0 100% / 0 1px;
+  transition: background-size 0.6s var(--ease), color 0.2s var(--ease);
+}
+.truth a:hover, .truth a:focus-visible, .footer-link:hover, .footer-link:focus-visible, .section-sub a:hover { background-size: 100% 1px; }
 .btn-link, .section-title a {
   text-decoration: none;
   background: linear-gradient(currentColor, currentColor) no-repeat 0 100% / 0 1px;
@@ -104,16 +110,16 @@ a:hover { color: #fff; }
   padding: 8px 12px 9px;
   font-family: var(--mono);
   cursor: default;
-  min-width: 128px;
+  min-width: 168px;
   transition: border-color 0.6s var(--ease), color 0.6s var(--ease);
 }
-.meter-h { font-size: 20px; line-height: 1.1; letter-spacing: 0.5px; }
-.meter-when { font-size: 11px; color: var(--dim); }
+.meter-h { font-size: 26px; line-height: 1.1; letter-spacing: 0.5px; }
+.meter-when { font-size: 12px; color: var(--dim); }
 .meter-clocks { display: grid; gap: 1px; margin: 4px 0 2px; font-size: 12px; color: var(--text); }
 .meter-clock.dead { color: var(--danger); }
 .talk-state { font-size: 13px; color: var(--accent); letter-spacing: 0.5px; margin: -16px 0 28px; }
 .talk-state.danger { color: var(--danger); }
-.meter-hint { font-size: 10.5px; color: var(--dimmer); letter-spacing: 1px; text-transform: uppercase; }
+.meter-hint { font-size: 11px; color: var(--dimmer); letter-spacing: 1px; text-transform: uppercase; }
 html.meter-ahead .meter { cursor: pointer; }
 html.meter-ahead .meter:hover .meter-h, html.meter-ahead .meter:focus-visible .meter-h { color: #fff; }
 .meter-static { position: fixed; }
@@ -159,7 +165,7 @@ h2 {
   z-index: 0;
   margin: 0;
   color: var(--gold);
-  opacity: 0.32;
+  opacity: 0.16;
   font-family: var(--mono);
   font-size: min(10px, 1.55vw);
   line-height: 1.04;
@@ -223,14 +229,17 @@ h1 {
 /* 2. The two beings                                                   */
 /* ------------------------------------------------------------------ */
 
-.beings {
+.beings, .beings-list {
   display: grid;
   grid-template-columns: 1fr;
   gap: 40px;
 }
 @media (min-width: 720px) {
-  .beings { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 44px; }
+  .beings, .beings-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 44px; }
 }
+/* a measure for every running text */
+.section-sub, .being p, .talk p, .truth-note, .feed li { max-width: 72ch; }
+.last-said { max-width: 60ch; }
 
 .being { min-width: 0; }
 .being-name {
@@ -362,7 +371,9 @@ h1 {
   font-size: 13.5px;
   line-height: 1.75;
 }
-.feed li { margin: 3px 0; min-width: 0; }
+.feed li { margin: 6px 0; min-width: 0; overflow-wrap: anywhere; }
+.feed-more { margin-top: 14px; }
+.btn-more { font-size: 12px; }
 .feed .t { color: var(--dimmer); }
 .feed li.dim-line { color: var(--dim); }
 .now-error { color: var(--danger); font-family: var(--mono); font-size: 12.5px; margin: 12px 0 0; }
