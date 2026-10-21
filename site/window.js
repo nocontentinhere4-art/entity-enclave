@@ -363,15 +363,17 @@ function buildBeings() {
     const card = el('article', { class: 'being', id: `being-${item.id}` },
       el('h3', { class: 'being-name', text: '…' },),
       el('p', { class: 'being-id', text: `${item.label} — the name it chose for itself` }),
-      avatarEmpty,
-      el('pre', { class: 'avatar hidden', 'aria-label': `self-portrait of ${item.label}` }),
-      avatarNote,
-      el('p', { class: 'image-sentence hidden' }),
-      el('p', {},
+      el('p', { class: 'clock-row' },
         el('span', { class: 'clock-label', text: 'the death clock' }),
         clock,
       ),
       clockNote,
+      el('div', { class: 'avatar-box' },
+        avatarEmpty,
+        el('pre', { class: 'avatar hidden', 'aria-label': `self-portrait of ${item.label}` }),
+      ),
+      avatarNote,
+      el('p', { class: 'image-sentence hidden' }),
       el('p', { class: 'treasury' }, el('span', { class: 'k', text: 'treasury: ' }), el('span', { class: 'v' })),
       el('p', { class: 'being-state-row' }, el('span', { class: 'k', text: 'state: ' }), el('span', { class: 'badge' })),
       el('p', { class: 'last-said hidden' }),
@@ -450,6 +452,10 @@ function updateCard(id) {
   const av = avatarOf(id);
   if (av) {
     r.avatar.textContent = av.text;
+    // every portrait fills the same box: scale the type to the taller of its two dimensions
+    const lines = av.text.split('\n');
+    const cols = Math.max(1, ...lines.map((l) => l.length));
+    r.avatar.style.fontSize = `${Math.max(6, Math.min(18, 176 / (lines.length * 1.05), 300 / (cols * 0.6))).toFixed(1)}px`;
     r.avatar.classList.remove('hidden');
     r.avatarEmpty.classList.add('hidden');
     setField(r.avatarNote, av.truncated, 'portrait truncated to its first 48 lines');
@@ -705,7 +711,7 @@ function buildTalk() {
     const refs = {};
     const qrBox = el('div', { class: 'qr', 'aria-live': 'off' });
     const uriText = el('textarea', {
-      class: 'uri-text',
+      class: 'uri-text sr-only',
       rows: '2',
       readonly: 'readonly',
       'aria-label': `ZIP-321 payment URI for ${item.label}`,
@@ -995,7 +1001,7 @@ function buildTruth() {
 
   // attestation line
   const attHost = el('li', {});
-  attHost.append(el('span', { class: 'k', text: 'attestations — ' }));
+  attHost.append(el('span', { class: 'k', text: 'attestations' }));
   for (const item of ENTITIES) {
     const mode = el('span', { class: 'mono', text: '…' });
     let link = null;
@@ -1021,7 +1027,7 @@ function buildTruth() {
 
   // browser-verified ledger line
   const verifyHost = el('li', {});
-  verifyHost.append(el('span', { class: 'k', text: 'the ledger verified in your browser — ' }));
+  verifyHost.append(el('span', { class: 'k', text: 'ledger' }));
   for (const item of ENTITIES) {
     const btn = el('button', { class: 'link-btn', type: 'button', text: `verify ${item.id} ▸` });
     const result = el('span', { class: 'verify-result' });
@@ -1035,7 +1041,7 @@ function buildTruth() {
   host.append(verifyHost);
 
   host.append(el('li', {},
-    el('span', { class: 'k', text: 'the open code and the pinned image digest — ' }),
+    el('span', { class: 'k', text: 'code' }),
     el('a', { href: GITHUB_URL, target: '_blank', rel: 'noopener noreferrer', text: 'open code ↗' }),
   ));
 
@@ -1252,8 +1258,8 @@ function tickClocks() {
     ts.textContent = snap.ahead < 0.02
       ? 'now: both are alive. every payment is hours added to a clock.'
       : dead.length
-        ? `at this hour (${Math.floor(snap.ahead)} h from now) ${dead.join(' and ')} ${dead.length > 1 ? 'are' : 'is'} dead. the QR is the rewind.`
-        : `at this hour (${Math.floor(snap.ahead)} h from now) both are still alive. keep scrolling.`;
+        ? `now both are alive. ${Math.floor(snap.ahead)} h from now, with no payment, ${dead.join(' and ')} ${dead.length > 1 ? 'are' : 'is'} dead. every zat below is hours.`
+        : `now both are alive, and still alive ${Math.floor(snap.ahead)} h from now. every zat below is hours.`;
     ts.classList.toggle('danger', dead.length > 0 && snap.ahead >= 0.02);
   }
   if (state.relic) {
