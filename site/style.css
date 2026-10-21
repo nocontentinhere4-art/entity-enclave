@@ -300,3 +300,6 @@ body { padding: 8px; }
   .face { font-size: clamp(5px, 1.9vw, 10px); }
   .face-out { font-size: clamp(5px, 1.8vw, 9px); }
 }
+
+.term-back { margin: 0 0 8px; font-size: 13px; }
+.term-back a { color: var(--acc); }

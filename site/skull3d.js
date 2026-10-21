@@ -144,9 +144,9 @@ export async function mount(host, { seed = 7, life = 1 } = {}) {
     // the relic keeps to the right half on wide screens; the words keep the left
     const halfW = Math.tan((camera.fov / 2) * Math.PI / 180) * camera.position.z * camera.aspect;
     const wide = camera.aspect > 1.15;
-    group.position.x = wide ? halfW * 0.62 : 0;
-    group.scale.setScalar(wide ? Math.min(0.95, halfW * 0.5) : 0.6);
-    baseY = wide ? 0.22 : 0.75;                       // narrow screens: the relic hangs above the words, dimmer
+    group.position.x = 0;                             // the relic sits between the two towers of hours
+    group.scale.setScalar(wide ? Math.min(0.9, halfW * 0.55) : 0.7);
+    baseY = 0.05;
     wire.material.uniforms.uAlpha.value = 0.42 * (wide ? 1 : 0.55);
     dots.material.uniforms.uAlpha.value = 0.9 * (wide ? 1 : 0.55);
   };
