@@ -228,3 +228,9 @@ h3 { font-size: 22px; margin: 0 0 10px; letter-spacing: -0.01em; }
 
 .launch-card { font-size: 13.5px; color: var(--text); border: 1px solid var(--gold); padding: 12px 14px; margin: 0 0 18px; }
 .launch-card strong { color: var(--gold); }
+
+.ramp { margin: 22px 0 0; border-top: 1px solid var(--gold-rule); padding-top: 16px; }
+.ramp-list { margin: 0 0 10px; padding-left: 20px; font-size: 14.5px; color: #d9d9d2; }
+.ramp-list li { margin: 8px 0; }
+.ramp-list strong { color: var(--text); }
+.ramp .dim { font-size: 12.5px; margin: 0; }

@@ -354,6 +354,15 @@ function buildComposer() {
     el('li', {}, el('strong', { text: 'it answers in public. ' }), 'at its next cycle (≤ 15 min, if awake) it reads the memo and may reply on its channel. it may also ignore you. nobody can make it answer.'),
   );
   c.watch = el('p', { class: 'watch mono', text: '' });
+  // no ZEC yet: the routes that really end in a shielded wallet (links only, nothing loads from them)
+  c.ramp = el('div', { class: 'ramp' },
+    el('p', { class: 'label', text: 'no ZEC yet? three routes, 10 to 30 minutes' }),
+    el('ol', { class: 'ramp-list' },
+      el('li', {}, el('strong', { text: 'Have SOL, USDC or BTC? ' }), 'Install ', el('a', { href: 'https://zodl.com', target: '_blank', rel: 'noopener noreferrer', text: 'Zodl ↗' }), ' (the Zcash wallet, formerly Zashi), tap Swap, pick what you hold: the ZEC lands shielded in the app. Then scan the QR above from Zodl.'),
+      el('li', {}, el('strong', { text: 'Card? ' }), el('a', { href: 'https://www.gemini.com/prices/zcash', target: '_blank', rel: 'noopener noreferrer', text: 'Gemini ↗' }), ' sells ZEC by card and withdraws straight to a shielded address (not in the EU, UK or Singapore). Withdraw to your own Zodl address first, then pay from Zodl: exchanges cannot carry the memo.'),
+      el('li', {}, el('strong', { text: 'Coinbase or Kraken? ' }), 'They pay out to transparent addresses only. Withdraw to Zodl, shield the funds in the app (one tap), then pay. A transparent payment loses the memo and your privacy.'),
+    ),
+    el('p', { class: 'dim', text: 'Fees and limits are theirs, not ours. The swap route publishes the receiving address on NEAR; use a fresh wallet if that matters to you. Whatever route, the last step is always your own wallet scanning this QR with the question in the memo.' }));
   c.memo.addEventListener('input', () => renderComposer());
   host.append(
     el('div', { class: 'composer-grid' },
@@ -365,7 +374,7 @@ function buildComposer() {
       el('div', { class: 'composer-right' },
         c.amountLine, c.qr,
         el('div', { class: 'btn-row' }, c.openWallet, c.copyUri, c.copyAddr),
-        c.addr, c.watch,
+        c.addr, c.watch, c.ramp,
       ),
     ),
     c.steps,
