@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=26';
+} from './term.js?v=27';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger,
-} from './data.js?v=26';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=26';
-import { initHero, setMouth, triggerTalk } from './hero.js?v=26';
-import { mountAscii, RAMP } from './ascii.js?v=26';
+} from './data.js?v=27';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=27';
+import { initHero, setMouth, triggerTalk } from './hero.js?v=27';
+import { mountAscii, RAMP } from './ascii.js?v=27';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -1618,7 +1618,7 @@ function mountScenes() {
   document.addEventListener('zealot:trade-open', () => { if (scenes.hand) scenes.hand.g.pulseUntil = performance.now() / 1000 + 0.8; });
   document.addEventListener('zealot:term-print', () => { if (scenes.shout) scenes.shout.g.talkUntil = performance.now() / 1000 + 1.4; });
 
-  buildDividers();
+  // dividers removed: one continuous page
 }
 
 function syncScenes() {
