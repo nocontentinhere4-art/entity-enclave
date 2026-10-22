@@ -17,7 +17,7 @@ const CELL = 7;               // px per glyph cell
 const GAMMA = 1.0;
 const THRESH = 0.09;          // below this luminance: empty cell
 const LIME_AT = 0.93;         // brightest cells go lime
-const GAP_FRAC = 0.20;        // push the two halves outwards, clear of the copy column
+const GAP_FRAC = 0.17;        // push the two halves outwards, clear of the copy column
 const LIME = '#f4b728';
 const BRIGHT = 'rgba(242,242,238,.92)';
 const DIM = 'rgba(242,242,238,.5)';
@@ -86,7 +86,7 @@ function sampleFrame(img, out) {
     octx.drawImage(img, hw, 0, hw, ih, x0, rows * 0.68, sw, sh);
   } else {
     // founder-approved look: contain-fit the pair, push the halves outwards
-    const s = Math.min(cols / iw, (rows * 0.74) / ih);
+    const s = Math.min(cols / iw, (rows * 0.90) / ih);
     const dw = iw * s, dh = ih * s;
     const GAP = GAP_FRAC * cols;
     const y0 = (rows - dh) / 2;
