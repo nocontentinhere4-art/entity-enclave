@@ -16,15 +16,15 @@ const RAMP = ' .-~:;=!*+^%$#&@';
 const CELL = 7;               // px per glyph cell
 const GAMMA = 1.0;
 const THRESH = 0.09;          // below this luminance: empty cell
-const LIME_AT = 0.93;         // brightest cells go lime
+const LIME_AT = 0.80;         // the brighter cells go Zcash yellow (founder likes the yellow on the bone)
 const GAP_FRAC = 0.17;        // push the two halves outwards, clear of the copy column
 const LIME = '#f4b728';
 const BRIGHT = 'rgba(242,242,238,.92)';
 const DIM = 'rgba(242,242,238,.5)';
 const MONO = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const CHEW = 1.4;             // one open-close, seconds (soft)
-const YAWN_PERIOD = 2.6;      // one yawn, seconds
-const YAWN_EVERY = 12;        // yawn interval, seconds
+const YAWN_PERIOD = 2.2;      // one yawn, seconds
+const YAWN_EVERY = 4;         // yawn interval, seconds (asleep still moves the jaw often)
 const TALK_SECS = 3;          // forced talk after a new public post
 const STACK_AT = 720;         // below this width the skulls stack (phone)
 
@@ -144,7 +144,7 @@ function computeK(s, now) {
   if (now < s.talkUntil) return chewK(s, now);
   if (s.mode === 'none' || s.mode === 'unknown') return 0;
   if (s.mode === 'asleep') {
-    if (s.nextYawn <= 0) s.nextYawn = now + YAWN_EVERY * (0.5 + Math.random());
+    if (s.nextYawn <= 0) s.nextYawn = now + YAWN_EVERY * (0.3 + Math.random());
     if (now >= s.nextYawn && now >= s.yawnEnd) {
       s.yawnStart = now;
       s.yawnPeriod = YAWN_PERIOD;
@@ -155,12 +155,12 @@ function computeK(s, now) {
     return 1;
   }
   // alive: talk bursts of two or three chews, then a 2–4 s pause
-  if (s.nextBurst <= 0) s.nextBurst = now + 2 + Math.random() * 2;
+  if (s.nextBurst <= 0) s.nextBurst = now + 0.8 + Math.random() * 1.2;
   if (now < s.burstEnd) return chewK(s, now);
   if (now >= s.nextBurst) {
     s.chewStart = now;
     s.burstEnd = now + (2 + (Math.random() < 0.5 ? 0 : 1)) * CHEW;
-    s.nextBurst = s.burstEnd + 2 + Math.random() * 2;
+    s.nextBurst = s.burstEnd + 0.8 + Math.random() * 1.2;
     return chewK(s, now);
   }
   return 0;
