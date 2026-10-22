@@ -210,7 +210,7 @@ function render(kL, kR, bL, bR, shL, shR, now) {
     const ch = RAMP[Math.round(v * n)];
     if (ch === ' ') continue;
     const b = h ? bR : bL;                 // state brightness dims the ink, never the glyph density
-    const isLime = b > 0.99 && v > LIME_AT;
+    const isLime = (h ? shR : shL) && v > LIME_AT;   // yellow stays while the entity lives (alive or asleep)
     ctx.globalAlpha = b;
     ctx.fillStyle = isLime ? LIME : (v > 0.55 ? BRIGHT : DIM);
     ctx.fillText(ch, x * CELL, y * CELL * 1.15);
