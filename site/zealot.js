@@ -4,6 +4,7 @@ import {
   formatInt, fixed8, peerUrlOf, applyDevBase, applyDevBase2,
 } from './data.js';
 import { zip321Uri, qrSvg } from './qr.js';
+import { mount as mountSkull } from './skull.js?v=202610220052';
 
 const RENT = 10000; // zats per hour, base rent (matches rent_paid.data.rentZats)
 const MEMO_MAX = 500;
@@ -229,6 +230,7 @@ function renderAll(full) {
   if ($('#pay').open) renderPay();
 }
 async function boot() {
+  try { mountSkull(document.getElementById('skull')); } catch {}
   state.order = ['e1'];
   const e1 = AIS[0]; await load(e1, true);
   const d1 = state.ais.e1;
