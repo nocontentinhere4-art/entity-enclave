@@ -514,3 +514,11 @@ legend { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; col
 
 /* the nav arrow is not a segment option */
 .seg .arr, .cell .arr { height: auto; padding: 0; border: 0; background: none; display: inline; }
+
+/* trades are not live: say it so nobody sends money for them */
+.notlive { border: 1px solid var(--lime); border-radius: var(--r4); padding: 16px 18px; margin: 18px 0; display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start; }
+.notlive-tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.22em; font-weight: 700; color: var(--bg); background: var(--lime); padding: 6px 10px; border-radius: 2px; white-space: nowrap; }
+.notlive p { margin: 0; color: var(--body); font-size: 14px; line-height: 1.55; }
+.notlive code { font-family: var(--mono); color: var(--lime); }
+.btn.is-off { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
+@media (max-width: 640px) { .notlive { grid-template-columns: 1fr; } }
