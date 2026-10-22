@@ -3,7 +3,7 @@ import * as THREE from './vendor/three.module.min.js';
 
 const BONE = 0xe9e2d3;
 const BLOOD = 0x8b1e1e;
-const BASE_X = 0;
+const BASE_Y = 0.4;
 
 async function loadSkull(url) {
   const buf = await (await fetch(url)).arrayBuffer();
@@ -43,6 +43,7 @@ export function mount(container) {
   let points = null;
   let base = null;
   let boneHeight = 1;
+  let boneWidth = 1;
   let destroyed = false;
 
   let running = false;
@@ -72,8 +73,10 @@ export function mount(container) {
   function fit() {
     if (!points) return;
     const half = (camera.fov * Math.PI) / 360;
-    const visible = 2 * camera.position.z * Math.tan(half);
-    points.scale.setScalar((visible * 0.8) / (boneHeight || 1));
+    const visibleH = 2 * camera.position.z * Math.tan(half);
+    const byHeight = (visibleH * 0.72) / (boneHeight || 1);
+    const byWidth = (visibleH * camera.aspect * 0.9) / (boneWidth || 1);
+    points.scale.setScalar(Math.min(byHeight, byWidth));
   }
 
   function renderFrame() {
@@ -123,8 +126,8 @@ export function mount(container) {
 
     const t = now - started;
     const sway = Math.sin((t * Math.PI * 2) / 12000) * ((25 * Math.PI) / 180);
-    points.rotation.y = sway + easeX * 0.22;
-    points.rotation.x = BASE_X - easeY * 0.12;
+    points.rotation.y = BASE_Y + sway + easeX * 0.22;
+    points.rotation.x = -easeY * 0.12;
 
     if (glitching && now >= glitchUntil) endGlitch();
     if (!glitching && now >= nextGlitch) beginGlitch(now);
@@ -188,7 +191,7 @@ export function mount(container) {
     if (reduced) {
       stop();
       if (points) {
-        points.rotation.set(BASE_X, 0, 0);
+        points.rotation.set(0, BASE_Y, 0);
         easeX = easeY = 0;
         pointerX = pointerY = 0;
       }
@@ -236,7 +239,8 @@ export function mount(container) {
       const cx = (minX + maxX) / 2;
       const cy = (minY + maxY) / 2;
       const cz = (minZ + maxZ) / 2;
-      boneHeight = Math.max(maxX - minX, maxY - minY, maxZ - minZ) || 1;
+      boneHeight = maxY - minY || 1;
+      boneWidth = maxX - minX || 1;
       base = new Float32Array(pos.length);
       for (let i = 0; i < pos.length; i += 3) {
         base[i] = pos[i] - cx;
@@ -255,7 +259,7 @@ export function mount(container) {
         depthWrite: false,
       });
       points = new THREE.Points(geom, material);
-      points.rotation.x = BASE_X;
+      points.rotation.y = BASE_Y;
       scene.add(points);
 
       resize();
