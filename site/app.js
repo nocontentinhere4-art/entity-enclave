@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=24';
+} from './term.js?v=26';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger,
-} from './data.js?v=24';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=24';
-import { initHero, setMouth, triggerTalk } from './hero.js?v=24';
-import { mountAscii, RAMP } from './ascii.js?v=24';
+} from './data.js?v=26';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=26';
+import { initHero, setMouth, triggerTalk } from './hero.js?v=26';
+import { mountAscii, RAMP } from './ascii.js?v=26';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -1476,7 +1476,7 @@ function handScene() {
   return {
     g,
     opts: {
-      src: './vendor/hand-coin.jpg', cell: 6, fit: 'contain', align: 'right',
+      src: './vendor/hand-coin.jpg', cell: 6, fit: 'contain', align: 'left',
       motion: (inst, t) => { g.cols = inst.cols; g.rows = inst.rows; g.t = t; return live; },
     },
   };
@@ -1570,7 +1570,7 @@ function shoutScene() {
   return {
     g,
     opts: {
-      src: './vendor/shout.jpg', cell: 6, fit: 'contain',
+      src: './vendor/shout.jpg', cell: 6, fit: 'cover', align: 'right',
       motion: (inst, t) => { g.cols = inst.cols; g.rows = inst.rows; g.t = t; return live; },
     },
   };

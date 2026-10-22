@@ -12,8 +12,8 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=24';
-import { zip321Uri, qrSvg } from './qr.js?v=24';
+} from './data.js?v=26';
+import { zip321Uri, qrSvg } from './qr.js?v=26';
 
 const RENT = 10000;                 // zats per hour, base rent (matches rent_paid.data.rentZats)
 const MEMO_MAX = 500;               // bytes

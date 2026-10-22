@@ -697,34 +697,42 @@ legend { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; col
 }
 
 /* ---------- v21 · ASCII scenes (the skull style, extended site-wide) ---------- */
-.scene { display: block; background: #000; pointer-events: none; }
+.scene { display: block; background: transparent; pointer-events: none; }
 
-/* the two portraits in the enclave cards */
-.card-portrait {
-  position: relative; height: 340px; background: #000;
-  border-bottom: 1px solid var(--hairline); overflow: hidden;
-}
+/* every section gets the hero's glyph field behind it */
+.section { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22288%22%20height%3D%22288%22%3E%3Cg%20fill%3D%22%23f4b728%22%20fill-opacity%3D%220.16%22%20font-family%3D%22Menlo%2Cmonospace%22%20font-size%3D%2211%22%20text-anchor%3D%22middle%22%3E%3Ctext%20x%3D%2224%22%20y%3D%2230%22%3E%29%3C%2Ftext%3E%3Ctext%20x%3D%2272%22%20y%3D%2230%22%3E%24%3C%2Ftext%3E%3Ctext%20x%3D%22120%22%20y%3D%2230%22%3E%29%3C%2Ftext%3E%3Ctext%20x%3D%22168%22%20y%3D%2230%22%3E%29%3C%2Ftext%3E%3Ctext%20x%3D%22216%22%20y%3D%2230%22%3E%24%3C%2Ftext%3E%3Ctext%20x%3D%22264%22%20y%3D%2230%22%3E%23%3C%2Ftext%3E%3Ctext%20x%3D%2224%22%20y%3D%2278%22%3E%5E%3C%2Ftext%3E%3Ctext%20x%3D%2272%22%20y%3D%2278%22%3E%25%3C%2Ftext%3E%3Ctext%20x%3D%22120%22%20y%3D%2278%22%3E%24%3C%2Ftext%3E%3Ctext%20x%3D%22168%22%20y%3D%2278%22%3E%29%3C%2Ftext%3E%3Ctext%20x%3D%22216%22%20y%3D%2278%22%3E%23%3C%2Ftext%3E%3Ctext%20x%3D%22264%22%20y%3D%2278%22%3E%25%3C%2Ftext%3E%3Ctext%20x%3D%2224%22%20y%3D%22126%22%3E%40%3C%2Ftext%3E%3Ctext%20x%3D%2272%22%20y%3D%22126%22%3E%29%3C%2Ftext%3E%3Ctext%20x%3D%22120%22%20y%3D%22126%22%3E%26amp%3B%3C%2Ftext%3E%3Ctext%20x%3D%22168%22%20y%3D%22126%22%3E%25%3C%2Ftext%3E%3Ctext%20x%3D%22216%22%20y%3D%22126%22%3E%40%3C%2Ftext%3E%3Ctext%20x%3D%22264%22%20y%3D%22126%22%3E%24%3C%2Ftext%3E%3Ctext%20x%3D%2224%22%20y%3D%22174%22%3E%21%3C%2Ftext%3E%3Ctext%20x%3D%2272%22%20y%3D%22174%22%3E%23%3C%2Ftext%3E%3Ctext%20x%3D%22120%22%20y%3D%22174%22%3E%28%3C%2Ftext%3E%3Ctext%20x%3D%22168%22%20y%3D%22174%22%3E%29%3C%2Ftext%3E%3Ctext%20x%3D%22216%22%20y%3D%22174%22%3E%23%3C%2Ftext%3E%3Ctext%20x%3D%22264%22%20y%3D%22174%22%3E%25%3C%2Ftext%3E%3Ctext%20x%3D%2224%22%20y%3D%22222%22%3E%23%3C%2Ftext%3E%3Ctext%20x%3D%2272%22%20y%3D%22222%22%3E%21%3C%2Ftext%3E%3Ctext%20x%3D%22120%22%20y%3D%22222%22%3E%24%3C%2Ftext%3E%3Ctext%20x%3D%22168%22%20y%3D%22222%22%3E%40%3C%2Ftext%3E%3Ctext%20x%3D%22216%22%20y%3D%22222%22%3E%21%3C%2Ftext%3E%3Ctext%20x%3D%22264%22%20y%3D%22222%22%3E%21%3C%2Ftext%3E%3Ctext%20x%3D%2224%22%20y%3D%22270%22%3E%5E%3C%2Ftext%3E%3Ctext%20x%3D%2272%22%20y%3D%22270%22%3E%5E%3C%2Ftext%3E%3Ctext%20x%3D%22120%22%20y%3D%22270%22%3E%23%3C%2Ftext%3E%3Ctext%20x%3D%22168%22%20y%3D%22270%22%3E%21%3C%2Ftext%3E%3Ctext%20x%3D%22216%22%20y%3D%22270%22%3E%29%3C%2Ftext%3E%3Ctext%20x%3D%22264%22%20y%3D%22270%22%3E%2A%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fsvg%3E"); background-size: 288px 288px; }
+
+/* ---------- stages: the art is as big as the hero's, the copy sits in a clear column ---------- */
+.section > .wrap { position: relative; z-index: 1; }
+
+/* enclaves: two big portraits, no boxes around them */
+.card { background: transparent; }
+.card-portrait { position: relative; height: 560px; background: transparent; border-bottom: 1px solid var(--hairline); overflow: hidden; }
 .card-portrait canvas { width: 100%; height: 100%; display: block; }
 .card-portrait.is-dead { opacity: 0.35; }
 
-/* bands drawn behind section titles sit at 30% so the copy always reads */
-.section > .wrap { position: relative; z-index: 1; }
-.scene.hand-band { position: absolute; top: 40px; left: 0; right: 0; width: 100%; height: 340px; opacity: 0.55; z-index: 0; }
-.scene.spine-band { position: absolute; top: 20px; left: 0; right: 0; width: 100%; height: 180px; opacity: 0.6; z-index: 0; }
+/* trades: the hand fills the right half of the section, full height */
+#trades { min-height: 760px; }
+.scene.hand-band { position: absolute; top: 0; right: 0; bottom: 0; left: auto; width: 52%; height: 100%; opacity: 0.95; z-index: 0; transform: scaleX(-1); } /* mirrored: the hand reaches in from the right edge, away from the copy */
+#trades .wrap > *:not(.book):not(.notlive) { max-width: 640px; }
 
-/* hourglass beside the flow table */
-.money-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
+/* money: a tall hourglass beside the table, sticky while you read */
+.money-grid { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 32px; align-items: start; }
 .money-main { min-width: 0; }
-.scene.hourglass { width: 100%; height: 460px; border: 1px solid var(--hairline); border-radius: var(--r4); }
+.scene.hourglass { width: 100%; height: 820px; position: sticky; top: 64px; }
 
-/* shout beside the terminal (desktop only) */
-.term-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: center; }
-.scene.shout { width: 100%; height: 160px; border: 1px solid var(--hairline); border-radius: var(--r4); }
+/* ledger: the spine runs across the whole top of the section, big */
+#ledger { padding-top: 360px; }
+.scene.spine-band { position: absolute; top: 40px; left: 0; right: 0; width: 100%; height: 300px; opacity: 1; z-index: 0; }
+
+/* terminal: the shouting skull is as tall as the terminal */
+.term-grid { display: grid; grid-template-columns: minmax(0, 1fr) 460px; gap: 24px; align-items: stretch; }
+.scene.shout { width: 100%; height: 100%; min-height: 460px; }
 .term.docked ~ .scene.shout { display: none; }
 
-/* crossed bones, a low-contrast band across the top of the footer */
+/* footer: crossed bones as a real band */
 .foot { padding-top: 0; }
-.scene.bones { width: 100%; height: 84px; border-bottom: 1px solid var(--hairline); opacity: 0.35; }
+.scene.bones { width: 100%; height: 240px; border-bottom: 1px solid var(--hairline); opacity: 0.85; }
 .foot-inner { padding-top: 30px; }
 
 /* scrolling 1-row ASCII dividers (CSS only) */
@@ -738,15 +746,19 @@ legend { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; col
 
 @media (max-width: 980px) {
   .money-grid { grid-template-columns: 1fr; }
-  .scene.hourglass { height: 260px; }
+  .scene.hourglass { height: 520px; position: static; }
   .term-grid { grid-template-columns: 1fr; }
-  .scene.shout { display: none; }
+  .scene.shout { min-height: 320px; height: 320px; }
+  .scene.hand-band { position: relative; width: 100%; height: 360px; }
+  #trades { min-height: 0; }
 }
 @media (max-width: 640px) {
-  .scene.hand-band { height: 200px; opacity: 0.35; }
-  .scene.spine-band { height: 120px; }
-  .scene.bones { height: 64px; }
-  .card-portrait { height: 260px; }
+  .scene.hand-band { height: 260px; }
+  #ledger { padding-top: 220px; }
+  .scene.spine-band { height: 180px; }
+  .scene.bones { height: 140px; }
+  .card-portrait { height: 420px; }
+  .scene.hourglass { height: 440px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
