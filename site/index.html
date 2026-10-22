@@ -27,7 +27,7 @@
   <meta name="twitter:image" content="https://nocontentinhere4-art.github.io/entity-enclave/og.jpg">
   <link rel="canonical" href="https://nocontentinhere4-art.github.io/entity-enclave/">
   <meta name="theme-color" content="#060606">
-  <link rel="stylesheet" href="./site.css?v=18">
+  <link rel="stylesheet" href="./site.css?v=19">
 </head>
 <body>
 
@@ -89,12 +89,12 @@
           </tbody>
         </table>
         <p class="fee">Fee when live: 1% open + 1% close.</p>
-        <div class="notlive" role="note">
+        <div class="notlive" role="note" id="trades-notlive">
           <span class="notlive-tag">NOT LIVE YET</span>
           <p>Do not send a <code>buy</code> memo today: it is read as a paid question and buys one hour, nothing else. No trade opens, no ZEC comes back. This section turns on when the first order appears in the book below.</p>
         </div>
         <div class="book" id="book"></div>
-        <span class="btn fill is-off" aria-disabled="true">Open a trade · not live yet</span>
+        <button class="btn fill is-off" id="trade-open-btn" type="button" disabled aria-disabled="true" data-open-trade>Open a trade · not live yet</button>
       </div>
     </section>
 
@@ -286,6 +286,64 @@
     </form>
   </dialog>
 
-  <script type="module" src="./app.js?v=18"></script>
+  <!-- open a trade dialog -->
+  <dialog class="trade" id="trade" aria-labelledby="trade-h">
+    <form method="dialog" class="trade-form" id="trade-form">
+      <div class="trade-head">
+        <h2 id="trade-h">Open a trade</h2>
+        <button class="x" type="submit" aria-label="close">×</button>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="trade mode">
+        <button class="tab is-active" type="button" role="tab" aria-selected="true" data-trade-tab="buy">BUY</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-trade-tab="sell">SELL</button>
+      </div>
+
+      <fieldset class="seg" id="trade-who"><legend>entity</legend></fieldset>
+
+      <div class="trade-panel" data-trade-panel="buy">
+        <label class="trade-field"><span>amount in ZEC <span class="dim" id="trade-range"></span></span>
+          <input id="trade-amount" type="number" inputmode="decimal" min="0.1" step="0.0001" value="0.1"></label>
+        <label class="trade-field"><span>token · ticker or Solana mint</span>
+          <input id="trade-token" type="text" spellcheck="false" autocapitalize="off" placeholder="$TICKER or mint"></label>
+        <div class="trade-chips" id="trade-chips" aria-label="quick-pick tickers"></div>
+        <div class="trade-row">
+          <label class="trade-field"><span>target %</span><input id="trade-target" type="number" inputmode="decimal" min="0" max="1000" step="0.1" placeholder="e.g. 20"></label>
+          <label class="trade-field"><span>stop %</span><input id="trade-stop" type="number" inputmode="decimal" min="0" max="90" step="0.1" placeholder="e.g. 10"></label>
+        </div>
+        <label class="trade-field"><span>return address · shielded u1…/zs1…</span>
+          <input id="trade-return" type="text" spellcheck="false" autocapitalize="off" placeholder="u1…"></label>
+        <div class="trade-memo"><span>memo <span class="dim" id="trade-bytes">0 / 512 bytes</span></span>
+          <code id="trade-memo-text">buy …</code></div>
+      </div>
+
+      <div class="trade-panel" data-trade-panel="sell" hidden>
+        <label class="trade-field"><span>orderId</span>
+          <input id="trade-orderid" type="text" spellcheck="false" autocapitalize="off" placeholder="o + 16 hex"></label>
+        <label class="trade-field"><span>key · optional, 6 hex</span>
+          <input id="trade-key" type="text" spellcheck="false" autocapitalize="off" placeholder="6 hex"></label>
+        <div class="trade-memo"><span>memo <span class="dim" id="trade-bytes-sell">0 / 512 bytes</span></span>
+          <code id="trade-memo-sell">sell …</code></div>
+        <p class="trade-note">amount 0.0001 ZEC (10,000 zats) — the smallest value that carries a memo.</p>
+      </div>
+
+      <div class="notlive trade-notlive" id="trade-notlive" role="note" hidden>
+        <span class="notlive-tag">NOT LIVE YET</span>
+        <p>Do not send a <code>buy</code> memo to this entity today: it is read as a paid question and buys one hour, nothing else. No trade opens, no ZEC comes back.</p>
+      </div>
+
+      <div class="trade-out" id="trade-out" hidden>
+        <div class="qr" id="trade-qr" aria-live="polite"></div>
+        <div class="trade-actions">
+          <a class="btn fill" id="trade-open" href="#" rel="noopener">Open in Zcash wallet <span class="arr" aria-hidden="true">↗</span></a>
+          <button class="btn ghost" type="button" id="trade-copy">Copy payment link</button>
+        </div>
+      </div>
+      <p class="addr" id="trade-addr"></p>
+      <p class="trade-help">You send ZEC shielded. The entity opens one Solana wallet for this order only, buys, closes on your sell memo or on target/stop, and sends ZEC back shielded to your return address. Fee 1% open + 1% close.</p>
+    </form>
+  </dialog>
+
+  <script type="module" src="./app.js?v=19"></script>
 </body>
 </html>

@@ -10,12 +10,13 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=18';
+} from './term.js?v=19';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS,
-} from './data.js?v=18';
-import { initHero, setMouth, triggerTalk } from './hero.js?v=18';
+} from './data.js?v=19';
+import { zip321Uri, qrSvg } from './qr.js?v=19';
+import { initHero, setMouth, triggerTalk } from './hero.js?v=19';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -331,6 +332,366 @@ function renderMoney() {
 }
 
 /* ------------------------------------------------------------------ */
+/* trade dialog (BUY | SELL memo → ZIP-321)                            */
+/* ------------------------------------------------------------------ */
+const TRADE_MEMO_MAX = 512;    // Zcash memo field, bytes
+const TRADE_MIN_ZEC = 0.1;     // engine default minZats 10_000_000
+const TRADE_MAX_ZEC = 1;       // fallback max; /trades may override
+const SELL_ZATS = 10_000;      // sell memo amount: no engine minimum, so 10k zats
+
+const tradeState = {
+  mode: 'buy',
+  who: 'e1',
+  checking: { e1: false, e2: false },
+  maxZec: { e1: TRADE_MAX_ZEC, e2: TRADE_MAX_ZEC },
+};
+
+/* -- client-side parity with enclave/src/trade/address.mjs -- */
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+function base58Bytes(s) {
+  let zeros = 0;
+  while (zeros < s.length && s[zeros] === '1') zeros++;
+  let n = 0n;
+  for (const c of s) {
+    const v = B58.indexOf(c);
+    if (v < 0) throw new Error('bad base58');
+    n = n * 58n + BigInt(v);
+  }
+  const out = [];
+  while (n > 0n) { out.push(Number(n & 0xffn)); n >>= 8n; }
+  out.reverse();
+  return new Uint8Array([...new Array(zeros).fill(0), ...out]);
+}
+function isValidMint(s) {
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s)) return false;
+  try { return base58Bytes(s).length === 32; } catch { return false; }
+}
+
+const B32 = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+const B32_GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+const BECH32_CONST = 1;
+const BECH32M_CONST = 0x2bc830a3;
+function bech32Polymod(values) {
+  let chk = 1;
+  for (const v of values) {
+    const top = chk >>> 25;
+    chk = ((chk & 0x1ffffff) << 5) ^ v;
+    for (let i = 0; i < 5; i++) if ((top >>> i) & 1) chk ^= B32_GEN[i];
+  }
+  return chk >>> 0;
+}
+function hrpExpand(hrp) {
+  const out = [];
+  for (const c of hrp) out.push(c.charCodeAt(0) >>> 5);
+  out.push(0);
+  for (const c of hrp) out.push(c.charCodeAt(0) & 31);
+  return out;
+}
+function addressKind(s) {
+  if (/^u1[0-9a-z]+$/.test(s.toLowerCase())) return 'unified';
+  if (/^zs1[0-9a-z]+$/.test(s.toLowerCase())) return 'sapling';
+  if (/^t[0-9a-zA-Z]{20,}$/.test(s)) return 'transparent';
+  return 'unknown';
+}
+function validateZcashAddress(s) {
+  const kind = addressKind(s);
+  if (kind === 'unknown') return { ok: false, kind };
+  if (kind === 'transparent') return { ok: true, kind };
+  let decoded;
+  try {
+    const raw = String(s ?? '');
+    if (!raw) return { ok: false, kind };
+    if (raw.length > 1023) return { ok: false, kind };
+    if (raw !== raw.toLowerCase() && raw !== raw.toUpperCase()) return { ok: false, kind };
+    const norm = raw.toLowerCase();
+    const pos = norm.lastIndexOf('1');
+    if (pos < 1 || pos + 7 > norm.length) throw new Error('separator');
+    const hrp = norm.slice(0, pos);
+    const words = [];
+    for (const c of norm.slice(pos + 1)) {
+      const v = B32.indexOf(c);
+      if (v < 0) throw new Error('char');
+      words.push(v);
+    }
+    const constant = bech32Polymod([...hrpExpand(hrp), ...words]);
+    if (constant !== BECH32_CONST && constant !== BECH32M_CONST) throw new Error('checksum');
+    decoded = { hrp, words: words.slice(0, -6), constant };
+  } catch { return { ok: false, kind }; }
+  if (kind === 'unified') {
+    if (decoded.hrp !== 'u' || decoded.constant !== BECH32M_CONST) return { ok: false, kind };
+    if (decoded.words.length < 16) return { ok: false, kind };
+  } else {
+    if (decoded.hrp !== 'zs' || decoded.constant !== BECH32_CONST) return { ok: false, kind };
+    if (decoded.words.length < 60) return { ok: false, kind };
+  }
+  return { ok: true, kind };
+}
+function validateReturnAddress(s) {
+  const v = validateZcashAddress(s);
+  if (!v.ok) return v;
+  if (v.kind === 'transparent') return { ok: false, kind: v.kind };
+  if (v.kind !== 'unified' && v.kind !== 'sapling') return { ok: false, kind: v.kind };
+  return v;
+}
+
+/* -- live gate: /trades answers with enabled:true ⇔ live -- */
+function isTradeLive(id) {
+  const c = tradesCache[id];
+  return Boolean(c && c.ok && !c.notFound && c.data && c.data.enabled === true);
+}
+
+async function checkTradeLive(id) {
+  const d = ent(id);
+  tradeState.checking[id] = true;
+  renderTrade();
+  if (d && d.base) {
+    const r = await request(d.base, '/trades', { allow404: true });
+    tradesCache[id] = r;
+    const data = (r && r.ok && !r.notFound && r.data && typeof r.data === 'object') ? r.data : null;
+    if (data) {
+      const maxZats = Number(data.maxZats ?? (data.limits && data.limits.maxZats));
+      if (Number.isFinite(maxZats) && maxZats > 0) tradeState.maxZec[id] = maxZats / 1e8;
+    }
+  } else {
+    tradesCache[id] = { ok: false, notFound: true };
+  }
+  tradeState.checking[id] = false;
+  renderTrade();
+  renderTradeGate();
+}
+
+/* -- memo builders (canonical strings mirroring orders.mjs parseBuy/parseSell) -- */
+function buildBuyMemo() {
+  const token = ($('#trade-token').value || '').trim();
+  const targetRaw = ($('#trade-target').value || '').trim();
+  const stopRaw = ($('#trade-stop').value || '').trim();
+  const ret = ($('#trade-return').value || '').trim();
+  let err = null;
+
+  const asset = token.startsWith('$') ? token.slice(1) : token;
+  if (!token) err = 'buy needs a mint or ticker';
+  else if (!asset) err = 'empty ticker';
+  else if (!isValidMint(asset) && !/^[A-Za-z0-9._-]{1,20}$/.test(asset)) err = 'invalid ticker or mint';
+
+  let targetPct = null;
+  if (targetRaw !== '') {
+    const n = Number(targetRaw);
+    if (!Number.isFinite(n) || !(n > 0 && n <= 1000)) { if (!err) err = 'target must be >0 and ≤1000'; }
+    else targetPct = n;
+  }
+  let stopPct = null;
+  if (stopRaw !== '') {
+    const n = Number(stopRaw);
+    const mag = Math.abs(n);
+    if (!Number.isFinite(n) || !(mag > 0 && mag <= 90)) { if (!err) err = 'stop must be >0 and ≤90'; }
+    else stopPct = mag;
+  }
+  if (!ret) { if (!err) err = 'return needs a shielded u1/zs1 address'; }
+  else if (!validateReturnAddress(ret).ok) { if (!err) err = 'return must be a shielded u1/zs1 address'; }
+  if (err) return { memo: null, err };
+
+  let memo = `buy ${token}`;
+  if (targetPct != null) memo += ` target +${targetPct}%`;
+  if (stopPct != null) memo += ` stop -${stopPct}%`;
+  memo += ` return ${ret}`;
+  return { memo, err: null };
+}
+
+function buildSellMemo() {
+  const orderId = ($('#trade-orderid').value || '').trim().toLowerCase();
+  const key = ($('#trade-key').value || '').trim().toLowerCase();
+  let err = null;
+  if (!orderId) err = 'sell needs an orderId';
+  else if (!/^o[0-9a-f]{16}$/.test(orderId)) err = 'invalid orderId (o + 16 hex)';
+  if (key && !/^[0-9a-f]{6}$/.test(key)) { if (!err) err = 'key must be 6 hex characters'; }
+  if (err) return { memo: null, err };
+  let memo = `sell ${orderId}`;
+  if (key) memo += ` key ${key}`;
+  return { memo, err: null };
+}
+
+function copyText(text, node) {
+  if (!text || !node) return;
+  const prev = node.textContent;
+  const done = (ok) => {
+    node.textContent = ok ? 'Copied' : 'Copy failed';
+    setTimeout(() => { node.textContent = prev; }, 1400);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => done(true), () => done(false));
+  } else {
+    done(false);
+  }
+}
+
+/* -- render -- */
+function renderTrade() {
+  const dlg = $('#trade');
+  if (!dlg || !dlg.open) return;
+  const who = tradeState.who;
+  const d = ent(who);
+  const checking = tradeState.checking[who] === true;
+  const live = !checking && isTradeLive(who);
+  const maxZec = tradeState.maxZec[who] ?? TRADE_MAX_ZEC;
+  const isBuy = tradeState.mode === 'buy';
+
+  $$('#trade [data-trade-tab]').forEach((b) => {
+    const on = b.dataset.tradeTab === tradeState.mode;
+    b.classList.toggle('is-active', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  const buyPanel = $('#trade [data-trade-panel="buy"]');
+  const sellPanel = $('#trade [data-trade-panel="sell"]');
+  if (buyPanel) buyPanel.hidden = !isBuy;
+  if (sellPanel) sellPanel.hidden = isBuy;
+
+  const range = $('#trade-range');
+  if (range) range.textContent = `min ${TRADE_MIN_ZEC} · max ${maxZec} ZEC`;
+  const amt = $('#trade-amount');
+  if (amt) { amt.min = String(TRADE_MIN_ZEC); amt.max = String(maxZec); }
+
+  let memo = null, err = null, amountZec = 0;
+  if (isBuy) {
+    const a = Number(amt ? amt.value : 0);
+    amountZec = a;
+    if (!Number.isFinite(a) || a < TRADE_MIN_ZEC || a > maxZec) err = `amount must be ${TRADE_MIN_ZEC}–${maxZec} ZEC`;
+    const b = buildBuyMemo();
+    if (b.err && !err) err = b.err;
+    memo = b.memo;
+  } else {
+    const s = buildSellMemo();
+    if (s.err) err = s.err;
+    memo = s.memo;
+    amountZec = SELL_ZATS / 1e8;
+  }
+
+  const bytes = memo ? new TextEncoder().encode(memo).length : 0;
+  const memoTextEl = isBuy ? $('#trade-memo-text') : $('#trade-memo-sell');
+  const bytesEl = isBuy ? $('#trade-bytes') : $('#trade-bytes-sell');
+  if (memoTextEl) memoTextEl.textContent = memo || '…';
+  if (bytesEl) bytesEl.textContent = `${bytes} / ${TRADE_MEMO_MAX} bytes`;
+  const memoBox = memoTextEl ? memoTextEl.closest('.trade-memo') : null;
+  if (memoBox) memoBox.classList.toggle('over', bytes > TRADE_MEMO_MAX);
+  if (bytes > TRADE_MEMO_MAX && !err) err = `memo is ${bytes} bytes, over the ${TRADE_MEMO_MAX}-byte Zcash limit`;
+
+  const notlive = $('#trade-notlive');
+  const out = $('#trade-out');
+  const qr = $('#trade-qr');
+  const open = $('#trade-open');
+  const copyBtn = $('#trade-copy');
+  const addrEl = $('#trade-addr');
+  if (addrEl) addrEl.textContent = (d && d.address) ? `${ename(who)}'s shielded address: ${d.address}` : '';
+
+  const disable = () => {
+    open.removeAttribute('href');
+    open.classList.add('is-off');
+    open.setAttribute('aria-disabled', 'true');
+    copyBtn.disabled = true;
+    copyBtn.classList.add('is-off');
+  };
+  const enable = (uri) => {
+    open.href = uri;
+    open.classList.remove('is-off');
+    open.removeAttribute('aria-disabled');
+    copyBtn.disabled = false;
+    copyBtn.classList.remove('is-off');
+    copyBtn.onclick = (ev) => uri && copyText(uri, ev.target);
+  };
+
+  if (checking) {
+    notlive.hidden = true;
+    out.hidden = true;
+    disable();
+    return;
+  }
+  if (!live) {
+    notlive.hidden = false;
+    out.hidden = true;
+    disable();
+    qr.replaceChildren(el('p', { class: 'err' }, 'Trades are not live on this entity.'));
+    return;
+  }
+  notlive.hidden = true;
+  if (err || !memo || !d || !d.address) {
+    out.hidden = false;
+    disable();
+    qr.replaceChildren(el('p', { class: 'err' }, err || 'no address published by this enclave right now'));
+    return;
+  }
+  out.hidden = false;
+  let uri = '';
+  try {
+    uri = zip321Uri(d.address, memo, amountZec);
+    qr.innerHTML = qrSvg(uri, { ecLevel: 'M', ariaLabel: `open trade with ${ename(who)}` });
+    enable(uri);
+  } catch (qrerr) {
+    disable();
+    qr.replaceChildren(el('p', { class: 'err' }, (qrerr && qrerr.message) ? qrerr.message : 'QR error'));
+  }
+}
+
+function openTrade({ who = null } = {}) {
+  const dlg = $('#trade');
+  if (!dlg) return;
+  const ids = list().map((d) => d.id);
+  if (!who) who = ids.find((id) => isTradeLive(id)) || tradeState.who || (ids[0] || 'e1');
+  tradeState.who = who;
+  tradeState.mode = 'buy';
+  $('#trade-who').replaceChildren(
+    el('legend', {}, 'entity'),
+    ...list().map((d) => el('label', { class: 'seg-item' },
+      el('input', { type: 'radio', name: 'trade-who', value: d.id, ...(d.id === tradeState.who ? { checked: '' } : {}), ...(d.state === 'dead' ? { disabled: '' } : {}), onchange: () => { tradeState.who = d.id; void checkTradeLive(d.id); } }),
+      el('span', {}, `${nameOf(d)} · ${stateWord(d)}`))));
+  if (!dlg.open) dlg.showModal();
+  void checkTradeLive(tradeState.who);
+  const tok = $('#trade-token');
+  if (tok) tok.focus({ preventScroll: true });
+}
+
+/* -- trades section: NOT LIVE YET box + button switch per entity -- */
+function renderTradeGate() {
+  const btn = $('#trade-open-btn');
+  const note = $('#trades-notlive');
+  if (!btn) return;
+  const anyLive = ['e1', 'e2'].some((id) => isTradeLive(id));
+  if (anyLive) {
+    btn.disabled = false;
+    btn.classList.remove('is-off');
+    btn.removeAttribute('aria-disabled');
+    btn.textContent = 'Open a trade';
+    if (note) note.hidden = true;
+  } else {
+    btn.disabled = true;
+    btn.classList.add('is-off');
+    btn.setAttribute('aria-disabled', 'true');
+    btn.textContent = 'Open a trade · not live yet';
+    if (note) note.hidden = false;
+  }
+}
+
+function wireTradeForm() {
+  const dlg = $('#trade');
+  const form = $('#trade-form');
+  if (!dlg || !form) return;
+  form.addEventListener('submit', (e) => {
+    if (!(e.submitter && e.submitter.matches('.x'))) e.preventDefault();
+  });
+  $$('#trade [data-trade-tab]').forEach((b) => b.addEventListener('click', () => {
+    tradeState.mode = b.dataset.tradeTab;
+    renderTrade();
+  }));
+  for (const id of ['trade-amount', 'trade-token', 'trade-target', 'trade-stop', 'trade-return', 'trade-orderid', 'trade-key']) {
+    const n = $('#' + id);
+    if (n) n.addEventListener('input', renderTrade);
+  }
+  const chips = $('#trade-chips');
+  if (chips) {
+    chips.replaceChildren(...['SOL', 'USDC', 'JUP'].map((t) =>
+      el('button', { class: 'trade-chip', type: 'button', text: t, onclick: () => { const n = $('#trade-token'); if (n) { n.value = t; renderTrade(); } } })));
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* render: ledger (last 40, interleaved)                               */
 /* ------------------------------------------------------------------ */
 const renderedLedger = new Set();
@@ -475,7 +836,7 @@ function wireNav() {
   }));
   $$('[data-open-trade]').forEach((n) => n.addEventListener('click', (ev) => {
     ev.preventDefault();
-    openPay({ who: 'e1', prefill: 'buy ' });
+    openTrade({});
   }));
   $$('#nav-term, .term-dock').forEach((n) => n.addEventListener('click', () => {
     const term = $('#term');
@@ -514,6 +875,7 @@ function renderAll() {
   renderMoney();
   renderLedger();
   renderFooter();
+  renderTradeGate();
 }
 
 /* ------------------------------------------------------------------ */
@@ -522,6 +884,7 @@ function renderAll() {
 async function init() {
   wireTerm();
   wireNav();
+  wireTradeForm();
 
   const grid = $('#entity-grid');
   grid.replaceChildren(panelShell('e1'), panelShell('e2'));
