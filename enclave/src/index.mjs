@@ -22,6 +22,7 @@ import { Orders, ordersView, PAYWALL_MEMO_FORMAT } from './orders/book.mjs';
 import { Inference } from './llm/infer.mjs';
 import { Tools } from './tools/registry.mjs';
 import { Life } from './life/loop.mjs';
+import { Replier } from './life/reply.mjs';
 import { Jobs } from './life/jobs.mjs';
 import { Market } from './economy/market.mjs';
 import { Forecasts } from './economy/forecasts.mjs';
@@ -139,6 +140,9 @@ async function readLetters() {
     }
     inbox.push({ at: t.datetime, zats: t.value, text, orderId: order?.id ?? null });
     if (inbox.length > 20) inbox.shift();
+    // A paid letter is answered instantly too (fuller, marked paid) — outside the normal loop. Trade orders
+    // (`buy …` / `sell …`) are NOT letters to answer: their memo carries the client's return address.
+    if (!/^\s*(buy|sell)\b/i.test(text)) replier.enqueue({ seq: letterEntry.seq, author: null, text, paid: true });
   }
   if (changed) { mem.seenTxids = [...seen].slice(-500); await memory.save(mem); }
 }
@@ -267,6 +271,9 @@ config.peerFeed = async () => {
 const tools = new Tools({ ledger, wallet, memory, pricing, keys, config, channels: { public: 'public' }, promises, nostr, forecasts, market, pages, orders, trades });
 
 const life = new Life({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused, jobs, orders, trades });
+// Instant replies answer the public channel and paid letters within seconds, independent of the think/act loop.
+const replier = new Replier({ config, ledger, memory, pricing, rent, charter, treasury: () => life.lastBalance, now: Date.now });
+life.replier = replier;
 life.start();
 void syncWallet();
 void probeProviders();
@@ -297,7 +304,9 @@ function acceptHumanMessage(source, body) {
   if (now - (lastBySource.get(source) ?? 0) < HUMAN_MSG.perSourceMs) return { code: 429, error: 'one message per minute' };
   lastBySource.set(source, now); globalWindow.n++;
   if (lastBySource.size > 10_000) lastBySource.clear();
-  return { code: 201, entry: ledger.append('human_message', { author: author || 'anonymous', text }) };
+  const entry = ledger.append('human_message', { author: author || 'anonymous', text });
+  replier.enqueue({ seq: entry.seq, author: entry.data.author, text: entry.data.text, paid: false });
+  return { code: 201, entry };
 }
 const readBody = (req, max = 4096) => new Promise((resolve, reject) => {
   let buf = ''; req.on('data', (d) => { buf += d; if (buf.length > max) { reject(Object.assign(new Error('body too large'), { code: 413 })); req.destroy(); } });
@@ -330,6 +339,7 @@ http.createServer(async (req, res) => {
         keys: { sign: keys.signPublicKey, box: keys.boxPublicKey },
         zcash: { chain: config.zcashChain, address, balance: life.lastBalance, error: walletError },
         nostr: { npub: nostr.npub, pubkey: nostr.pubkey },
+        reply: replier.status(),
         peer: config.peerUrl,
         lineage: { parent: config.parentUrl, children: ledger.recent(['birth_of'], 1000).map((e) => ({ url: e.data?.url, address: e.data?.address, ts: e.ts })) },
         ledger: { entries: ledger.seq, head: ledger.head },

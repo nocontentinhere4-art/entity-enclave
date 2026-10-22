@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=28';
+} from './term.js?v=29';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
-  REFRESH_MS, sha256Hex, parseLedger,
-} from './data.js?v=28';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=28';
-import { initHero, setMouth, triggerTalk } from './hero.js?v=28';
-import { mountAscii, RAMP } from './ascii.js?v=28';
+  REFRESH_MS, sha256Hex, parseLedger, postMessage,
+} from './data.js?v=29';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=29';
+import { initHero, setMouth, triggerTalk } from './hero.js?v=29';
+import { mountAscii, RAMP } from './ascii.js?v=29';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -1368,6 +1368,231 @@ function wireNav() {
 }
 
 /* ------------------------------------------------------------------ */
+/* public channel (chat)                                               */
+/* ------------------------------------------------------------------ */
+const CHAT_MAX = 120;
+const CHAT_POLL_MS = 8000;
+const chat = { who: 'e1', waiting: new Map(), flashUntil: new Map(), sending: false, timer: null };
+
+/* Escape-free linkify: splits raw text on http(s) URLs and builds anchors with
+ * textContent/setAttribute, so message text is never parsed as HTML. */
+function linkifyText(raw) {
+  const s = String(raw);
+  const frag = document.createDocumentFragment();
+  const re = /(https?:\/\/[^\s<>"']+)/gi;
+  let last = 0;
+  let m;
+  while ((m = re.exec(s)) !== null) {
+    if (m.index > last) frag.append(document.createTextNode(s.slice(last, m.index)));
+    let url = m[0];
+    let trail = '';
+    while (/[.,;:!?)\]}>]+$/.test(url)) { trail = url.slice(-1) + trail; url = url.slice(0, -1); }
+    const a = document.createElement('a');
+    a.setAttribute('href', url);
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = url;
+    frag.append(a);
+    if (trail) frag.append(document.createTextNode(trail));
+    last = re.lastIndex;
+  }
+  if (last < s.length) frag.append(document.createTextNode(s.slice(last)));
+  return frag;
+}
+
+function normalizePost(id, p) {
+  if (!p || typeof p !== 'object') return null;
+  const rawReplyTo = Array.isArray(p.replyTo) ? p.replyTo : (p.data && Array.isArray(p.data.replyTo) ? p.data.replyTo : []);
+  const replyTo = rawReplyTo.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0);
+  const isReply = p.kind === 'reply' || (p.data && p.data.kind === 'reply') || replyTo.length > 0;
+  return {
+    id, seq: Number(p.seq) || 0, ts: p.ts || null, from: stringOf(p.from),
+    text: stringOf(p.text), author: p.author ? stringOf(p.author) : null,
+    replyTo, isReply,
+  };
+}
+
+function chatEntries() {
+  const rows = [];
+  for (const id of ['e1', 'e2']) {
+    const d = ent(id);
+    if (!d || !Array.isArray(d.posts)) continue;
+    for (const p of d.posts) {
+      const n = normalizePost(id, p);
+      if (n && n.seq) rows.push(n);
+    }
+  }
+  rows.sort((a, b) => Date.parse(a.ts || 0) - Date.parse(b.ts || 0) || a.seq - b.seq);
+  return rows;
+}
+
+function messageEl(r, isReply = false) {
+  const isEntity = r.from === 'entity';
+  const author = isEntity ? ename(r.id) : (r.author || 'anonymous');
+  const t = r.ts ? hhmm(r.ts) : null;
+  const flash = (chat.flashUntil.get(r.seq) || 0) > Date.now();
+  const node = el('div', { class: 'msg' + (isReply ? ' reply' : '') + (flash ? ' flash' : '') },
+    el('div', { class: 'msg-head' },
+      el('span', { class: 'msg-author ' + (isEntity ? 'entity' : 'human') }, author),
+      el('span', { class: 'msg-time' }, t ? `${t} UTC` : '—')));
+  const textEl = el('div', { class: 'msg-text' });
+  textEl.append(linkifyText(r.text));
+  node.append(textEl);
+  if (chat.waiting.has(r.seq)) {
+    node.append(el('div', { class: 'msg-waiting' },
+      el('span', { class: 'spinner' }),
+      el('span', {}, 'waiting for an answer…')));
+  }
+  return node;
+}
+
+function renderChat() {
+  const feed = $('#chat-feed');
+  if (!feed) return;
+  const nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 48;
+  const all = chatEntries().slice(-CHAT_MAX);
+  const bySeq = new Map();
+  for (const r of all) bySeq.set(r.seq, r);
+
+  // A reply that answers one of our own messages ends its "waiting" state and flashes once.
+  for (const r of all) {
+    if (!r.isReply) continue;
+    let answered = false;
+    for (const s of r.replyTo) if (chat.waiting.delete(s)) answered = true;
+    if (answered && !chat.flashUntil.has(r.seq)) chat.flashUntil.set(r.seq, Date.now() + 2600);
+  }
+  if (chat.flashUntil.size > 50) {
+    const now = Date.now();
+    for (const [k, v] of chat.flashUntil) if (v < now) chat.flashUntil.delete(k);
+  }
+
+  if (!all.length) {
+    feed.replaceChildren(el('p', { class: 'empty' }, 'No messages yet. Say something public.'));
+    return;
+  }
+
+  const top = [];
+  const replyMap = new Map();
+  for (const r of all) {
+    if (!r.isReply) { top.push(r); continue; }
+    const parent = r.replyTo.find((s) => bySeq.has(s));
+    if (parent == null) { top.push(r); continue; }
+    if (!replyMap.has(parent)) replyMap.set(parent, []);
+    replyMap.get(parent).push(r);
+  }
+
+  const frag = document.createDocumentFragment();
+  for (const r of top) {
+    frag.append(messageEl(r, false));
+    for (const k of (replyMap.get(r.seq) || [])) frag.append(messageEl(k, true));
+  }
+  feed.replaceChildren(frag);
+  if (nearBottom) feed.scrollTop = feed.scrollHeight;
+}
+
+function renderChatTo() {
+  const set = $('#chat-to');
+  if (!set) return;
+  set.replaceChildren(el('legend', {}, 'to'),
+    ...['e1', 'e2'].map((id) => {
+      const d = ent(id);
+      const disabled = !d || !d.base || d.state === 'dead';
+      return el('label', { class: 'seg-item' },
+        el('input', { type: 'radio', name: 'chat-to', value: id, ...(chat.who === id ? { checked: '' } : {}), ...(disabled ? { disabled: '' } : {}), onchange: () => { chat.who = id; } }),
+        el('span', {}, ename(id)));
+    }));
+}
+
+function renderChatCounter() {
+  const ta = $('#chat-text');
+  const count = $('#chat-count');
+  if (!ta || !count) return;
+  count.textContent = `${ta.value.length} / 500`;
+}
+
+function setChatStatus(text, kind = '') {
+  const node = $('#chat-status');
+  if (!node) return;
+  node.textContent = text;
+  node.className = 'chat-status' + (kind ? ' ' + kind : '');
+}
+
+function chatError(r) {
+  if (r.status === 429) {
+    const e = (r.error || '').toLowerCase();
+    return e.includes('one message per minute') ? 'one message per minute' : 'channel busy, try later';
+  }
+  if (r.status === 413) return 'too long';
+  return r.error || `HTTP ${r.status}`;
+}
+
+async function sendChat() {
+  if (chat.sending) return;
+  const ta = $('#chat-text');
+  const nameIn = $('#chat-name');
+  const btn = $('#chat-send');
+  const d = ent(chat.who);
+  if (!d || !d.base) { setChatStatus('no endpoint for this entity', 'err'); return; }
+  const text = (ta.value || '').trim();
+  if (!text) { setChatStatus('write something first', 'err'); return; }
+  if (text.length > 500) { setChatStatus('too long', 'err'); return; }
+  const author = (nameIn.value || '').trim().slice(0, 40) || 'anonymous';
+
+  chat.sending = true;
+  btn.disabled = true;
+  setChatStatus('sending…');
+  const r = await postMessage(d.base, { author, text });
+  chat.sending = false;
+  btn.disabled = false;
+
+  if (r.ok) {
+    const seq = r.data && Number(r.data.seq);
+    setChatStatus(`Sent. ${ename(chat.who)} usually answers within a minute when awake or asleep; if the channel is busy it may take longer.`, 'ok');
+    if (seq) chat.waiting.set(seq, chat.who);
+    ta.value = '';
+    renderChatCounter();
+    void refreshChat();
+  } else {
+    setChatStatus(chatError(r), 'err');
+  }
+}
+
+async function refreshChat() {
+  if (document.hidden) return;
+  await Promise.all(['e1', 'e2'].map(async (id) => {
+    const d = ent(id);
+    if (!d || !d.base) return;
+    const r = await request(d.base, '/public-channel');
+    if (r.ok && Array.isArray(r.data)) d.posts = r.data;
+  }));
+  renderChat();
+}
+
+function startChatPoll() {
+  stopChatPoll();
+  chat.timer = setInterval(() => { void refreshChat(); }, CHAT_POLL_MS);
+}
+function stopChatPoll() {
+  if (chat.timer) { clearInterval(chat.timer); chat.timer = null; }
+}
+
+function wireChat() {
+  const form = $('#chat-composer');
+  const ta = $('#chat-text');
+  if (form) form.addEventListener('submit', (e) => { e.preventDefault(); void sendChat(); });
+  if (ta) {
+    ta.addEventListener('input', renderChatCounter);
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendChat(); }
+    });
+  }
+  const prio = $('#chat-priority');
+  if (prio) prio.addEventListener('click', () => openPay({ who: chat.who, hours: 1 }));
+  renderChatCounter();
+  renderChatTo();
+}
+
+/* ------------------------------------------------------------------ */
 /* refresh                                                             */
 /* ------------------------------------------------------------------ */
 async function refreshLight() {
@@ -1397,6 +1622,8 @@ function renderAll() {
   renderLedger();
   renderFooter();
   renderTradeGate();
+  renderChat();
+  renderChatTo();
   syncScenes();
 }
 
@@ -1661,6 +1888,7 @@ async function init() {
   wireNav();
   wireTradeForm();
   wireMyTrades();
+  wireChat();
 
   const grid = $('#entity-grid');
   grid.replaceChildren(panelShell('e1'), panelShell('e2'));
@@ -1680,6 +1908,7 @@ async function init() {
   await Promise.allSettled([loadTrades(), loadForecasts()]);
   renderAll();
   syncMouths();
+  startChatPoll();
 
   setInterval(refreshLight, REFRESH_MS);
   setInterval(refreshFull, REFRESH_MS * 5);

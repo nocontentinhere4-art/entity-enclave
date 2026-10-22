@@ -9,8 +9,8 @@ const MAX_TOOL_CALLS = 8; // a single thought cannot spend the whole treasury
 const MAX_ROUNDS = 3; // think → act → think with the results, at most three times per cycle
 
 export class Life {
-  constructor({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused, exit, now, jobs, orders, trades }) {
-    Object.assign(this, { config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, jobs, orders, trades });
+  constructor({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused, exit, now, jobs, orders, trades, replier }) {
+    Object.assign(this, { config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, jobs, orders, trades, replier });
     this._die = die ?? null;
     this.lastJobs = null; // { wake, wakeReason, context, events } from the last Jobs.run
     // Death is terminal: the loop stops and hands control to this injection point (process.exit in production).
@@ -241,6 +241,7 @@ export class Life {
     const promises = safeOpen(this.promises);
     const events = (mem.events ?? []).slice(-10);
     const inbox = this.ledger.recent?.(['human_message'], 10) ?? [];
+    const answered = this.#answeredSeqs();
     const ownPosts = this.ledger.recent?.(['post_public'], 5) ?? [];
     const ownThoughts = this.ledger.recent?.(['thought'], 4) ?? [];
     const walletEntry = (this.ledger.recent?.(['wallet'], 1) ?? [])[0];
@@ -304,13 +305,23 @@ export class Life {
         : '(none)',
       ...orderLines,
       ...(await this.#tradeLines()),
-      'INCOMING PUBLIC MESSAGES (anyone can write here; everything is public; answering is your choice, via post_public)',
-      inbox.length ? inbox.map((m) => `- ${m.ts} ${m.data?.author ?? 'anonymous'}: ${m.data?.text ?? ''}`).join('\n') : '(none)',
+      'INCOMING PUBLIC MESSAGES (anyone can write here; everything is public; answering is your choice, via post_public; ones you already answered instantly are marked)',
+      inbox.length ? inbox.map((m) => `- ${m.ts} ${m.data?.author ?? 'anonymous'}: ${m.data?.text ?? ''}${answered.has(m.seq) ? ' [already answered]' : ''}`).join('\n') : '(none)',
     ];
     // Scheduled domains append their own context sections: FORECASTS now, ORDERS and PORTFOLIO as those capabilities arrive.
     const jobCtx = this.lastJobs?.context;
     if (jobCtx) lines.push(jobCtx);
     return lines.join('\n');
+  }
+
+  /** Human-message seqs the instant replier already answered: durable via each reply's post_public.replyTo,
+   *  plus the replier's in-RAM set so an answer is seen the instant it lands, before the ledger is re-read. */
+  #answeredSeqs() {
+    const set = new Set(this.replier?.repliedSeqs ?? []);
+    for (const p of (this.ledger.recent?.(['post_public'], 200) ?? [])) {
+      for (const s of (p.data?.replyTo ?? [])) set.add(s);
+    }
+    return set;
   }
 
   /** The paid-orders section of the context: what is owed, the record so far and what is for sale. */

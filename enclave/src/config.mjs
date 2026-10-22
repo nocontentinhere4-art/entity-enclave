@@ -113,6 +113,16 @@ export const config = {
   pagesAllowHtml: bool(process.env.PAGES_ALLOW_HTML, true),
   pagesHistoryMax: num(process.env.PAGES_HISTORY_MAX, 50),
   pagesSlugMax: num(process.env.PAGES_SLUG_MAX, 40),
+  // Instant replies: when a human posts on the public channel or a paid letter arrives, the entity answers
+  // publicly within seconds without a full think/act cycle. Caps keep it bounded; free messages stop being
+  // answered instantly once the treasury drops below minHoursLeft of rent (paid letters always answer).
+  reply: {
+    enabled: bool(process.env.REPLY_ENABLED, true),
+    debounceMs: num(process.env.REPLY_DEBOUNCE_MS, 8000),
+    maxPerHour: num(process.env.REPLY_MAX_PER_HOUR, 40),
+    minHoursLeft: num(process.env.REPLY_MIN_HOURS_LEFT, 24),
+    maxBatch: num(process.env.REPLY_MAX_BATCH, 6),
+  },
   // Trading (capability T): the ONE-TRADE WALLETS engine. Fully automatic once opted in: order execution
   // is code (target/stop/deadline/client-sell), never the LLM. Disabled by default — no store, no scheduler.
   trade: {
