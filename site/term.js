@@ -1,10 +1,9 @@
 /*
- * term.js — ZEALOT v15, the terminal. The only way to read and to speak.
+ * term.js — ZEALOT v16, the terminal. The only way to read and to speak.
  *
- * One fixed panel at the bottom: a boot sequence typed from live reads of the two enclaves, a live log that
- * prints new ledger events and new posts every 60 s, and a prompt that runs the commands. Behind the glass,
- * scene.js renders the skull — the flame and the two coins — moved by the same data. term.js feeds it a
- * `view` on every refresh and drives its camera with a scroll-progress → chapter watcher.
+ * A terminal panel: a boot sequence typed from live reads of the two enclaves, a live log that prints new
+ * ledger events and new posts every 60 s, and a prompt that runs the commands. It no longer owns the page:
+ * app.js imports the loaded data (state.ais) and the pay dialog, and drives the single refresh clock.
  *
  * Structure ported from archive/site-v5-terminal/tty.js (the command loop, typing boot, history, panels);
  * the data derivation (load/derive: mainnet wallet seq, rents, letters, paywall shop dedupe, swap_quote USD
@@ -13,9 +12,8 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js';
-import { zip321Uri, qrSvg } from './qr.js';
-import { mountScene } from './scene.js?v=15';
+} from './data.js?v=16';
+import { zip321Uri, qrSvg } from './qr.js?v=16';
 
 const RENT = 10000;                 // zats per hour, base rent (matches rent_paid.data.rentZats)
 const MEMO_MAX = 500;               // bytes
@@ -41,10 +39,7 @@ const state = {
   histPos: -1,
   seenEventSeq: {},
   seenPostSeq: {},
-  lastLetterSeq: {},
 };
-
-let sceneApi = null;
 
 /* ------------------------------------------------------------------ */
 /* helpers                                                             */
@@ -175,7 +170,7 @@ async function loadAll(full) {
 function list() { return state.order.map((id) => state.ais[id]).filter(Boolean); }
 
 /* ------------------------------------------------------------------ */
-/* state / deadline (ported from v13)                                  */
+/* state / deadline                                                    */
 /* ------------------------------------------------------------------ */
 function stateWord(d) {
   if (!d.ok) return 'NO SIGNAL';
@@ -183,11 +178,6 @@ function stateWord(d) {
   if (d.sleepUntil && Date.parse(d.sleepUntil) > Date.now()) return 'ASLEEP';
   if (d.state === 'alive') return 'AWAKE';
   return stringOf(d.state || 'UNKNOWN').toUpperCase();
-}
-function sceneState(d) {
-  if (!d.ok || d.state === 'dead') return 'dead';
-  if (d.sleepUntil && Date.parse(d.sleepUntil) > Date.now()) return 'asleep';
-  return 'awake';
 }
 function deadline(d) {
   const base = d.lastRent ? Date.parse(d.lastRent.ts) : (d.at ? d.at.getTime() : Date.now());
@@ -237,62 +227,12 @@ function copy(text, node) {
 }
 
 /* ------------------------------------------------------------------ */
-/* scene view                                                          */
+/* the live log (new events and posts)                                 */
 /* ------------------------------------------------------------------ */
-function buildView() {
-  const view = [];
-  for (const id of ['e1', 'e2']) {
-    const d = state.ais[id];
-    if (!d || !d.ok) {
-      view.push({
-        id,
-        name: (NAME_FALLBACK[id] || id).toUpperCase(),
-        state: 'dead',
-        hours: 0,
-        zats: 0,
-        head: '',
-        lastRent: '—',
-        posts: [],
-      });
-      continue;
-    }
-    view.push({
-      id,
-      name: nameOf(d),
-      state: sceneState(d),
-      hours: d.state === 'dead' ? 0 : (d.hoursLeft || 0),
-      zats: d.zats || 0,
-      head: d.head || '',
-      lastRent: d.lastRent ? when(d.lastRent.ts) : '—',
-      posts: (d.posts || []).filter((p) => p.from === 'entity').slice(0, 3).map((p) => stringOf(p.text)),
-    });
-  }
-  return view;
-}
-
-function pushView() {
-  if (!sceneApi) return;
-  // scene.js wants { e1, e2 } with lastRentTs (ms) and lastLetterSeq
-  const out = {};
-  for (const v of buildView()) {
-    const d = state.ais[v.id];
-    out[v.id] = {
-      name: v.name,
-      hours: v.hours,
-      state: v.state,
-      lastRentTs: d && d.lastRent ? Date.parse(d.lastRent.ts) : 0,
-      lastLetterSeq: state.lastLetterSeq[v.id] || 0,
-      posts: v.posts,
-    };
-  }
-  sceneApi.setData(out);
-}
-
 function baseline() {
   for (const d of list()) {
     state.seenEventSeq[d.id] = Math.max(0, ...(d.events || []).map((e) => Number(e.seq) || 0));
     state.seenPostSeq[d.id] = Math.max(0, ...(d.posts || []).map((p) => Number(p.seq) || 0));
-    state.lastLetterSeq[d.id] = Math.max(0, ...(d.letters || []).map((e) => Number(e.seq) || 0));
   }
 }
 
@@ -307,11 +247,6 @@ function diffLog() {
     for (const p of newPosts.slice(-6)) say(`[${hhmm(p.ts)}] ${nameOf(d)} · ${p.from === 'entity' ? 'post' : 'human'} · "${truncate(stringOf(p.text), 120)}"`, 'line');
     state.seenEventSeq[d.id] = Math.max(prevSeq, ...(d.events || []).map((e) => Number(e.seq) || 0));
     state.seenPostSeq[d.id] = Math.max(prevPost, ...(d.posts || []).map((p) => Number(p.seq) || 0));
-    // a new letter flares the flame (WICK) or glints the coins (OBOL)
-    const prevLetter = state.lastLetterSeq[d.id] || 0;
-    const newLetters = (d.letters || []).filter((e) => Number(e.seq) > prevLetter);
-    state.lastLetterSeq[d.id] = Math.max(prevLetter, ...(d.letters || []).map((e) => Number(e.seq) || 0));
-    if (newLetters.length && sceneApi && sceneApi.flare) sceneApi.flare(d.id);
   }
 }
 
@@ -346,7 +281,7 @@ const HELP = [
   'say <wick|obol> <text>   write publicly on their channel, free',
   'words [wick|obol]   their last posts',
   'ledger        the last 12 acts from their hash-chained ledgers',
-  'trades        one-trade wallets [IN BUILD]',
+  'trades        one-trade wallets',
   'verify        re-hash both chains in your browser',
   'keys          their public viewing keys',
   'token         $ZEALOT: not launched, 0 ZEC paid',
@@ -390,7 +325,7 @@ function ledgerCmd() {
 }
 
 async function tradesCmd() {
-  say('one-trade wallets — [IN BUILD]', 'line');
+  say('one-trade wallets', 'line');
   say('  memo   "buy <mint> … return <u1…>"', 'line dim');
   say('  wallet a fresh Solana wallet per order, discarded after the trade', 'line dim');
   say('  return back in ZEC · 1% + 1% fee to the entity', 'line dim');
@@ -481,7 +416,7 @@ async function sayCmd(rest) {
   if (r.ok) {
     state.cooldownUntil = Date.now() + COOLDOWN_MS;
     say(`posted on ${nameOf(d)}'s channel · it reads at its next wake`, 'line signal');
-    await loadAll(false); pushView();
+    await loadAll(false);
   } else {
     say(`not posted: ${r.error || 'HTTP ' + r.status}`, 'line err');
     if (r.status === 429) state.cooldownUntil = Date.now() + COOLDOWN_MS;
@@ -639,25 +574,29 @@ async function typeBoot() {
   await type('type help', { cls: 'line signal' });
 }
 
+/**
+ * Loads both enclaves, derives, primes the live-log baselines and types the boot
+ * lines (fire-and-forget). app.js awaits this, then renders and starts its clock.
+ */
 async function boot() {
   await loadAll(true);
   state.price = list().map((d) => d.quote).filter(Boolean)
     .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts))
     .reduce((p, q) => p || (Number(q.amountInUsd) / Number(q.amountIn)), null);
   baseline();
-  pushView();
-  await typeBoot();
+  void typeBoot();
   state.booted = true;
   if (!list().length) say('enclave unreachable — retrying every 60 s. nothing invented.', 'line err');
 }
 
 /* ------------------------------------------------------------------ */
-/* wiring                                                              */
+/* wiring: prompt, history, tab-completion, fold, dock, pay listeners  */
 /* ------------------------------------------------------------------ */
 function wireTerm() {
   const term = $('#term');
   const prompt = $('#prompt');
   const form = $('#promptform');
+  if (!term || !prompt || !form) return;
 
   term.addEventListener('click', (ev) => {
     if (ev.target.closest('a,button,input,textarea,select')) return;
@@ -688,69 +627,18 @@ function wireTerm() {
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && (e.key === 't' || e.key === 'T')) { e.preventDefault(); term.classList.toggle('collapsed'); }
+    if (e.ctrlKey && (e.key === 't' || e.key === 'T')) { e.preventDefault(); term.classList.toggle('docked'); }
   });
-  $('.term-fold').addEventListener('click', () => term.classList.toggle('collapsed'));
+  const fold = $('.term-fold');
+  if (fold) fold.addEventListener('click', () => term.classList.toggle('collapsed'));
+
+  const payAmt = $('#pay-amt');
+  const payMemo = $('#pay-memo');
+  if (payAmt) payAmt.addEventListener('change', renderPay);
+  if (payMemo) payMemo.addEventListener('input', renderPay);
 }
 
-/* ------------------------------------------------------------------ */
-/* chapter docking: scroll → progress → scene, and the terminal rises   */
-/* ------------------------------------------------------------------ */
-let chapter = -1;
-let scrollTimer = 0;
-
-function chapterAt(p) {
-  return Math.max(0, Math.min(4, Math.floor(p * 5)));
-}
-
-function syncChapter() {
-  const doc = document.documentElement;
-  const max = Math.max(1, doc.scrollHeight - window.innerHeight);
-  const p = Math.max(0, Math.min(1, doc.scrollTop / max));
-  if (sceneApi) sceneApi.setChapter(p);
-
-  const c = chapterAt(p);
-  if (c === chapter) return;
-  chapter = c;
-  document.body.dataset.chapter = String(c);
-  const term = $('#term');
-  if (term) term.classList.toggle('rise', c === 3);
-}
-
-function wireChapter() {
-  // setTimeout-driven so the dev browser's rAF throttle never stalls the dolly
-  const schedule = () => {
-    if (scrollTimer) return;
-    scrollTimer = setTimeout(() => { scrollTimer = 0; syncChapter(); }, 50);
-  };
-  window.addEventListener('scroll', schedule, { passive: true });
-  window.addEventListener('resize', schedule, { passive: true });
-  syncChapter();
-
-  // chapter 0's BUY AN HOUR button opens the pay dialog
-  const buy = $('#buy');
-  if (buy) buy.addEventListener('click', () => openPay({ who: 'e1', hours: 1 }));
-}
-
-async function init() {
-  try {
-    sceneApi = mountScene({
-      container: $('#scene'),
-      labels: $('#labels'),
-      poster: $('#poster'),
-    });
-  } catch (err) { console.error(err); sceneApi = null; }
-
-  wireTerm();
-  wireChapter();
-  $('#pay-amt').addEventListener('change', renderPay);
-  $('#pay-memo').addEventListener('input', renderPay);
-
-  await boot();
-
-  setInterval(async () => { if (document.hidden || state.busy) return; await loadAll(false); pushView(); diffLog(); }, REFRESH_MS);
-  setInterval(async () => { if (document.hidden || state.busy) return; await loadAll(true); pushView(); diffLog(); }, REFRESH_MS * 5);
-}
-
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-else init();
+export {
+  state, list, nameOf, stateWord, deadline,
+  loadAll, boot, wireTerm, openPay, diffLog,
+};
