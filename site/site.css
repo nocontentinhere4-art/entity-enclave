@@ -14,9 +14,9 @@
   --caption: #8a8a8a;
   --body: #e5e5e5;
   --display: #fff;
-  --lime: #c5ff4a;
-  --olive: #597321;         /* glow under lime */
-  --moss: #314013;          /* dotted grid strokes */
+  --lime: #f4b728;
+  --olive: #8a6a1a;         /* glow under lime */
+  --moss: #3a2e0c;          /* dotted grid strokes */
 
   --serif: "PT Serif", "Source Serif 4", Georgia, serif;
   --sans: "Inter Tight", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;

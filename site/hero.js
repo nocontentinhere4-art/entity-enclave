@@ -18,11 +18,11 @@ const GAMMA = 1.0;
 const THRESH = 0.09;          // below this luminance: empty cell
 const LIME_AT = 0.93;         // brightest cells go lime
 const GAP_FRAC = 0.10;        // push the two halves outwards
-const LIME = '#c5ff4a';
+const LIME = '#f4b728';
 const BRIGHT = 'rgba(242,242,238,.92)';
 const DIM = 'rgba(242,242,238,.5)';
 const MONO = '"JetBrains Mono", "SF Mono", Menlo, monospace';
-const CHEW = 0.9;             // one open-close, seconds
+const CHEW = 1.4;             // one open-close, seconds (soft)
 const YAWN_PERIOD = 2.6;      // one yawn, seconds
 const YAWN_EVERY = 12;        // yawn interval, seconds
 const TALK_SECS = 3;          // forced talk after a new public post
@@ -127,13 +127,15 @@ function sample() {
   }
 }
 
+// soft jaw: cosine ease in and out, never fully shut while talking, never beyond [0,1]
 function chewK(s, now) {
-  const t = (now - s.chewStart) % CHEW;
-  return Math.sin(Math.PI * (t / CHEW));
+  const t = ((now - s.chewStart) % CHEW) / CHEW;
+  return 0.72 * (0.5 - 0.5 * Math.cos(2 * Math.PI * t));
 }
 function yawnK(s, now) {
-  const t = (now - s.yawnStart) / s.yawnPeriod;
-  return Math.cos(Math.PI * Math.min(1, Math.max(0, t)));
+  const t = Math.min(1, Math.max(0, (now - s.yawnStart) / s.yawnPeriod));
+  const o = Math.sin(Math.PI * t);
+  return 1 - 0.85 * o * o;
 }
 
 function computeK(s, now) {
