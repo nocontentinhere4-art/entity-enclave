@@ -1,5 +1,5 @@
 /*
- * ZEALOT v17 — "two skulls, one signal".
+ * ZEALOT v18 — "two skulls, one signal".
  * Encrypted terminal meets classified broadsheet. Near-black canvas, ONE lime accent, whisper-weight serif
  * display + terminal-grade sans. No shadows, no other chroma, radius 2/4, exactly one lime divider. No webfonts.
  */
@@ -15,6 +15,7 @@
   --body: #e5e5e5;
   --display: #fff;
   --lime: #f4b728;
+  --lime-hover: #f8c64f;    /* CTA hover, lighter yellow */
   --olive: #8a6a1a;         /* glow under lime */
   --moss: #3a2e0c;          /* dotted grid strokes */
 
@@ -97,7 +98,7 @@ code { font-family: var(--mono); }
 .cell.brand { font-weight: 700; letter-spacing: 0.22em; color: var(--display); }
 .cell.token { color: var(--muted); }
 .cell.cta { background: var(--lime); color: var(--bg); font-weight: 700; }
-.cell.cta:hover { color: var(--bg); background: #d6ff6b; }
+.cell.cta:hover { color: var(--bg); background: var(--lime-hover); }
 .cell.dock { display: none; color: var(--muted); }
 .cell.dock:hover { color: var(--display); }
 
@@ -151,7 +152,7 @@ main { position: relative; }
   display: inline-flex; align-items: baseline; gap: 2px;
   padding: 7px 16px; border: 1px solid var(--lime); border-radius: 999px;
   background: rgba(6, 6, 6, 0.55);
-  box-shadow: 0 0 18px rgba(89, 115, 33, 0.55);
+  box-shadow: 0 0 18px rgba(138, 106, 26, 0.55);
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; color: var(--body);
   white-space: nowrap;
 }
@@ -177,13 +178,13 @@ main { position: relative; }
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
 .btn.fill { background: var(--lime); color: var(--bg); border-color: var(--lime); }
-.btn.fill:hover { background: #d6ff6b; color: var(--bg); }
+.btn.fill:hover { background: var(--lime-hover); color: var(--bg); }
 .btn.ghost { background: transparent; color: var(--body); border-color: var(--hairline); }
 .btn.ghost:hover { border-color: var(--body); color: var(--display); }
 .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
 .btn.buy-small { height: 32px; padding: 0 14px; font-size: 12px; }
 
-/* ---------- 2 · the enclaves ---------- */
+/* ---------- [0002] · the enclaves ---------- */
 .entity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .card { border: 1px solid var(--hairline); border-radius: var(--r4); background: var(--graphite); overflow: hidden; }
 .card-meta {
@@ -232,7 +233,7 @@ main { position: relative; }
 .word-text { font-size: 14px; line-height: 1.5; margin: 0 0 6px; color: var(--body); }
 .word-time { font-size: 11px; color: var(--caption); }
 
-/* ---------- 3 · one trade, one wallet ---------- */
+/* ---------- [0003] · one trade, one wallet ---------- */
 .steps { width: 100%; border-collapse: collapse; border: 1px solid var(--hairline); border-radius: var(--r4); overflow: hidden; margin: 0 0 8px; }
 .steps th, .steps td { text-align: left; vertical-align: top; padding: 14px 16px; border-bottom: 1px solid var(--hairline); }
 .steps tr:last-child th, .steps tr:last-child td { border-bottom: 0; }
@@ -255,7 +256,45 @@ main { position: relative; }
 .book-table tbody tr:last-child td { border-bottom: 0; }
 .book .empty { padding: 26px 18px; }
 
-/* ---------- 4 · the ledger ---------- */
+/* ---------- [0006] · where the money goes ---------- */
+.flow { width: 100%; border-collapse: collapse; border: 1px solid var(--hairline); border-radius: var(--r4); overflow: hidden; margin: 0 0 12px; }
+.flow th, .flow td { text-align: left; vertical-align: top; padding: 13px 16px; border-bottom: 1px solid var(--hairline); font-family: var(--mono); }
+.flow thead th { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--caption); background: var(--onyx); font-weight: 600; white-space: nowrap; }
+.flow thead th::after { content: " →"; color: var(--hairline); font-weight: 400; letter-spacing: 0; }
+.flow thead th:last-child::after { content: none; }
+.flow tbody td { font-size: 12px; line-height: 1.6; color: var(--body); }
+.flow tbody tr:last-child td { border-bottom: 0; }
+.flow td:nth-child(3) { color: var(--display); font-variant-numeric: tabular-nums; }
+.flow td:nth-child(4) { color: var(--muted); }
+.flow td.flow-addr { overflow-wrap: anywhere; user-select: all; }
+.canary {
+  display: inline-block; padding: 1px 7px; border: 1px solid var(--lime); border-radius: var(--r2);
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--lime); margin-left: 6px; white-space: nowrap; font-weight: 600;
+}
+.legend { font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--caption); margin: 12px 0 0; }
+.money-sub {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+  font-weight: 600; color: var(--caption); margin: 40px 0 14px;
+}
+.route {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+  border: 1px solid var(--hairline); border-radius: var(--r4); background: var(--onyx); padding: 16px;
+}
+.hop-node { font-family: var(--mono); font-size: 12px; color: var(--body); }
+.hop-arr { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.pv { border: 1px solid var(--hairline); border-radius: var(--r4); background: var(--onyx); overflow: hidden; }
+.pv-row { display: flex; gap: 16px; padding: 13px 16px; border-bottom: 1px solid var(--hairline); align-items: baseline; }
+.pv-row:last-child { border-bottom: 0; }
+.pv-k { flex: none; width: 128px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--caption); }
+.pv-v { font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--body); }
+.token-plan { border: 1px solid var(--hairline); border-radius: var(--r4); background: var(--onyx); padding: 16px; }
+.token-plan p { font-family: var(--mono); font-size: 12px; color: var(--caption); margin: 0 0 10px; }
+.plan { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--body); line-height: 1.6; }
+.plan li { padding-left: 18px; position: relative; }
+.plan li::before { content: "·"; position: absolute; left: 4px; color: var(--caption); }
+
+/* ---------- [0007] · the ledger ---------- */
 .ledger-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; align-items: start; }
 .ledger-panel { border: 1px solid var(--hairline); border-radius: var(--r4); background: var(--graphite); overflow: hidden; }
 .ledger-head {
@@ -299,7 +338,7 @@ main { position: relative; }
 .fc-score { color: var(--body); }
 .forecasts-body .empty { padding: 18px 16px; }
 
-/* ---------- 5 · terminal ---------- */
+/* ---------- [0008] · terminal ---------- */
 .term {
   border: 1px solid var(--hairline); border-radius: var(--r4);
   height: 420px; display: flex; flex-direction: column;
@@ -356,7 +395,7 @@ main { position: relative; }
 }
 .copy:hover { color: var(--body); border-color: var(--body); }
 
-/* ---------- 6 · footer ---------- */
+/* ---------- footer ---------- */
 .foot { position: relative; border-top: 1px solid var(--hairline); padding: 30px 0 44px; background: var(--void); }
 .foot-inner {
   max-width: var(--max); margin: 0 auto; padding: 0 var(--pad);
@@ -451,6 +490,19 @@ legend { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; col
   .pay-buyrow { flex-direction: column; align-items: stretch; }
   .pay-out { grid-template-columns: 1fr; }
   .qr { width: 160px; }
+
+  .flow thead { display: none; }
+  .flow, .flow tbody, .flow tr, .flow td { display: block; width: 100%; }
+  .flow tr { padding: 14px 16px; border-bottom: 1px solid var(--hairline); }
+  .flow tr:last-child { border-bottom: 0; }
+  .flow td { position: relative; padding: 6px 0 6px 112px; border: 0; }
+  .flow td::before {
+    content: attr(data-label);
+    position: absolute; left: 0; top: 7px; width: 100px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--caption);
+  }
+  .pv-row { flex-direction: column; gap: 5px; align-items: flex-start; }
+  .pv-k { width: auto; }
 }
 
 /* ---------- reduced motion ---------- */

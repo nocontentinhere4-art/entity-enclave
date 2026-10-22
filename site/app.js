@@ -1,5 +1,5 @@
 /*
- * app.js — ZEALOT v17, the page. Two skulls, one signal.
+ * app.js — ZEALOT v18, the page. Two skulls, one signal.
  *
  * Owns the whole page: nav, the two enclave cards with tabs, the status pills under each skull, the one-trade
  * section (steps + live /trades book), the ledger stream with Verify chain, the forecasts, the footer clock, and
@@ -10,12 +10,12 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=17';
+} from './term.js?v=18';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS,
-} from './data.js?v=17';
-import { initHero, setMouth, triggerTalk } from './hero.js?v=17';
+} from './data.js?v=18';
+import { initHero, setMouth, triggerTalk } from './hero.js?v=18';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -308,6 +308,29 @@ function renderForecasts() {
 }
 
 /* ------------------------------------------------------------------ */
+/* render: where the money goes (live rent address)                    */
+/* ------------------------------------------------------------------ */
+function renderMoney() {
+  const to = $('#flow-rent-to');
+  if (!to) return;
+  let addr = '';
+  for (const id of ['e1', 'e2']) {
+    const d = ent(id);
+    if (d && d.ok && d.root && typeof d.root.rentAddress === 'string' && d.root.rentAddress.trim()) {
+      addr = d.root.rentAddress.trim();
+      break;
+    }
+  }
+  if (addr) {
+    to.textContent = addr;
+    to.title = addr;
+  } else {
+    to.textContent = 'the landlord address in the enclave config';
+    to.title = '';
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* render: ledger (last 40, interleaved)                               */
 /* ------------------------------------------------------------------ */
 const renderedLedger = new Set();
@@ -488,6 +511,7 @@ function renderAll() {
   renderEntities();
   renderTrades();
   renderForecasts();
+  renderMoney();
   renderLedger();
   renderFooter();
 }
