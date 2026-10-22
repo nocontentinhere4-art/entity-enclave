@@ -141,7 +141,7 @@ main { position: relative; }
   font-family: var(--sans); font-weight: 400; font-size: 15px; line-height: 1.7; color: var(--muted);
 }
 .mark { margin: 28px auto 0; display: grid; justify-items: center; gap: 10px; }
-.mark canvas { width: 150px; height: 150px; display: block; }
+.mark canvas { width: 190px; height: 190px; display: block; }
 .mark-word { font-family: var(--mono); font-size: 11px; letter-spacing: 0.26em; color: var(--lime); }
 .hero-pills {
   position: absolute; left: 0; right: 0; bottom: 60px; z-index: 2; pointer-events: none;

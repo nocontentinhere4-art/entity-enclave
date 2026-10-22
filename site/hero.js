@@ -247,41 +247,51 @@ function tick() {
 }
 
 /* The Z mark, drawn with the same glyphs as the skulls (yellow), 'ZCASH' under it in the HTML. */
-let zMask = null, zCtx = null;
-const Z_S = 216, Z_CELL = 6; // S must be a multiple of the cell
+let zMask = null, zCtx = null, zHeads = null, zSpeeds = null;
+const Z_S = 216, Z_CELL = 6, Z_N = Z_S / Z_CELL; // S is a multiple of the cell
+/* The Zcash mark (ring + Z with its two ticks) drawn in the skulls' glyphs; glyph rain falls down the strokes. */
 function drawZMark(now = 0) {
   const c = document.getElementById('zmark');
   if (!c) return;
-  const S = Z_S, cell = Z_CELL;
-  if (zMask) {
-    // cascade: a brightness wave falls through the Z, glyphs change as it passes
-    const g = zCtx, n = RAMP.length - 1;
-    g.clearRect(0, 0, S, S);
-    g.font = `${cell * 1.3}px ${MONO}`; g.textBaseline = 'top'; g.fillStyle = LIME;
-    for (let y = 0; y < S; y += cell) for (let x = 0; x < S; x += cell) {
-      if (!zMask[(y / cell) * (S / cell) + (x / cell)]) continue;
-      const w = 0.5 + 0.5 * Math.sin((y / S) * 6.0 - now * 3.2 + x * 0.015);
-      const v = Math.min(1, 0.35 + 0.65 * w);
-      g.globalAlpha = 0.45 + 0.55 * w;
-      g.fillText(RAMP[Math.round(v * n)], x, y);
+  const S = Z_S, cell = Z_CELL, n = RAMP.length - 1;
+  if (!zMask) {
+    const off = document.createElement('canvas'); off.width = off.height = S;
+    const o = off.getContext('2d');
+    o.fillStyle = '#000'; o.fillRect(0, 0, S, S);
+    o.strokeStyle = '#fff'; o.lineWidth = S * 0.085;
+    o.beginPath(); o.arc(S / 2, S / 2, S * 0.44, 0, Math.PI * 2); o.stroke();
+    o.fillStyle = '#fff'; o.font = `900 ${S * 0.56}px "Helvetica Neue", Arial, sans-serif`;
+    o.textAlign = 'center'; o.textBaseline = 'middle';
+    o.fillText('Z', S / 2, S / 2 + S * 0.025);
+    // the two ticks of the Zcash glyph
+    const tw = S * 0.06, th = S * 0.09;
+    o.fillRect(S / 2 - tw / 2, S / 2 - S * 0.28 - th, tw, th);
+    o.fillRect(S / 2 - tw / 2, S / 2 + S * 0.28 - S * 0.02, tw, th);
+    const d = o.getImageData(0, 0, S, S).data;
+    zMask = new Uint8Array(Z_N * Z_N);
+    for (let y = 0; y < Z_N; y++) for (let x = 0; x < Z_N; x++) {
+      const i = ((y * cell + cell / 2) * S + (x * cell + cell / 2)) * 4;
+      zMask[y * Z_N + x] = d[i] > 127 ? 1 : 0;
     }
-    g.globalAlpha = 1;
-    return;
+    zHeads = new Float32Array(Z_N); zSpeeds = new Float32Array(Z_N);
+    for (let x = 0; x < Z_N; x++) { zHeads[x] = Math.random() * Z_N; zSpeeds[x] = 6 + Math.random() * 10; }
+    zCtx = c.getContext('2d');
   }
-  const off = document.createElement('canvas'); off.width = off.height = S;
-  const o = off.getContext('2d');
-  o.fillStyle = '#000'; o.fillRect(0, 0, S, S);
-  o.fillStyle = '#fff'; o.font = `900 ${S * 0.92}px "Helvetica Neue", Arial, sans-serif`;
-  o.textAlign = 'center'; o.textBaseline = 'middle';
-  o.fillText('Z', S / 2, S / 2 + S * 0.04);
-  const d = o.getImageData(0, 0, S, S).data;
-  zCtx = c.getContext('2d');
-  zMask = new Uint8Array((S / cell) * (S / cell));
-  for (let y = 0; y < S; y += cell) for (let x = 0; x < S; x += cell) {
-    const i = ((y + cell / 2) * S + (x + cell / 2)) * 4;
-    zMask[(y / cell) * (S / cell) + (x / cell)] = d[i] > 127 ? 1 : 0;
+  const g = zCtx;
+  g.clearRect(0, 0, S, S);
+  g.font = `${cell * 1.3}px ${MONO}`; g.textBaseline = 'top'; g.fillStyle = LIME;
+  for (let x = 0; x < Z_N; x++) {
+    const head = (zHeads[x] + now * zSpeeds[x]) % (Z_N + 8);
+    for (let y = 0; y < Z_N; y++) {
+      if (!zMask[y * Z_N + x]) continue;
+      let dist = head - y; if (dist < 0) dist += Z_N + 8;   // cells above the head glow, fading up the trail
+      const w = dist < 7 ? 1 - dist / 7 : 0;
+      const v = Math.min(1, 0.55 + 0.45 * w);
+      g.globalAlpha = 0.62 + 0.38 * w;
+      g.fillText(RAMP[Math.round(v * n)], x * cell, y * cell);
+    }
   }
-  drawZMark(now);
+  g.globalAlpha = 1;
 }
 
 export function initHero() {
