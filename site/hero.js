@@ -223,7 +223,34 @@ function tick() {
   timer = setTimeout(tick, 1000 / 30);
 }
 
+/* The Z mark, drawn with the same glyphs as the skulls (yellow), 'ZCASH' under it in the HTML. */
+function drawZMark() {
+  const c = document.getElementById('zmark');
+  if (!c) return;
+  const S = 220, cell = 6;
+  const off = document.createElement('canvas'); off.width = off.height = S;
+  const o = off.getContext('2d');
+  o.fillStyle = '#000'; o.fillRect(0, 0, S, S);
+  o.fillStyle = '#fff'; o.font = `900 ${S * 0.92}px "Helvetica Neue", Arial, sans-serif`;
+  o.textAlign = 'center'; o.textBaseline = 'middle';
+  o.fillText('Z', S / 2, S / 2 + S * 0.04);
+  const d = o.getImageData(0, 0, S, S).data;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, S, S);
+  g.font = `${cell * 1.3}px ${MONO}`; g.textBaseline = 'top'; g.fillStyle = LIME;
+  const n = RAMP.length - 1;
+  for (let y = 0; y < S; y += cell) for (let x = 0; x < S; x += cell) {
+    const i = ((y + cell / 2) * S + (x + cell / 2)) * 4;
+    const l = d[i] / 255;
+    if (l < 0.5) continue;
+    // noise so the Z reads as the skulls do: dense core, breathing rim
+    const v = Math.min(1, 0.55 + 0.45 * Math.abs(Math.sin(x * 0.37 + y * 0.23)));
+    g.fillText(RAMP[Math.round(v * n)], x, y);
+  }
+}
+
 export function initHero() {
+  drawZMark();
   canvas = document.getElementById('skulls');
   if (!canvas) return;
   ctx = canvas.getContext('2d');
