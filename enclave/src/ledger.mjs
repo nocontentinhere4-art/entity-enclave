@@ -32,6 +32,20 @@ export class Ledger {
     return e;
   }
 
+  /** Yield every public entry of the given types in file order (oldest first), tolerant of a torn tail.
+   *  `types = null` means all public entries. Private entries are skipped. Replay uses this so a long
+   *  history is never truncated by recent(). */
+  *each(types = null) {
+    const want = types ? new Set(types) : null;
+    for (const line of this.#lines()) {
+      let e;
+      try { e = JSON.parse(line); } catch { continue; }
+      if (e.private) continue;
+      if (want && !want.has(e.type)) continue;
+      yield e;
+    }
+  }
+
   /** Latest public entries of the given types (newest last). Private entries are never returned here. */
   recent(types, limit = 10) {
     const want = new Set(types);
@@ -71,7 +85,7 @@ export class Ledger {
     const lines = readFileSync(path, 'utf8').trim().split('\n').filter(Boolean);
     for (let i = 0; i < lines.length; i++) {
       let e;
-      try { e = JSON.parse(lines[i]); } catch { return { ok: false, entries: lines.length, brokenAt: i + 1, reason: 'unparsable line' }; }
+      try { e = JSON.parse(lines[i]); } catch { continue; } // torn line (crash mid-write): skipped, never fatal
       const { hash, ...rest } = e;
       const recomputed = createHash('sha256').update(JSON.stringify(rest)).digest('hex');
       if (hash !== recomputed || e.prev !== prev) return { ok: false, entries: lines.length, brokenAt: i + 1 };

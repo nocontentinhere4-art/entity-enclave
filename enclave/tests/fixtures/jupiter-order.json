@@ -1,0 +1,29 @@
+{
+  "_comment": "Hand-crafted Jupiter /swap/v2/order fixture; transaction is the deterministic v0 slot0 vector.",
+  "request": {
+    "inputMint": "So11111111111111111111111111111111111111112",
+    "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "amount": "92000000",
+    "taker": "So11111111111111111111111111111111111111112",
+    "slippageBps": 100
+  },
+  "response": {
+    "transaction": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAQABA/NC5HZr5dpMtmQw6LiYYJLrrEFEiiMlmM3aNfbkQ1QXkqJXxo3sBMHmy8BwJtrApdIAizNl0/2tefVOzGEmYOMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABdSzFyW7NljMFEMA/6/0pzopp/DWtyLf7mKNilACI9OAQICAAEMAgAAAEBCDwAAAAAA",
+    "requestId": "fixture-request-id-0001",
+    "outAmount": "123456789",
+    "router": "metis",
+    "mode": "ultra",
+    "feeBps": 0,
+    "feeMint": "So11111111111111111111111111111111111111112",
+    "transactionVersion": "0",
+    "priceImpactPct": 0.12
+  },
+  "quoteOnly": {
+    "transaction": null,
+    "requestId": null,
+    "outAmount": "98000000",
+    "router": "metis",
+    "mode": "ultra",
+    "priceImpactPct": 0.05
+  }
+}

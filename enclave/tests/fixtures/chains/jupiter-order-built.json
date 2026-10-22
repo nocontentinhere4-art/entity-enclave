@@ -1,0 +1,31 @@
+{
+  "_comment": "DERIVED fixture (generate.mjs) — a regeneratable derivative of soltx-real-v0.json. Jupiter /swap/v2/order response shape: v0 transaction, slot 0 = fixture taker (zero pre-fill, taker signs; signature included as expectedTakerSignature), slot 1 = zeroed co-signer (real payer at static key 1, JupiterZ-style partial sign), static keys = real swap keys hoisted by one for the taker.",
+  "requestId": "rfq-fixture-0001",
+  "outAmount": "123456789",
+  "router": "JUP",
+  "mode": "ExactIn",
+  "feeBps": 0,
+  "feeMint": "So11111111111111111111111111111111111111112",
+  "transactionVersion": "V0",
+  "transaction": "AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAIABgs4R6MNVgLCtkpuN9QLPxPzSBsJUWaqKzQSyaUy1jh03a5layEZu4H/1fecRFuWZCoVBlD5mIlyBFDPvGdXJHSo0aFx09SdM3pIdz2TAjGmXV1CT94Lo8xNt5W/6LL764gmkjfmhcG/PgW+lQZ/jGvfuK4MDm7jEy6mNVZ83ta0lBDbpQQ77w9DDnyWDNI5flRNO/1RppG26lFEynBE3+C3AwZGb+UhFzL/7K26csOb57yM5bvF9xJrLEObOkAAAACMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKkEedVb8jHAbu50xW7OaBUH/bGy3qP0jlECsc2iVrwTj7Q/+if11/ZKdMCbHylYed5LCas238ndUUsyGqezjOXoV8OhIfVqb01GgpJs1NYrVF89FCZy/c0p+3MeUqYqwiYFBQAFAnekAgAFAAkDXHkEAAAAAAAGBgECAQ8HCAEBCR0IAQMCCQ8JCgkQCwEREg8DAgwNEwgHBBQOFRABCSTlF8uXeuOtKgEAAADCAGQAAVhgrbQDAAAAjFE8GQAAAAAQJwAIAwIBAQEJAd+WnD9X2wF6tTWJzZtm7hq3y0NOrmHhcDy5UCTbw26BBDQ6ONIHEgYEQy4KDg==",
+  "expectedTakerSignatureBase58": "2bUnMQS2WJocG7GQBdd7yNL3qdqpDkzC8xSY2gALzPbK9mp65enkrchPoU2W4duUnojuTXKhhJqgAy2wYrVH5Ms7",
+  "signedTransaction": "Ak/AGMfOCpSavqFSzV/VMqhnU8HNInMwS58XXThPQiOAT55/QjIsqCulTZdi0sOYaACImlL6vi9snqpjCIwOCQoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAIABgs4R6MNVgLCtkpuN9QLPxPzSBsJUWaqKzQSyaUy1jh03a5layEZu4H/1fecRFuWZCoVBlD5mIlyBFDPvGdXJHSo0aFx09SdM3pIdz2TAjGmXV1CT94Lo8xNt5W/6LL764gmkjfmhcG/PgW+lQZ/jGvfuK4MDm7jEy6mNVZ83ta0lBDbpQQ77w9DDnyWDNI5flRNO/1RppG26lFEynBE3+C3AwZGb+UhFzL/7K26csOb57yM5bvF9xJrLEObOkAAAACMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKkEedVb8jHAbu50xW7OaBUH/bGy3qP0jlECsc2iVrwTj7Q/+if11/ZKdMCbHylYed5LCas238ndUUsyGqezjOXoV8OhIfVqb01GgpJs1NYrVF89FCZy/c0p+3MeUqYqwiYFBQAFAnekAgAFAAkDXHkEAAAAAAAGBgECAQ8HCAEBCR0IAQMCCQ8JCgkQCwEREg8DAgwNEwgHBBQOFRABCSTlF8uXeuOtKgEAAADCAGQAAVhgrbQDAAAAjFE8GQAAAAAQJwAIAwIBAQEJAd+WnD9X2wF6tTWJzZtm7hq3y0NOrmHhcDy5UCTbw26BBDQ6ONIHEgYEQy4KDg==",
+  "_keys": {
+    "taker": {
+      "seedLabel": "sov-trade-taker-fixture",
+      "pub": "4nhBrWfRyMYxJsAf3e2AH9UTuh2BMMe9d7BsXiFCY8V2"
+    },
+    "maker": {
+      "seedLabel": "sov-trade-maker-fixture",
+      "pub": "56szAmoynRt1EuFu6a1AAx7jfnW3WxEPWGmKUFiUB42n"
+    },
+    "treasury": {
+      "seedLabel": "sov-trade-treasury-fixture",
+      "pub": "EqdJGp62X4NMTDPkojLP9YyBYjvVKGti72pay5SJ7R16"
+    },
+    "other": {
+      "seedLabel": "sov-trade-dest-fixture",
+      "pub": "8w3mQjrEtnEzc2xPu2Md9N3GEXQvARYGcW94TMqgqw2q"
+    }
+  }
+}

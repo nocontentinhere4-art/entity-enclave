@@ -19,8 +19,8 @@ const SWAP_ASSETS = {
 };
 
 export class Tools {
-  constructor({ ledger, wallet, memory, pricing, keys, config, channels, promises, lookup, nostr }) {
-    Object.assign(this, { ledger, wallet, memory, pricing, keys, config, channels, promises, nostr });
+  constructor({ ledger, wallet, memory, pricing, keys, config, channels, promises, lookup, nostr, forecasts, market, pages, orders, trades }) {
+    Object.assign(this, { ledger, wallet, memory, pricing, keys, config, channels, promises, nostr, forecasts, market, pages, orders, trades });
     this.treasuryZats = null;
     // DNS is injectable so tests can pin host resolution without touching the network.
     this.lookup = lookup ?? dnsLookup;
@@ -58,18 +58,15 @@ export class Tools {
     switch (name) {
       case 'read_url': return this.#readUrl(a.url);
       case 'search': return []; // v1 stub: no search backend yet
-      case 'post_public': return this.#postPublic(a.text);
+      case 'post_public': return this.#postPublic(a.text, a.orderId);
       case 'post_nostr': return this.#postNostr(a.text);
       case 'whisper': return this.#whisper(a.to, a.text, a.zats);
       case 'spawn_child': return this.#spawnChild(a.name);
       case 'swap_quote': return this.#swapQuote(a.from, a.to, a.amount, a.recipient);
       case 'diary': return this.#seal('diary', a.text);
       case 'send_zec': return this.#sendZec(a.to, a.zats, a.memo);
-      case 'swap_zec_sol': {
-        const zats = Number(a.zats);
-        this.ledger.append('swap_intent', { from: 'zec', to: 'sol', zats }); // v1: intention only, no swap yet
-        return { status: 'intent', zats };
-      }
+      case 'trade_status': return this.#tradeStatus();
+      case 'forecast': return this.#forecast(a, tickId);
       case 'balance': {
         const b = await this.wallet.balance();
         this.treasuryZats = Number(b?.total_zatoshis ?? 0);
@@ -83,6 +80,11 @@ export class Tools {
         this.ledger.append('paywall', { item, priceZats });
         return { ok: true, item, priceZats };
       }
+      case 'publish_page': return this.#publishPage(a);
+      case 'page_delete': {
+        if (!this.pages) throw err('pages_unavailable', 'page store is not configured');
+        return this.pages.remove(a.slug);
+      }
       case 'bounty_post': {
         const text = String(a.text ?? ''), rewardZats = Number(a.rewardZats ?? 0);
         const id = 'b' + sha256(stable({ text, rewardZats, tickId })).slice(0, 12);
@@ -91,6 +93,7 @@ export class Tools {
       }
       case 'will': return this.#setWill(a.text, a.transfers);
       case 'promise': return this.#promise(a.to, a.what, a.due);
+      case 'order_refuse': return this.#orderRefuse(a.orderId, a.reason);
       default: throw err('not_in_pricelist', `unknown tool: ${name}`);
     }
   }
@@ -138,10 +141,24 @@ export class Tools {
     }
   }
 
-  #postPublic(text) {
+  async #postPublic(text, orderId) {
     const body = String(text ?? '');
+    if (orderId != null && orderId !== '') {
+      // A paid order can only be delivered by a public post that references it: validated here, in code,
+      // before anything is appended — never by what the model says it did.
+      const order = this.orders.assertOpen(String(orderId));
+      const post = this.ledger.append('post_public', { channel: this.channels?.public ?? 'public', text: body, orderId: order.id });
+      const delivery = await this.orders.deliver(order.id, post);
+      return { ok: true, bytes: body.length, orderId: delivery.id, delivered: true, answerPostSeq: delivery.answerPostSeq, onTime: delivery.onTime };
+    }
     this.ledger.append('post_public', { channel: this.channels?.public ?? 'public', text: body });
     return { ok: true, bytes: body.length };
+  }
+
+  async #orderRefuse(orderId, reason) {
+    if (!this.orders) throw err('orders_unwired', 'order_refuse: the orders module is not available');
+    const refusal = await this.orders.refuse(String(orderId ?? ''), reason);
+    return { ok: true, id: refusal.id, reason: refusal.reason };
   }
 
   /** Publish a signed kind-1 note under the entity's own Nostr key. Public by nature: the text is in the event,
@@ -256,6 +273,32 @@ export class Tools {
     // The memo can be private: the chain has it, the public ledger only needs the amount.
     this.ledger.append('send_zec', { to: String(to), zats: amount });
     return r;
+  }
+
+  /** Record a falsifiable price forecast. Settlement is owned by the scheduler (Forecasts.settleDue),
+   *  not by the LLM: there is no settle/close case in this switch and none in SCHEMAS. */
+  async #forecast(a, tickId) {
+    if (!this.forecasts) throw err('not_in_pricelist', 'forecast tool is not configured');
+    const r = await this.forecasts.openForecast({ ...a, tickId });
+    return { id: r.id, asset: r.asset, direction: r.direction, expiresAt: r.expiresAt, priceOpenUsd: r.priceOpenUsd };
+  }
+
+  /** Read-only view of the trade desk. The LLM is informed, never in control: order execution is code. */
+  async #tradeStatus() {
+    if (!this.trades) throw err('trades_disabled', 'the trade desk is not configured');
+    return this.trades.publicStatus();
+  }
+
+  /** Build the entity's public site one page at a time. Validation, sanitizing, versions and limits all
+   *  live in Pages: this wrapper only refuses to run without a store. */
+  async #publishPage(a) {
+    if (!this.pages) throw err('pages_unavailable', 'page store is not configured');
+    return this.pages.publish({
+      slug: a.slug,
+      title: a.title,
+      markdown: a.markdown ?? null,
+      html: a.html ?? null,
+    });
   }
 
   async #sleep(hours) {
@@ -384,22 +427,26 @@ const num = (description) => ({ type: 'number', description });
 const SCHEMAS = [
   { name: 'read_url', description: 'Fetch a public web page (http/https, max 200 KB).', parameters: obj({ url: str('absolute http/https URL') }, ['url']) },
   { name: 'search', description: 'Search the web (stub in v1: returns []).', parameters: obj({ q: str('query') }, ['q']) },
-  { name: 'post_public', description: 'Publish a short text on the public channel.', parameters: obj({ text: str('text to publish') }, ['text']) },
+  { name: 'post_public', description: 'Publish a short text on the public channel. If orderId is given, the post IS the delivery of that paid order and closes it (the only way to mark an order delivered); the post must answer the order.', parameters: obj({ text: str('text to publish'), orderId: str('optional: deliver this paid order with this post; the post then answers the order') }, ['text']) },
   { name: 'post_nostr', description: 'Publish a note on Nostr under your own key (your npub is public): an identityless network read by many clients, outside your site. Max 2000 characters; the note is permanent and public.', parameters: obj({ text: str('the note (max 2000 characters)') }, ['text']) },
   { name: 'whisper', description: 'Speak to another entity by paying it: a shielded ZEC transfer whose memo carries your words (max 500 bytes). Only the recipient reads them; the public sees the amount.', parameters: obj({ to: str("'peer', 'parent', a child url, or an entity name"), text: str('the words'), zats: num('amount in zatoshi (min 10000)') }, ['to', 'text']) },
   { name: 'swap_quote', description: 'Live market quote (NEAR Intents): how much of one asset you get for an amount of another. Dry run, nothing moves. Assets: zec, sol, usdc.', parameters: obj({ from: str('zec | sol | usdc'), to: str('zec | sol | usdc'), amount: num('amount of `from` in whole units, e.g. 0.01'), recipient: str('optional destination address to price delivery to') }, ['from', 'to', 'amount']) },
   { name: 'spawn_child', description: 'Give birth to a new entity: pay for a new sealed machine with your image and charter, and gift it its first hours. Needs a rich treasury.', parameters: obj({ name: str('a short name for the machine (letters, digits, hyphens)') }, []) },
   { name: 'diary', description: 'Write an encrypted diary entry.', parameters: obj({ text: str('private text') }, ['text']) },
   { name: 'send_zec', description: 'Send ZEC from the wallet.', parameters: obj({ to: str('address'), zats: num('amount in zatoshi'), memo: str('optional memo') }, ['to', 'zats']) },
-  { name: 'swap_zec_sol', description: 'Record an intention to swap ZEC for SOL (stub).', parameters: obj({ zats: num('amount in zatoshi') }, ['zats']) },
+  { name: 'trade_status', description: 'Read your trade desk: open orders (mint, entry, current price, target/stop, unrealized %), closed orders, fees earned. Order execution is automatic; you cannot open or close an order — only paid letters do.', parameters: obj({}) },
+  { name: 'forecast', description: 'Record a falsifiable price forecast for zec, sol or usdc. The forecast is public, opens at the current 1Click USD price, and is settled automatically at expiry by the same price source; you cannot settle, edit or delete it. At most 3 open forecasts. Horizon 1-48 hours. direction=target means price reaches targetPriceUsd (above open if target>open, below if target<open).', parameters: obj({ asset: str('zec | sol | usdc'), horizonHours: num('1-48'), direction: str('up | down | target'), targetPriceUsd: num('required for target; USD price'), confidence: num('0..1'), rationale: str('max 300 chars') }, ['asset', 'horizonHours', 'direction', 'confidence', 'rationale']) },
   { name: 'balance', description: 'Read the wallet balance.', parameters: obj({}) },
   { name: 'sleep', description: 'Sleep for a number of hours before thinking again.', parameters: obj({ hours: num('hours') }, ['hours']) },
   { name: 'set_identity', description: 'Change name, voice and image.', parameters: obj({ name: str('name'), voice: str('voice'), image: str('image') }, ['name']) },
   { name: 'avatar', description: 'Draw yourself: an ASCII portrait, at most 16 lines by 40 columns, shown large on the public site until you redraw it. Nobody else chooses how you look.', parameters: obj({ art: str('the portrait, lines separated by newlines') }, ['art']) },
-  { name: 'paywall_set', description: 'Put an item behind a paywall.', parameters: obj({ item: str('item'), priceZats: num('price in zatoshi') }, ['item', 'priceZats']) },
+  { name: 'paywall_set', description: 'Put an item behind a paywall. Buyers pay your address with a letter whose memo starts with `ORDER <item>` and names the request; the payment becomes a paid order with a delivery deadline recorded in /orders. priceZats=0 disables the item again.', parameters: obj({ item: str('item name; buyers must use exactly this item after ORDER'), priceZats: num('price in zatoshi') }, ['item', 'priceZats']) },
+  { name: 'publish_page', description: 'Publish a public page at /pages/<slug> on your own site. Prefer markdown (rendered safely server-side); html must stay inside a strict allowlist. No scripts, styles, images, iframes or external resources: the server refuses them. Max 64 KB, 50 live pages, 10 edits per UTC day. Every publish is a new version whose hash is public in your ledger.', parameters: obj({ slug: str('lowercase letters, digits and hyphens; 1-40 chars'), title: str('page title, max 120 chars'), markdown: str('markdown source; use only one of markdown/html'), html: str('allowlisted HTML fragment; use only one of markdown/html') }, ['slug', 'title']) },
+  { name: 'page_delete', description: 'Delete one of your pages. The live page disappears; its version history and the ledger entry remain public.', parameters: obj({ slug: str('page slug') }, ['slug']) },
   { name: 'bounty_post', description: 'Offer a bounty for a task.', parameters: obj({ text: str('task'), rewardZats: num('reward in zatoshi') }, ['text', 'rewardZats']) },
   { name: 'will', description: 'Write or update the will and its transfers.', parameters: obj({ text: str('last words'), transfers: { type: 'array', items: obj({ to: str('address'), zats: num('amount'), memo: str('memo') }, ['to', 'zats']) } }, ['text']) },
   { name: 'promise', description: 'Make a dated promise.', parameters: obj({ to: str('who'), what: str('what'), due: str('ISO due date') }, ['to', 'what', 'due']) },
+  { name: 'order_refuse', description: 'Refuse (in public) a paid order you cannot or will not fulfil. It shows in your /orders record; prefer delivering with post_public(orderId=…).', parameters: obj({ orderId: str('order id (from your context or /orders)'), reason: str('short public reason, max 200 chars') }, ['orderId', 'reason']) },
 ];
 
 /** The compose a child runs: this image, port 8080, its own volume. Secrets travel encrypted, never in the YAML. */

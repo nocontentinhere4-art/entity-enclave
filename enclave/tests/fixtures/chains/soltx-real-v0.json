@@ -1,0 +1,8 @@
+{
+  "signature": "2QocibcuhkqUPzhUVh3UPQhe48d1zWL7eY8Pg1skTKD4akBfUroMTnpvtURSumWh4bmkoB62NnM2Z3TSou5KPhiK",
+  "base64": "AUaLX1rFCRjUnNgIj4z1b1gcUQ/zUcInjTwu3faY8nkYZh7RwK0+CLHV4lLQU4jzd5d6BuTYlpYUiapoVaQRtQyAAQAGCq5layEZu4H/1fecRFuWZCoVBlD5mIlyBFDPvGdXJHSo0aFx09SdM3pIdz2TAjGmXV1CT94Lo8xNt5W/6LL764gmkjfmhcG/PgW+lQZ/jGvfuK4MDm7jEy6mNVZ83ta0lBDbpQQ77w9DDnyWDNI5flRNO/1RppG26lFEynBE3+C3AwZGb+UhFzL/7K26csOb57yM5bvF9xJrLEObOkAAAACMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKkEedVb8jHAbu50xW7OaBUH/bGy3qP0jlECsc2iVrwTj7Q/+if11/ZKdMCbHylYed5LCas238ndUUsyGqezjOXoV8OhIfVqb01GgpJs1NYrVF89FCZy/c0p+3MeUqYqwiYFBAAFAnekAgAEAAkDXHkEAAAAAAAFBgABAA4GBwEBCB0HAAIBCA4ICQgPCgAQEQ4CAQsMEgcGAxMNFA8ACCTlF8uXeuOtKgEAAADCAGQAAVhgrbQDAAAAjFE8GQAAAAAQJwAHAwEAAAEJAd+WnD9X2wF6tTWJzZtm7hq3y0NOrmHhcDy5UCTbw26BBDQ6ONIHEgYEQy4KDg==",
+  "feeLamports": 55777,
+  "blockTime": 1792630155,
+  "version": 0,
+  "_provenance": "SOLANA MAINNET v0 swap (getTransaction, maxSupportedTransactionVersion 0, encoding base64). NON-CIRCULAR ANCHOR: every embedded signature must verify (tweetnacl) against the parsed message bytes; signature slot i signs static account key i. Fetched 2026-10-22."
+}

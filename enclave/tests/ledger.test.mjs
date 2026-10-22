@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Ledger } from '../src/ledger.mjs';
@@ -51,3 +51,49 @@ test('recent() returns the newest public entries of the given types, never priva
   assert.equal(l.recent(['diary'], 5).length, 0);
   assert.equal(l.recent(['human_message'], 1)[0].data.text, 'c');
 });
+
+test('each() yields public entries of the given types in file order, skipping private and torn lines', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ledger-each-'));
+  const p = join(dir, 'ledger.jsonl');
+  const l = new Ledger(p);
+  l.append('forecast_open', { id: 'f1', asset: 'zec' });
+  l.append('forecast_settled', { id: 'f1', hit: true });
+  l.appendPrivate('diary', 'Y2lwaGVy');
+  l.append('forecast_void', { id: 'f2', reason: 'price_unavailable' });
+
+  const byType = [...l.each(['forecast_open', 'forecast_void'])].map((e) => [e.type, e.data.id]);
+  assert.deepEqual(byType, [['forecast_open', 'f1'], ['forecast_void', 'f2']]);
+
+  const allPublic = [...l.each()].map((e) => e.type);
+  assert.deepEqual(allPublic, ['forecast_open', 'forecast_settled', 'forecast_void']); // private skipped
+
+  // A torn trailing line is dropped; an unparsable line in the middle is skipped, never fatal.
+  appendSync(p, 'not json at all\n');
+  const afterTear = [...l.each()].map((e) => e.type);
+  assert.deepEqual(afterTear, ['forecast_open', 'forecast_settled', 'forecast_void']);
+  const l2 = new Ledger(p); // reopen tolerates the torn tail and continues the chain
+  l2.append('tick', { ok: true });
+  assert.equal(Ledger.verify(p).ok, true);
+});
+
+test('each() yields every public entry of the given types in file order and skips private ones', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ledger-each-'));
+  const p = join(dir, 'ledger.jsonl');
+  const l = new Ledger(p);
+  l.append('page_published', { slug: 'a' });
+  l.append('page_deleted', { slug: 'a' });
+  l.appendPrivate('diary', 'Y2lwaGVy');
+  l.append('page_published', { slug: 'b' });
+
+  assert.deepEqual([...l.each(['page_published'])].map((e) => e.data.slug), ['a', 'b']);
+  assert.deepEqual([...l.each(['page_published', 'page_deleted'])].map((e) => e.type), ['page_published', 'page_deleted', 'page_published']);
+  assert.equal([...l.each()].filter((e) => e.private).length, 0);
+  assert.equal([...l.each(['diary'])].length, 0); // private entries are never replayed
+
+  // A torn tail is ignored, exactly like recent() and verify().
+  writeFileSync(p, readFileSync(p, 'utf8') + '{"seq":99,"type":"page_pub');
+  const reopened = new Ledger(p);
+  assert.deepEqual([...reopened.each(['page_published'])].map((e) => e.data.slug), ['a', 'b']);
+});
+
+function appendSync(path, text) { appendFileSync(path, text); }

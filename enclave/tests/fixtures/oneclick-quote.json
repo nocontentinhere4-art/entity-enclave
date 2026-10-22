@@ -1,0 +1,86 @@
+{
+  "_comment": "Hand-crafted 1Click /v0/quote fixture matching plan §2.1. Addresses are checksum-valid but synthetic.",
+  "request": {
+    "dry": false,
+    "swapType": "EXACT_INPUT",
+    "slippageTolerance": 100,
+    "originAsset": "nep141:zec.omft.near",
+    "depositType": "ORIGIN_CHAIN",
+    "destinationAsset": "nep141:sol.omft.near",
+    "amount": "2475000",
+    "recipient": "So11111111111111111111111111111111111111112",
+    "recipientType": "DESTINATION_CHAIN",
+    "refundTo": "u1vymxea5uae7yux3ya3fva0qe6s0pfngth3rlde546lnshazymc6q4zt44g",
+    "refundType": "ORIGIN_CHAIN",
+    "deadline": "2026-10-22T12:00:00.000Z"
+  },
+  "response": {
+    "quote": {
+      "depositAddress": "u1vymxea5uae7yux3ya3fva0qe6s0pfngth3rlde546lnshazymc6q4zt44g",
+      "depositMemo": "synthetic-memo-1",
+      "amountIn": "2475000",
+      "amountOut": "98000000",
+      "minAmountOut": "97020000",
+      "deadline": "2026-10-22T12:00:00.000Z",
+      "timeWhenInactive": "2026-10-22T12:30:00.000Z",
+      "timeEstimate": 120,
+      "refundFee": "10000",
+      "withdrawFee": "0"
+    },
+    "quoteRequest": {
+      "amount": "2475000"
+    },
+    "timestamp": "2026-10-22T11:00:00.000Z",
+    "signature": "synthetic-signature",
+    "correlationId": "fixture-correlation-id"
+  },
+  "dryResponse": {
+    "quote": {
+      "amountIn": "2475000",
+      "amountOut": "98000000",
+      "minAmountOut": "97020000",
+      "timeEstimate": 120,
+      "refundFee": "10000",
+      "withdrawFee": "0"
+    },
+    "timestamp": "2026-10-22T11:00:00.000Z",
+    "signature": "synthetic-signature",
+    "correlationId": "fixture-correlation-id"
+  },
+  "closeRequest": {
+    "dry": false,
+    "swapType": "EXACT_INPUT",
+    "slippageTolerance": 100,
+    "originAsset": "nep141:sol.omft.near",
+    "depositType": "ORIGIN_CHAIN",
+    "destinationAsset": "nep141:zec.omft.near",
+    "amount": "97000000",
+    "recipient": "u1vymxea5uae7yux3ya3fva0qe6s0pfngth3rlde546lnshazymc6q4zt44g",
+    "recipientType": "DESTINATION_CHAIN",
+    "refundTo": "So11111111111111111111111111111111111111112",
+    "refundType": "ORIGIN_CHAIN",
+    "deadline": "2026-10-22T12:00:00.000Z"
+  },
+  "closeResponse": {
+    "quote": {
+      "depositAddress": "So11111111111111111111111111111111111111112",
+      "depositMemo": null,
+      "amountIn": "97000000",
+      "amountOut": "2400000",
+      "minAmountOut": "2380000",
+      "deadline": "2026-10-22T12:00:00.000Z",
+      "timeEstimate": 120
+    }
+  },
+  "badDeposit": {
+    "_comment": "Transparent address plus a memo: the preflight must abort before sending.",
+    "depositAddress": "t1SyntheticTransparentAddressForTestsOnly1111111",
+    "depositMemo": "must-not-travel"
+  },
+  "addresses": {
+    "u1": "u1vymxea5uae7yux3ya3fva0qe6s0pfngth3rlde546lnshazymc6q4zt44g",
+    "zs1": "zs1fmj7d8e2xp2nyc3yhaz2kldw8yhecm3s9yumuek2ma26r4x68egzfe5e99w5jmz8gls9wduqtjn",
+    "badU1": "u1vymxea5uae7yux3ya3fva0qe6s0pfngth3rlde546lnshazymc6q4zt44q",
+    "transparent": "t1SyntheticTransparentAddressForTestsOnly1111111"
+  }
+}

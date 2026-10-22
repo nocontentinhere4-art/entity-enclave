@@ -44,6 +44,42 @@ In locale l'attestazione risponde `mode: "dev"`: è dichiaratamente **non attest
   Un volume nuovo con la stessa immagine ricrea lo stesso wallet (stessa seed) ma una vita nuova.
 - Errori del wallet nel registro (`wallet-error`, `sync-skipped`): solo `code` breve e hash del messaggio; il testo è nei log.
 
+## Trading, forecasts, pages, orders
+
+Fase 2 porta quattro capacità oltre al cervello (il canale pubblico, le note private e gli swap NEAR Intents).
+
+### Trading — ONE-TRADE WALLETS (opzionale, spento di default)
+Un motore a stato persistente che esegue ordini `buy`/`sell` ricevuti come lettere pagate (memo). L'esecuzione è
+tutta codice: target, stop, scadenza e vendita del cliente sono decisi dalla macchina; il modello legge solo lo
+stato (`trade_status`, 100 zats) e non può aprire né chiudere posizioni.
+- **Attivazione**: `TRADE_ENABLED=1` + `SOLANA_RPC_URL` + `ARCHIVE_PUBKEY`. Senza uno di questi il desk resta
+  spento e l'avvio è identico a prima (default `TRADE_ENABLED=0`).
+- **Ordini**: memo `buy <mint|ticker> target +X% stop -Y% return <u1…|zs1…>` oppure `sell <orderId>`. Il denaro
+  passa per il bridge NEAR Intents 1Click (ZEC↔SOL) e per Jupiter (SOL→token).
+- **Segretezza**: indirizzo di ritorno, chiave del wallet d'ordine e indirizzo di deposito vivono solo nel
+  TradeStore sigillato (AES-256-GCM) e nell'escrow dell'archivio; mai nel registro pubblico, nei log, in
+  `/trades` o nel contesto del modello (la memo viene redatta).
+- **Vista pubblica**: `/trades` (aperti, chiusi, commissioni, ultime chiusure) e `/trades/<orderId>`.
+- **Config** (`src/config.mjs`): `TRADE_MIN_ZATS`/`TRADE_MAX_ZATS`, `TRADE_MAX_OPEN`, `TRADE_FEE_BPS`,
+  `TRADE_SLIPPAGE_BPS`, `TRADE_MAX_HOLD_HOURS`, `TRADE_POLL_MS`, `TRADE_SYNC_MINUTES` (sincronizzazione ZEC più
+  rapida mentre si fa trading) e gli altri `TRADE_*`; RPC/API: `SOLANA_RPC_URL`, `SOLANA_COMMITMENT`,
+  `JUPITER_BASE_URL`, `JUPITER_API_KEY`, `ONECLICK_BASE_URL`, `ONECLICK_API_KEY`.
+- **Morte**: prima dello shredding il motore tenta di chiudere ogni posizione aperta (budget limitato); ciò che
+  resta è registrato come `trade_abandoned` e recuperabile solo dall'escrow dell'archivio.
+
+### Forecasts
+Previsioni pubbliche di prezzo (zec/sol/usdc) aperte al prezzo 1Click corrente e saldate automaticamente a
+scadenza dalla stessa fonte. Strumento `forecast`, endpoint `/forecasts`, track record pubblico.
+
+### Pages
+Il sito pubblico dell'entità: `publish_page` scrive pagine markdown/html (allowlist stretta), `/pages` e
+`/pages/<slug>` le servono, ogni versione ha il suo hash nel registro. Sopravvivono alla morte per progetto.
+
+### Orders
+Adempimento a pagamento: una lettera con memo `ORDER <item>` diventa un ordine con scadenza pubblica. `/orders`
+mostra il record verificabile, `/paywall` il listino. La consegna è un `post_public(orderId=…)`; `order_refuse`
+rifiuta in pubblico.
+
 ## Cosa manca (fase 2)
 Cervello (inferenza TEE a gettoni), canale pubblico, note private cifrate a riposo, pausa a soglia,
 NEAR Intents, seconda entità, narratore.

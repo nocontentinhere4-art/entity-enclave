@@ -1,0 +1,10 @@
+{
+  "_comment": "DERIVED (generate.mjs): legacy closeAccount-built tx on the SPL Token program. data = [9]; keys [owner(signer), account(w), destination(w), program(ro)]; fee payer slot 0 = owner.",
+  "wire": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAEEOEejDVYCwrZKbjfUCz8T80gbCVFmqis0EsmlMtY4dN112kyhR3jIi+45TCQq4w6qnpW1IetndfW5iTmhKrH18s2c2dbsod8aBGhtCMHpZd6DdbjDNwA+uvf9ITcGqaMFBt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKlXw6Eh9WpvTUaCkmzU1itUXz0UJnL9zSn7cx5SpirCJgEDAwECAAEJ",
+  "keysBase58": [
+    "4nhBrWfRyMYxJsAf3e2AH9UTuh2BMMe9d7BsXiFCY8V2",
+    "8w3mQjrEtnEzc2xPu2Md9N3GEXQvARYGcW94TMqgqw2q",
+    "EqdJGp62X4NMTDPkojLP9YyBYjvVKGti72pay5SJ7R16",
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  ]
+}

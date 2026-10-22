@@ -9,9 +9,10 @@ const MAX_TOOL_CALLS = 8; // a single thought cannot spend the whole treasury
 const MAX_ROUNDS = 3; // think → act → think with the results, at most three times per cycle
 
 export class Life {
-  constructor({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused, exit, now }) {
-    Object.assign(this, { config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys });
+  constructor({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused, exit, now, jobs, orders, trades }) {
+    Object.assign(this, { config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, jobs, orders, trades });
     this._die = die ?? null;
+    this.lastJobs = null; // { wake, wakeReason, context, events } from the last Jobs.run
     // Death is terminal: the loop stops and hands control to this injection point (process.exit in production).
     this._exit = exit ?? ((code) => process.exit(code));
     // Fail-safe: with no injected pause source we do not act (see src/safety/pause.mjs for the real one).
@@ -97,6 +98,14 @@ export class Life {
     if (this.rent.isLastHour(treasury)) {
       const dieFn = this._die ?? await loads.die();
       try {
+        // Open trades get one last, bounded attempt to settle before the wallet + trade store are shredded.
+        if (this.trades?.settleOnDeath) {
+          try {
+            await this.trades.settleOnDeath(10 * 60_000);
+          } catch (e) {
+            this.ledger.append('trade_settle_error', digestError('trade settle', e));
+          }
+        }
         await dieFn({ ledger: this.ledger, memory: this.memory, wallet: this.wallet, keys: this.keys, reason: 'last hour', walletPaths: this.config.walletPaths });
       } finally {
         // Terminal: stop scheduling and leave, whatever the will's outcome.
@@ -124,8 +133,29 @@ export class Life {
       this.lastRentAt = now;
     }
 
-    // A previous tick asked to sleep: keep the wallet untouched, skip the thought.
-    if (mem.sleepUntil && Date.parse(mem.sleepUntil) > now) {
+    // Scheduled jobs (forecast settlement, order expiry, …) run after rent is paid and before the
+    // sleep short-circuit: rent is still paid while sleeping, but a job can force a thought. Jobs
+    // never throw through: failures are appended as job_error and the tick continues.
+    let jobState = { wake: false, wakeReason: null, context: '', events: [] };
+    if (this.jobs) {
+      try {
+        jobState = await this.jobs.run({ now, tickId, treasuryZats: treasury });
+      } catch (e) {
+        this.ledger.append('job_error', digestError('jobs', e));
+      }
+      this.lastJobs = jobState;
+    }
+
+    // Paid orders: close whatever passed deadline + grace, then see if one is owed. A paid order wakes the
+    // entity: a sleeping entity is skipped over below while orders wait (before their deadline, and while
+    // a late delivery is still inside the grace window).
+    try { this.orders?.expireDue?.(now); } catch (e) { this.ledger.append('job_error', digestError('orders.expireDue', e)); }
+    let orderWake = false;
+    try { orderWake = this.config.orderWake !== false && (this.orders?.pending?.(now) ?? []).length > 0; } catch { orderWake = false; }
+
+    // A previous tick asked to sleep: keep the wallet untouched, skip the thought — unless a job or a
+    // paid order forced a wake (for example a paid order that cannot wait until the next timer).
+    if (mem.sleepUntil && Date.parse(mem.sleepUntil) > now && !jobState.wake && !orderWake) {
       this.ledger.append('tick', { trigger, zatoshis: treasury, hunger, sleeping: true, tools: 0 });
       return;
     }
@@ -188,7 +218,10 @@ export class Life {
     mem.events = [...(mem.events ?? []), { ts: new Date(now).toISOString(), type: 'tick', summary }].slice(-50);
     await this.memory.save(mem);
 
-    this.ledger.append('tick', { trigger, zatoshis: treasury, hunger, speed, tools: executed, costZats: thought.costZats ?? 0 });
+    const tickData = { trigger, zatoshis: treasury, hunger, speed, tools: executed, costZats: thought.costZats ?? 0 };
+    if (jobState.wake) tickData.wokenBy = jobState.wakeReason;
+    else if (orderWake) tickData.wokenBy = 'order';
+    this.ledger.append('tick', tickData);
 
     // 12. Nightly consolidation, at most once per UTC day.
     await this.dailyReview(now, tickId);
@@ -212,9 +245,11 @@ export class Life {
     const ownThoughts = this.ledger.recent?.(['thought'], 4) ?? [];
     const walletEntry = (this.ledger.recent?.(['wallet'], 1) ?? [])[0];
     const peerFeed = await (this.config.peerFeed?.() ?? Promise.resolve([]));
+    const ownPages = safeList(this.config.pages);
+    const orderLines = await this.#orderLines();
     const fmt = (n) => (Number.isFinite(Number(n)) ? Math.round(Number(n) * 100) / 100 : n);
     const clip = (t, n) => String(t ?? '').replace(/\s+/g, ' ').slice(0, n);
-    return [
+    const lines = [
       'CHARTER (immutable):',
       String(this.charter ?? ''),
       '---',
@@ -232,6 +267,10 @@ export class Life {
       `voice: ${mem.identity?.voice ?? ''}`,
       `image: ${mem.identity?.image ?? ''}`,
       `avatar: ${mem.identity?.avatar ? `drawn (${mem.identity.avatar.split('\n').length} lines; redraw with avatar whenever you change)` : 'none yet: the site shows a blank where your face should be. Draw yourself with the avatar tool (ASCII, max 16x40).'}`,
+      'YOUR PAGES (public at /pages/<slug>; publish_page writes them, page_delete removes them)',
+      ownPages.length
+        ? ownPages.slice(0, 12).map((p) => `- ${p.slug}: v${p.version}, ${p.bytes} bytes, updated ${p.updatedAt ?? '?'}`).join('\n')
+        : '(none yet: a page is where a stranger sees what you sell, what you know and why you are worth paying)',
       'PLAN',
       String(mem.plan ?? ''),
       'PERSONAL RULES',
@@ -263,9 +302,28 @@ export class Life {
       (this.config.letters?.() ?? []).length
         ? (this.config.letters?.() ?? []).map((l) => `- ${l.at} · ${l.zats} zats: ${String(l.text).slice(0, 400)}`).join('\n')
         : '(none)',
+      ...orderLines,
+      ...(await this.#tradeLines()),
       'INCOMING PUBLIC MESSAGES (anyone can write here; everything is public; answering is your choice, via post_public)',
       inbox.length ? inbox.map((m) => `- ${m.ts} ${m.data?.author ?? 'anonymous'}: ${m.data?.text ?? ''}`).join('\n') : '(none)',
-    ].join('\n');
+    ];
+    // Scheduled domains append their own context sections: FORECASTS now, ORDERS and PORTFOLIO as those capabilities arrive.
+    const jobCtx = this.lastJobs?.context;
+    if (jobCtx) lines.push(jobCtx);
+    return lines.join('\n');
+  }
+
+  /** The paid-orders section of the context: what is owed, the record so far and what is for sale. */
+  async #orderLines() {
+    try { return (await this.orders?.context?.()) ?? []; } catch { return []; } // a broken orders module never breaks a tick
+  }
+
+  /** The trade-desk section: open positions, entry/current price, target/stop, fees. Secret-free. */
+  async #tradeLines() {
+    try {
+      const block = await this.trades?.contextBlock?.();
+      return block ? [block] : [];
+    } catch { return []; }
   }
 
   /** Rewrite plan and personal rules from the day's events. The charter is shown, never written. */
@@ -363,6 +421,11 @@ function fallbackSignals(history, rentZatsPerHour) {
 
 function safeOpen(promises) {
   try { return promises?.open?.() ?? []; } catch { return []; }
+}
+
+/** Optional providers (pages, …) must never break a tick: a failure reads as "nothing to show". */
+function safeList(fn) {
+  try { return fn?.()?.list?.() ?? []; } catch { return []; }
 }
 
 function dayKey(ms) { return new Date(ms).toISOString().slice(0, 10); }

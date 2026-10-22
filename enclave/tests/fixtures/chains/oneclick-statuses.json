@@ -1,0 +1,38 @@
+{
+  "_comment": "1Click /v0/status response shapes for the open/close HTTP tests. The open leg's PENDING_DEPOSIT → PROCESSING → SUCCESS ladder is consumed in order by Intents.pollStatus (tests/trade-open.test.mjs); successClose ends the close leg (tests/trade-close.test.mjs). swapDetails.destinationChainTxHashes[0].hash is the on-chain payout txid the engine records.",
+  "pending": { "status": "PENDING_DEPOSIT" },
+  "processing": {
+    "status": "PROCESSING",
+    "swapDetails": { "amountIn": "2475000", "amountOut": "98000000" }
+  },
+  "successOpen": {
+    "status": "SUCCESS",
+    "swapDetails": {
+      "amountIn": "2475000",
+      "amountOut": "98000000",
+      "amountOutFormatted": "0.098",
+      "originChainTxHashes": [ { "hash": "zec-txid-open", "explorerUrl": "https://fixture/zec" } ],
+      "destinationChainTxHashes": [ { "hash": "sol-txid-open", "explorerUrl": "https://fixture/sol" } ],
+      "depositedAmount": "2475000"
+    }
+  },
+  "successClose": {
+    "status": "SUCCESS",
+    "swapDetails": {
+      "amountIn": "120000000",
+      "amountOut": "2400000",
+      "amountOutFormatted": "0.024",
+      "originChainTxHashes": [ { "hash": "sol-txid-close", "explorerUrl": "https://fixture/sol" } ],
+      "destinationChainTxHashes": [ { "hash": "zec-txid-payout", "explorerUrl": "https://fixture/zec" } ],
+      "depositedAmount": "120000000"
+    }
+  },
+  "failed": {
+    "status": "FAILED",
+    "swapDetails": { "refundReason": "bridge_unavailable" }
+  },
+  "refunded": {
+    "status": "REFUNDED",
+    "swapDetails": { "refundedAmount": "2475000" }
+  }
+}

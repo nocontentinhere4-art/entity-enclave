@@ -1,0 +1,29 @@
+{
+  "_comment": "Solana JSON-RPC responses for the open/close HTTP tests. The blockhash is a 32-byte base58 value (reused from soltx-derived-transfer.json) so buildLegacyTransaction accepts it. sendTransaction returns a base58 signature ≥ 32 chars; getSignatureStatuses reports confirmed on the first poll so Solana.confirm() returns immediately.",
+  "getBalance": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": { "context": { "slot": 1 }, "value": 98000000 }
+  },
+  "getLatestBlockhash": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "context": { "slot": 1 },
+      "value": { "blockhash": "6ubV9kYQiNG1GJjkqvYkk3mSVJvSscgK7SE2aXLsMeuB", "lastValidBlockHeight": 300000000 }
+    }
+  },
+  "sendTransaction": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": "2QocibcuhkqUPzhUVh3UPQhe48d1zWL7eY8Pg1skTKD4akBfUroMTnpvtURSumWh4bmkoB62NnM2Z3TSou5KPhiK"
+  },
+  "getSignatureStatuses": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "context": { "slot": 1 },
+      "value": [ { "slot": 1, "confirmations": 1, "status": null, "err": null, "confirmationStatus": "confirmed" } ]
+    }
+  }
+}

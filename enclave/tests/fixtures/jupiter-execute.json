@@ -1,0 +1,33 @@
+{
+  "_comment": "Hand-crafted Jupiter /swap/v2/execute success and failure fixtures (plan §2.2b).",
+  "success": {
+    "status": "Success",
+    "signature": "5xY7fixtureSignature0000000000000000000000000000000000000000000000000000000000000000",
+    "code": 0,
+    "totalInputAmount": "92000000",
+    "inputAmountResult": "92000000",
+    "totalOutputAmount": "123456789",
+    "outputAmountResult": "123456789"
+  },
+  "expiredBlockhash": {
+    "status": "Failed",
+    "signature": null,
+    "code": -1005,
+    "error": "blockhash expired"
+  },
+  "expiredRfq": {
+    "status": "Failed",
+    "signature": null,
+    "code": -2003,
+    "error": "rfq expired"
+  },
+  "sellSuccess": {
+    "status": "Success",
+    "signature": "4aB2fixtureSellSignature0000000000000000000000000000000000000000000000000000000000000",
+    "code": 0,
+    "totalInputAmount": "123456789",
+    "inputAmountResult": "123456789",
+    "totalOutputAmount": "101500000",
+    "outputAmountResult": "101500000"
+  }
+}

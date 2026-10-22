@@ -1,0 +1,22 @@
+{
+  "_comment": "1Click /v0/quote response for the OPEN leg (ZEC→SOL, EXACT_INPUT). Hand-authored HTTP fixture for tests/trade-open.test.mjs. amountIn is zats (ZEC, 8 decimals); amountOut/minAmountOut are lamports (SOL, 9 decimals). depositAddress is a shielded ZEC address (u1…) so a depositMemo can travel with the entity's deposit — the transparent+memo abort path is covered separately in the test.",
+  "quote": {
+    "depositAddress": "u1openlegfixturedeposit0000000000000000000000000000",
+    "depositMemo": "sov-trade-0001",
+    "amountIn": "2475000",
+    "amountOut": "98000000",
+    "minAmountOut": "97500000",
+    "deadline": "2026-10-22T12:00:00.000Z",
+    "timeWhenInactive": "2026-10-22T13:00:00.000Z",
+    "timeEstimate": 120,
+    "refundFee": "5000",
+    "withdrawFee": "5000"
+  },
+  "quoteRequest": {
+    "originAsset": "nep141:zec.omft.near",
+    "destinationAsset": "nep141:sol.omft.near"
+  },
+  "timestamp": "2026-10-22T10:00:00.000Z",
+  "signature": "fixture-signature-open",
+  "correlationId": "open-corr-0001"
+}

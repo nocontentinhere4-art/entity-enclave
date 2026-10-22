@@ -1,0 +1,12 @@
+{
+  "_comment": "Jupiter /swap/v2/execute success response (code 0, status Success). totalInputAmount/totalOutputAmount are raw integer strings used for wallet-level accounting. totalOutputAmount 121000000 is the close-leg solOut the tests assert against (the open test only checks status/code).",
+  "success": {
+    "status": "Success",
+    "signature": "2QocibcuhkqUPzhUVh3UPQhe48d1zWL7eY8Pg1skTKD4akBfUroMTnpvtURSumWh4bmkoB62NnM2Z3TSou5KPhiK",
+    "code": 0,
+    "totalInputAmount": "123456789",
+    "inputAmountResult": "123456789",
+    "totalOutputAmount": "121000000",
+    "outputAmountResult": "121000000"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "_comment": "Jupiter /swap/v2/order response shapes for the open/close HTTP tests. The `transaction` fields are placeholder base64 strings (buy-order/sell-order fixture markers): these tests assert the client plumbing (URL/query, normalized fields, execute round-trip), while byte-level signing/serialization is covered in tests/soltx.test.mjs against the real mainnet fixtures. `quoteOnly` is the no-taker sell-side price probe (transaction === null).",
+  "buy": {
+    "transaction": "YnV5LW9yZGVyLXRyYW5zYWN0aW9uLWZpeHR1cmU=",
+    "requestId": "buy-rfq-0001",
+    "outAmount": "123456789",
+    "router": "JUP",
+    "mode": "ExactIn",
+    "feeBps": 0,
+    "feeMint": "So11111111111111111111111111111111111111112",
+    "transactionVersion": "V0",
+    "lastValidBlockHeight": 300000000
+  },
+  "sell": {
+    "transaction": "c2VsbC1vcmRlci10cmFuc2FjdGlvbi1maXh0dXJl",
+    "requestId": "sell-rfq-0001",
+    "outAmount": "121000000",
+    "router": "JUP",
+    "mode": "ExactOut",
+    "feeBps": 0,
+    "feeMint": "So11111111111111111111111111111111111111112",
+    "transactionVersion": "V0",
+    "lastValidBlockHeight": 300000000
+  },
+  "quoteOnly": {
+    "transaction": null,
+    "requestId": null,
+    "outAmount": "119000000",
+    "router": "JUP",
+    "mode": "ExactOut"
+  }
+}

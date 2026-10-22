@@ -1,0 +1,17 @@
+{
+  "_comment": "Deterministic, hand-crafted but structurally real Solana v0 transaction used by the signer tests. Keys: slot0 payer index 0; slot1 payer index 1 (JupiterZ-style partial signature). The message is prefixed 0x80 (v0), includes a SystemProgram transfer instruction, and the signature slots are zero-filled in the wire transaction, exactly as Jupiter returns it. The expected* fields are the ed25519 signature over messageBase64, which the signer must splice into the matching slot.",
+  "payerPublicKey": "HNbENcQ39Sgh4phghmErCkHTLN4P1toqsDPsxS5GVuUS",
+  "payerSecretKey": "cmIA6PjACj4U0yuedtDqYQXHbvBgNJSNNN8Z/UgAMaDzQuR2a+XaTLZkMOi4mGCS66xBRIojJZjN2jX25ENUFw==",
+  "slot0": {
+    "transaction": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAQABA/NC5HZr5dpMtmQw6LiYYJLrrEFEiiMlmM3aNfbkQ1QXkqJXxo3sBMHmy8BwJtrApdIAizNl0/2tefVOzGEmYOMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABdSzFyW7NljMFEMA/6/0pzopp/DWtyLf7mKNilACI9OAQICAAEMAgAAAEBCDwAAAAAA",
+    "messageBase64": "gAEAAQPzQuR2a+XaTLZkMOi4mGCS66xBRIojJZjN2jX25ENUF5KiV8aN7ATB5svAcCbawKXSAIszZdP9rXn1TsxhJmDjAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXUsxcluzZYzBRDAP+v9Kc6Kafw1rci3+5ijYpQAiPTgECAgABDAIAAABAQg8AAAAAAA==",
+    "signerIndex": 0,
+    "expectedSignatureBase64": "Z7iHfVeTNwPZsUB0vI3OlEDEX7y6S6G/3r7PhsZzAwPppJyPitY0xfcbl+oDdBsbzQCCQpArbKscgC3SlZBnAg=="
+  },
+  "slot1": {
+    "transaction": "AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAIAAQRBk4v528ReVB9McLYA3uBOznadr3RVMDeSp4BNmpds8/NC5HZr5dpMtmQw6LiYYJLrrEFEiiMlmM3aNfbkQ1QXkqJXxo3sBMHmy8BwJtrApdIAizNl0/2tefVOzGEmYOMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABdSzFyW7NljMFEMA/6/0pzopp/DWtyLf7mKNilACI9OAQMCAQIMAgAAAEBCDwAAAAAA",
+    "messageBase64": "gAIAAQRBk4v528ReVB9McLYA3uBOznadr3RVMDeSp4BNmpds8/NC5HZr5dpMtmQw6LiYYJLrrEFEiiMlmM3aNfbkQ1QXkqJXxo3sBMHmy8BwJtrApdIAizNl0/2tefVOzGEmYOMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABdSzFyW7NljMFEMA/6/0pzopp/DWtyLf7mKNilACI9OAQMCAQIMAgAAAEBCDwAAAAAA",
+    "signerIndex": 1,
+    "expectedSignatureBase64": "IM7XUGoZqLcpHcrZy63Lliyn1qMU3VoicivQv6LHZo0bj2xYRMk+GvbqUZDcfMM2/0ckOzjHzpEiq9YPo07mBA=="
+  }
+}

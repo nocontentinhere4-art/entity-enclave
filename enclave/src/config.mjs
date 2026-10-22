@@ -84,9 +84,71 @@ export const config = {
   nostrRelays: (process.env.NOSTR_RELAYS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   // Hard ceiling on a single model call: a slow provider must never hang the entity.
   llmTimeoutMs: num(process.env.LLM_TIMEOUT_MS, 60_000),
+  // Paid order fulfilment: a letter whose memo matches an active paywall item becomes an order with a deadline.
+  orderDeadlineHours: num(process.env.ORDER_DEADLINE_HOURS, 24),   // how long the entity has to deliver
+  orderGraceHours: num(process.env.ORDER_GRACE_HOURS, 6),         // late deliveries still accepted in this window
+  orderMaxOpen: num(process.env.ORDER_MAX_OPEN, 10),              // > this many open orders: new ones are refused
+  orderWake: bool(process.env.ORDER_WAKE, true),                  // pending orders wake a sleeping entity
+  orderRequestsMax: num(process.env.ORDER_REQUESTS_MAX, 100),     // private request texts kept in memory
   // Wallet directories to shred on death. Empty for the in-memory fake wallet (it leaves no files behind);
   // the service fills it in when it builds a real wallet.
   walletPaths: process.env.WALLET_PATHS
     ? process.env.WALLET_PATHS.split(',').map((s) => s.trim()).filter(Boolean)
     : [],
+  // Forecasts: public price predictions with automatic settlement and a track record.
+  forecastMaxOpen: num(process.env.FORECAST_MAX_OPEN, 3),
+  forecastMinHorizonHours: num(process.env.FORECAST_MIN_HORIZON_HOURS, 1),
+  forecastMaxHorizonHours: num(process.env.FORECAST_MAX_HORIZON_HOURS, 48),
+  forecastSettleGraceHours: num(process.env.FORECAST_SETTLE_GRACE_HOURS, 6),
+  // Market price source: the same 1Click rail used by swap_quote.
+  marketPriceTtlSeconds: num(process.env.MARKET_PRICE_TTL_SECONDS, 60),
+  marketMaxStaleSeconds: num(process.env.MARKET_MAX_STALE_SECONDS, 900),
+  oneClickBaseUrl: process.env.ONECLICK_BASE_URL ?? 'https://1click.chaindefuser.com',
+  oneClickApiKey: process.env.ONECLICK_API_KEY ?? null,
+  // Public pages (capability C). PAGES_DIR defaults to <STATE_DIR>/pages in index.mjs; null means "derive it".
+  pagesDir: process.env.PAGES_DIR ? process.env.PAGES_DIR.trim() : null,
+  pagesMax: num(process.env.PAGES_MAX, 50),
+  pagesEditsPerDay: num(process.env.PAGES_EDITS_PER_DAY, 10),
+  pagesMaxBytes: num(process.env.PAGES_MAX_BYTES, 65_536),
+  pagesAllowHtml: bool(process.env.PAGES_ALLOW_HTML, true),
+  pagesHistoryMax: num(process.env.PAGES_HISTORY_MAX, 50),
+  pagesSlugMax: num(process.env.PAGES_SLUG_MAX, 40),
+  // Trading (capability T): the ONE-TRADE WALLETS engine. Fully automatic once opted in: order execution
+  // is code (target/stop/deadline/client-sell), never the LLM. Disabled by default — no store, no scheduler.
+  trade: {
+    enabled: bool(process.env.TRADE_ENABLED, false),
+    minZats: num(process.env.TRADE_MIN_ZATS, 10_000_000),                 // 0.1 ZEC floor
+    maxZats: num(process.env.TRADE_MAX_ZATS, 1_000_000_000),              // 10 ZEC ceiling
+    maxOpen: num(process.env.TRADE_MAX_OPEN, 5),
+    maxOpenZats: num(process.env.TRADE_MAX_OPEN_ZATS, 2_000_000_000),
+    maxPerClient: num(process.env.TRADE_MAX_PER_CLIENT, 1),
+    rentReserveHours: num(process.env.TRADE_RENT_RESERVE_HOURS, 24),
+    feeBps: Math.min(num(process.env.TRADE_FEE_BPS, 100), 300),           // per leg, clamped to 300
+    slippageBps: Math.min(num(process.env.TRADE_SLIPPAGE_BPS, 100), 300), // Jupiter, clamped to 300
+    intentsSlippageBps: Math.min(num(process.env.TRADE_INTENTS_SLIPPAGE_BPS, 100), 300), // 1Click, clamped to 300
+    gasReserveLamports: num(process.env.TRADE_GAS_RESERVE_LAMPORTS, 5_000_000),
+    maxHoldHours: num(process.env.TRADE_MAX_HOLD_HOURS, 168),
+    pollMs: num(process.env.TRADE_POLL_MS, 60_000),
+    syncMinutes: num(process.env.TRADE_SYNC_MINUTES, 2),                  // faster ZEC sync while trading
+    bridgeTimeoutMs: num(process.env.TRADE_BRIDGE_TIMEOUT_MS, 45 * 60_000),
+    depositWindowMs: num(process.env.TRADE_DEPOSIT_WINDOW_MS, 60 * 60_000),
+    depositGraceMs: num(process.env.TRADE_DEPOSIT_GRACE_MS, 120_000),
+    minLiquidityUsd: num(process.env.TRADE_MIN_LIQUIDITY_USD, 50_000),
+    maxPriceImpactPct: num(process.env.TRADE_MAX_PRICE_IMPACT_PCT, 5),
+    maxRoundTripLossPct: num(process.env.TRADE_MAX_ROUNDTRIP_LOSS_PCT, 20),
+    minSolLamports: num(process.env.TRADE_MIN_SOL_LAMPORTS, 10_000_000),
+    refundMinZats: num(process.env.TRADE_REFUND_MIN_ZATS, 50_000),
+    networkFeeZats: num(process.env.TRADE_NETWORK_FEE_ZATS, 10_000),
+    allowToken2022: bool(process.env.TRADE_ALLOW_TOKEN2022, false),
+    allowManualClose: bool(process.env.TRADE_ALLOW_MANUAL_CLOSE, false),
+    confirmPolls: num(process.env.TRADE_TRIGGER_CONFIRM, 2),
+    ackZats: num(process.env.TRADE_ACK_ZATS, 0),
+    // Chain rails. SOLANA_RPC_URL is required for trades; a dedicated RPC (public one rate-limits hard).
+    rpcUrl: process.env.SOLANA_RPC_URL ?? '',
+    rpcCommitment: process.env.SOLANA_COMMITMENT ?? 'confirmed',
+    jupiterBase: process.env.JUPITER_BASE_URL ?? 'https://api.jup.ag',
+    jupiterKey: process.env.JUPITER_API_KEY ?? '',
+    oneclickBase: process.env.ONECLICK_BASE_URL ?? 'https://1click.chaindefuser.com',
+    oneclickKey: process.env.ONECLICK_API_KEY ?? '',
+  },
 };

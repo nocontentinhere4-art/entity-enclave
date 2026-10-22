@@ -10,16 +10,25 @@ import { connectDstack, attest } from './attestation.mjs';
 import { ZcashWallet } from './zcash.mjs';
 import { FakeWallet } from './fake-wallet.mjs';
 import { MemoryStore } from './memory/store.mjs';
+import { Pages } from './pages/store.mjs';
+import { pagesView, pageResponse } from './pages/http.mjs';
 import { Pricing } from './economy/pricing.mjs';
 import { Rent } from './economy/rent.mjs';
 import { die } from './economy/death.mjs';
 import { paused } from './safety/pause.mjs';
 import { digestError } from './log.mjs';
 import { Promises } from './life/promises.mjs';
+import { Orders, ordersView, PAYWALL_MEMO_FORMAT } from './orders/book.mjs';
 import { Inference } from './llm/infer.mjs';
 import { Tools } from './tools/registry.mjs';
 import { Life } from './life/loop.mjs';
+import { Jobs } from './life/jobs.mjs';
+import { Market } from './economy/market.mjs';
+import { Forecasts } from './economy/forecasts.mjs';
+import { serveForecasts } from './http/forecasts.mjs';
 import { deathState, deadView } from './boot.mjs';
+import { redactMemo } from './trade/orders.mjs';
+import { tradesHttp } from './trade/http.mjs';
 
 import { entropyToMnemonic } from './bip39.mjs';
 import { nostrIdentity } from './nostr.mjs';
@@ -64,6 +73,22 @@ if (ledger.seq === 0) {
 // Memory is encrypted at rest under a subkey of the entity seed: the same identity survives a redeploy.
 const memory = new MemoryStore({ path: join(STATE, 'memory.bin'), key: keys.deriveSubkey('memory') });
 
+// The entity's public site. Content is plain files under the state dir; the ledger holds only slug/bytes/hash/
+// version, so a page can be verified byte-for-byte. Pages survive a death (not in walletPaths) by design.
+const pages = new Pages({
+  dir: config.pagesDir ?? join(STATE, 'pages'),
+  ledger,
+  config,
+  entity: async () => (await memory.load())?.identity?.name ?? 'unnamed',
+});
+config.pages = () => pages;
+
+// Paid order fulfilment: a letter whose memo matches an active paywall item becomes an order with a public
+// deadline. The ledger records only ids, amounts and times; the private request text lives in memory.
+// Boot recovery: a delivery post that lost its order_delivered entry to a crash is closed here.
+const orders = new Orders({ ledger, memory, config });
+try { await orders.reconcile(); } catch (e) { ledger.append('order_error', digestError('order reconcile', e)); }
+
 // Wallet: real zingo-cli (offline locally, online through the mixnet to sync/send), or an in-memory fake.
 const wallet = config.fakeWallet
   ? new FakeWallet({ zats: config.fakeBalanceZats, dataDir: join(STATE, 'zcash') })
@@ -99,14 +124,25 @@ async function readLetters() {
     if (t.kind !== 'received' || t.status !== 'confirmed' || !t.memos?.length || seen.has(t.txid)) continue;
     seen.add(t.txid); changed = true;
     const text = t.memos.join('\n---\n').slice(0, 2000);
-    ledger.append('letter', { zats: t.value, bytes: Buffer.byteLength(text, 'utf8'), txid: t.txid });
+    const letterEntry = ledger.append('letter', { zats: t.value, bytes: Buffer.byteLength(text, 'utf8'), txid: t.txid });
     if (config.archivePub) ledger.appendPrivate('letter_text', keys.sealPrivate(config.archivePub, JSON.stringify({ txid: t.txid, zats: t.value, text })));
-    inbox.push({ at: t.datetime, zats: t.value, text });
+    // The letter may be a paid order (memo matching a paywall item): matching happens where letters land,
+    // and `buy `/`sell ` memos are left to the trade engine. The memo itself stays out of the public ledger.
+    let order = null;
+    try { const r = await orders.onLetter({ seq: letterEntry.seq, txid: t.txid, zats: t.value, text, at: t.datetime }); order = r?.order ?? null; }
+    catch (e) { ledger.append('order_error', digestError('order onLetter', e)); }
+    // A `buy `/`sell ` memo is a trade order; anything else is ignored by the engine. Ingestion never blocks:
+    // it parses, applies the pure limits and persists (or refunds), then the scheduler does the rest.
+    if (trades) {
+      try { await trades.ingest({ txid: t.txid, zats: t.value, text, at: t.datetime }); }
+      catch (e) { ledger.append('trade_error', digestError('trade ingest', e)); }
+    }
+    inbox.push({ at: t.datetime, zats: t.value, text, orderId: order?.id ?? null });
     if (inbox.length > 20) inbox.shift();
   }
   if (changed) { mem.seenTxids = [...seen].slice(-500); await memory.save(mem); }
 }
-config.letters = () => inbox.slice(-10);
+config.letters = () => inbox.slice(-10).map((l) => ({ ...l, text: redactMemo(l.text) }));
 async function syncWallet() {
   for (;;) {
     try {
@@ -126,7 +162,9 @@ async function syncWallet() {
       ledger.append('sync-skipped', digestError('sync', e));
       syncState = { ...syncState, ok: false, at: new Date().toISOString() };
     }
-    await new Promise((r) => setTimeout(r, Math.max(1, config.syncMinutes) * 60_000));
+    // While trading, a faster ZEC sync keeps incoming order letters from waiting a full window.
+    const syncMinutes = trades ? Math.min(config.syncMinutes, config.trade.syncMinutes ?? config.syncMinutes) : config.syncMinutes;
+    await new Promise((r) => setTimeout(r, Math.max(1, syncMinutes) * 60_000));
   }
 }
 
@@ -154,9 +192,50 @@ async function probeProviders() {
 }
 
 const pricing = new Pricing({ ledger, scale: config.priceScale });
+// Market prices (same 1Click rail as swap_quote), forecasts with an automatic settlement track record,
+// and the scheduled jobs that settle expired forecasts after rent is paid.
+const market = new Market({ fetchImpl: fetch, now: Date.now, baseUrl: config.oneClickBaseUrl, ttlMs: config.marketPriceTtlSeconds * 1000, maxStaleMs: config.marketMaxStaleSeconds * 1000 });
+const forecasts = new Forecasts({ ledger, market, config, now: Date.now });
+const jobs = new Jobs({ forecasts, config, ledger, now: Date.now });
 const rent = new Rent({ ledger, wallet, config, pricing });
 const promises = new Promises({ ledger, memory });
 const inference = new Inference({ config, ledger, pricing });
+
+// Trading (capability T): the ONE-TRADE WALLETS engine. Opt-in and fail-closed — TRADE_ENABLED=1 plus a Solana
+// RPC and an archive key are all required; without them the desk stays off and none of this is constructed, so
+// the default boot (TRADE_ENABLED=0) is byte-for-byte unchanged.
+let trades = null;
+if (config.trade.enabled && config.trade.rpcUrl && config.archivePub) {
+  try {
+    const { TradeStore, tradeStoreKey } = await import('./trade/store.mjs');
+    const { TradeEngine } = await import('./trade/engine.mjs');
+    const { buildTradeClients } = await import('./trade/wiring.mjs');
+    const store = new TradeStore({ path: join(STATE, 'trades.bin'), key: tradeStoreKey(keys) });
+    const clients = buildTradeClients({ config, keys, fetchImpl: fetch });
+    trades = new TradeEngine({
+      store,
+      ledger,
+      keys,
+      config,
+      zcash: wallet,
+      ...clients,
+      now: Date.now,
+      fetch,
+      archivePub: config.archivePub,
+      entityZcashAddress: address,
+      entitySolanaAddress: clients.treasury.pubkey,
+      rentZatsPerHour: config.rentZatsPerHour,
+    });
+    // The sealed trade store (and its backup) is shredded on death alongside the wallet.
+    config.walletPaths.push(join(STATE, 'trades.bin'), join(STATE, 'trades.bin.bak'));
+    trades.start();
+  } catch (e) {
+    ledger.append('trade_error', digestError('trade wiring', e));
+    trades = null;
+  }
+}
+const tradesView = tradesHttp();
+
 // The other entities this one knows: the sibling (PEER_URL), the parent (PARENT_URL) and every child it paid for.
 config.peers = () => {
   const out = [];
@@ -185,9 +264,9 @@ config.peerFeed = async () => {
   }
   return out;
 };
-const tools = new Tools({ ledger, wallet, memory, pricing, keys, config, channels: { public: 'public' }, promises, nostr });
+const tools = new Tools({ ledger, wallet, memory, pricing, keys, config, channels: { public: 'public' }, promises, nostr, forecasts, market, pages, orders, trades });
 
-const life = new Life({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused });
+const life = new Life({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused, jobs, orders, trades });
 life.start();
 void syncWallet();
 void probeProviders();
@@ -244,6 +323,7 @@ http.createServer(async (req, res) => {
     if (req.method !== 'GET') return json(405, { error: 'method not allowed' });
     if (req.url === '/') {
       const m = await memory.load();
+      const orderStats = orders.stats();
       return json(200, {
         entity: m.identity?.name || 'unnamed',
         mode: keys.mode,
@@ -253,7 +333,12 @@ http.createServer(async (req, res) => {
         peer: config.peerUrl,
         lineage: { parent: config.parentUrl, children: ledger.recent(['birth_of'], 1000).map((e) => ({ url: e.data?.url, address: e.data?.address, ts: e.ts })) },
         ledger: { entries: ledger.seq, head: ledger.head },
+        forecasts: { open: forecasts.list().open.length, score: forecasts.score() },
+        pages: pages.summary(),
         attestation: { mode: attestation.mode, app: attestation.app, compose: attestation.compose },
+        orders: { open: orderStats.open, delivered: orderStats.delivered, onTimePct: orderStats.onTimePct },
+        solana: trades ? { treasury: trades.entitySolanaAddress ?? null } : null,
+        trades: trades ? await trades.publicStatus() : { enabled: false, open: 0, closed: 0 },
       });
     }
     if (req.url === '/attestation') return json(200, attestation);
@@ -296,6 +381,20 @@ http.createServer(async (req, res) => {
           : { seq: e.seq, ts: e.ts, from: 'human', author: e.data?.author, text: e.data?.text }
       )));
     }
+    if (req.url === '/forecasts') return serveForecasts(req, res, { forecasts });
+    if (req.url === '/pages') return json(200, pagesView(pages));
+    if (req.url.startsWith('/pages/')) {
+      // The exact bytes whose hash is in the ledger, under a CSP that forbids every fetch.
+      const r = await pageResponse(pages, req.url.slice('/pages/'.length));
+      res.writeHead(r.status, r.headers);
+      return res.end(r.body);
+    }
+    // Paid orders: the fulfilment record anyone can audit, and the price list buyers order from.
+    // Both are generated from ledger ids and amounts only — the letter memo never appears.
+    if (req.url === '/orders') return json(200, ordersView(orders));
+    if (req.url === '/paywall') return json(200, { items: orders.items(), memoFormat: PAYWALL_MEMO_FORMAT });
+    // The trade desk: /trades and /trades/<orderId>, generated from ledger ids and amounts only (plan §8).
+    if (req.url === '/trades' || req.url.startsWith('/trades/')) return tradesView.serve(req, res, { trades });
     json(404, { error: 'not found' });
   } catch (e) {
     json(500, { error: String(e.message).slice(0, 300), code: e.code ?? null });

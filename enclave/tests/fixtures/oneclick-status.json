@@ -1,0 +1,71 @@
+{
+  "_comment": "Hand-crafted status sequence for the open bridge (plan §2.1d) and a successful close payout.",
+  "open": [
+    {
+      "status": "PENDING_DEPOSIT"
+    },
+    {
+      "status": "KNOWN_DEPOSIT_TX"
+    },
+    {
+      "status": "PROCESSING"
+    },
+    {
+      "status": "SUCCESS",
+      "swapDetails": {
+        "amountIn": "2475000",
+        "amountOut": "98000000",
+        "originChainTxHashes": [
+          {
+            "hash": "zecTxFixture0001"
+          }
+        ],
+        "destinationChainTxHashes": [
+          {
+            "hash": "solTxFixture0001"
+          }
+        ]
+      }
+    }
+  ],
+  "failed": {
+    "status": "FAILED",
+    "swapDetails": {
+      "amountIn": "2475000",
+      "amountOut": "0",
+      "refundReason": "synthetic failure"
+    }
+  },
+  "refunded": {
+    "status": "REFUNDED",
+    "swapDetails": {
+      "amountIn": "2475000",
+      "refundedAmount": "2475000"
+    }
+  },
+  "close": [
+    {
+      "status": "PENDING_DEPOSIT"
+    },
+    {
+      "status": "PROCESSING"
+    },
+    {
+      "status": "SUCCESS",
+      "swapDetails": {
+        "amountIn": "97000000",
+        "amountOut": "2400000",
+        "originChainTxHashes": [
+          {
+            "hash": "solCloseTxFixture0001"
+          }
+        ],
+        "destinationChainTxHashes": [
+          {
+            "hash": "zecPayoutTxFixture0001"
+          }
+        ]
+      }
+    }
+  ]
+}

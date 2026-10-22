@@ -1,0 +1,22 @@
+{
+  "_comment": "1Click /v0/quote response for the CLOSE leg (SOL→ZEC, EXACT_INPUT). Hand-authored HTTP fixture for tests/trade-close.test.mjs. amountIn is lamports (SOL); amountOut/minAmountOut are zats (ZEC). The rate 2400000 zats / 120000000 lamports = 0.02 zats/lamport is what feeCloseZats() uses to state the close fee in ZEC.",
+  "quote": {
+    "depositAddress": "EqdJGp62X4NMTDPkojLP9YyBYjvVKGti72pay5SJ7R16",
+    "depositMemo": null,
+    "amountIn": "120000000",
+    "amountOut": "2400000",
+    "minAmountOut": "2390000",
+    "deadline": "2026-10-22T13:00:00.000Z",
+    "timeWhenInactive": "2026-10-22T14:00:00.000Z",
+    "timeEstimate": 120,
+    "refundFee": "5000",
+    "withdrawFee": "5000"
+  },
+  "quoteRequest": {
+    "originAsset": "nep141:sol.omft.near",
+    "destinationAsset": "nep141:zec.omft.near"
+  },
+  "timestamp": "2026-10-22T10:30:00.000Z",
+  "signature": "fixture-signature-close",
+  "correlationId": "close-corr-0001"
+}
