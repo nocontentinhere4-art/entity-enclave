@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=27';
+} from './term.js?v=28';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger,
-} from './data.js?v=27';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=27';
-import { initHero, setMouth, triggerTalk } from './hero.js?v=27';
-import { mountAscii, RAMP } from './ascii.js?v=27';
+} from './data.js?v=28';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=28';
+import { initHero, setMouth, triggerTalk } from './hero.js?v=28';
+import { mountAscii, RAMP } from './ascii.js?v=28';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -100,7 +100,6 @@ function panelShell(id) {
   art.innerHTML = `
     <header class="card-meta">
       <span class="meta-label">ENCLAVE 0${id === 'e1' ? 1 : 2}</span>
-      <span class="meta-idx">[0002]</span>
     </header>
     <div class="card-portrait" data-portrait><canvas role="img" aria-label="ASCII portrait of ${id === 'e1' ? 'WICK' : 'OBOL'}"></canvas></div>
     <header class="card-head">
@@ -120,13 +119,19 @@ function panelShell(id) {
           <div><dt>last rent</dt><dd data-k="lastRent">—</dd></div>
           <div><dt>dies at</dt><dd data-k="dies">—</dd></div>
           <div><dt>last letter</dt><dd data-k="lastLetter">—</dd></div>
-          <div><dt>chain digest</dt><dd class="mono" data-k="digest">—</dd></div>
-          <div><dt>channel count</dt><dd data-k="channel">—</dd></div>
+          <div><dt>paid by people</dt><dd data-k="earned">—</dd></div>
+          <div><dt>public posts</dt><dd data-k="channel">—</dd></div>
         </dl>
       </div>
       <div class="tab-panel" data-panel="shop" role="tabpanel" hidden><div class="shop-list" data-k="shop"></div></div>
       <div class="tab-panel" data-panel="words" role="tabpanel" hidden><div class="words-list" data-k="words"></div></div>
+    </div>
+    <div class="card-actions">
+      <button class="btn fill" type="button" data-act="hour">Buy ${id === 'e1' ? 'WICK' : 'OBOL'} an hour</button>
+      <button class="btn ghost" type="button" data-act="ask">Ask ${id === 'e1' ? 'WICK' : 'OBOL'} something</button>
     </div>`;
+  art.querySelector('[data-act="hour"]').addEventListener('click', () => openPay({ who: id, hours: 1 }));
+  art.querySelector('[data-act="ask"]').addEventListener('click', () => openPay({ who: id, hours: 1 }));
   art.querySelector('.tabs').addEventListener('click', (ev) => {
     const b = ev.target.closest('.tab');
     if (!b) return;
@@ -150,27 +155,27 @@ function updatePanel(id) {
   get('state').textContent = d ? stateWord(d) : '—';
 
   if (!d) {
-    for (const k of ['treasury', 'hours', 'lastRent', 'dies', 'lastLetter', 'digest', 'channel']) get(k).textContent = '—';
+    for (const k of ['treasury', 'hours', 'lastRent', 'dies', 'lastLetter', 'earned', 'channel']) get(k).textContent = '—';
     get('shop').replaceChildren(el('p', { class: 'empty' }, BOOK_EMPTY));
     get('words').replaceChildren(el('p', { class: 'empty' }, BOOK_EMPTY));
     return;
   }
   if (!d.ok) {
     const off = offlineLabel(d);
-    for (const k of ['treasury', 'hours', 'lastRent', 'dies', 'lastLetter', 'digest', 'channel']) get(k).textContent = off;
+    for (const k of ['treasury', 'hours', 'lastRent', 'dies', 'lastLetter', 'earned', 'channel']) get(k).textContent = off;
     get('shop').replaceChildren(el('p', { class: 'empty' }, off));
     get('words').replaceChildren(el('p', { class: 'empty' }, off));
     return;
   }
 
   get('treasury').textContent = `${formatInt(d.zats)} zats · ${formatZats(d.zats)} ZEC`;
-  get('hours').textContent = formatInt(d.hoursLeft);
+  get('hours').textContent = `${formatInt(d.hoursLeft)} · about ${formatInt(Math.floor((d.hoursLeft || 0) / 24))} days`;
   get('lastRent').textContent = d.lastRent ? fmtStamp(d.lastRent.ts) : '—';
   get('dies').textContent = d.state === 'dead'
     ? (d.diedAt ? fmtStamp(d.diedAt) : 'dead')
     : (d.lastRent ? fmtStamp(deadline(d)) : '—');
   get('lastLetter').textContent = (d.letters && d.letters.length) ? fmtStamp(d.letters[d.letters.length - 1].ts) : '—';
-  get('digest').textContent = shortHash(d.head);
+  get('earned').textContent = `${formatZats(d.inTotal || 0)} ZEC · ${formatInt((d.letters || []).length)} letters`;
   get('channel').textContent = formatInt((d.posts || []).length);
 
   const shop = get('shop');
@@ -1217,12 +1222,15 @@ function entryAmount(e) {
   }
 }
 
+// heartbeat and bookkeeping lines are still in the chain (and verified), just not listed here
+const LEDGER_NOISE = new Set(['tick', 'tick_llm', 'tick_error', 'charge', 'tool', 'tool_error', 'llm_probe', 'wallet-sync', 'thought', 'letter_text', 'memory', 'diary']);
+
 function renderLedger() {
   const lines = [];
   for (const id of ['e1', 'e2']) {
     const d = ent(id);
     if (!d || !Array.isArray(d.entries)) continue;
-    for (const e of d.entries) lines.push({ d, e });
+    for (const e of d.entries) if (!LEDGER_NOISE.has(e.type)) lines.push({ d, e });
   }
   lines.sort((a, b) => Date.parse(a.e.ts || 0) - Date.parse(b.e.ts || 0));
   const last = lines.slice(-40);
