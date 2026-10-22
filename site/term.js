@@ -334,7 +334,7 @@ async function tradesCmd() {
     const r = await request(ai.base, '/trades', { allow404: true });
     if (r.ok && !r.notFound) say(`${nameOf(state.ais[ai.id]) || ai.id}: ${truncate(JSON.stringify(r.data), 200)}`, 'line signal');
   }
-  say('TRADES ARE NOT LIVE YET. A buy memo sent today is read as a paid question and buys hours, nothing else. No date promised.', 'line dim');
+  say('GET /trades did not answer: the entity may be restarting. Try again in a minute.', 'line dim');
 }
 
 async function verifyCmd() {
