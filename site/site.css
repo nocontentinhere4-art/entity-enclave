@@ -1,7 +1,9 @@
 /*
- * ZEALOT v14 — "the two live here".
- * A violet-black void, one living 3D scene fixed behind everything, and a real terminal docked at the
- * bottom. Almost no prose. No rounded corners, no cards, no shadows.
+ * ZEALOT v15 — "the obol on the eyes".
+ * An absolute black void. The whole 3D scene is drawn as terminal glyphs; the only smooth pixels are the
+ * terminal panel's own text. Film grain + vignette over the scene, never over the terminal. No rounded
+ * corners, no cards, no shadows. Scroll = chapters; the terminal docks at the bottom and rises to full
+ * height in chapter 3.
  */
 
 :root {
@@ -45,30 +47,48 @@ h1, h2, h3 { margin: 0; font-weight: 700; color: var(--bone); }
 .mono { font-variant-numeric: tabular-nums; }
 .dim { color: var(--dim); }
 
-/* faint scanlines over everything */
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.03) 0px,
-    rgba(255, 255, 255, 0.03) 1px,
-    transparent 1px,
-    transparent 3px
+/* ---------- post: vignette + grain (scene only, under the terminal) ---------- */
+.vignette, .grain { position: fixed; inset: 0; pointer-events: none; }
+.vignette {
+  z-index: 6;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 52%,
+    rgba(0, 0, 0, 0.55) 100%
   );
-  opacity: 1;
+}
+.grain {
+  z-index: 7;
+  opacity: 0.055;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  animation: grain 1.4s steps(4) infinite;
+}
+@keyframes grain {
+  0% { background-position: 0 0; }
+  25% { background-position: -43px 27px; }
+  50% { background-position: 31px -49px; }
+  75% { background-position: -27px -22px; }
+  100% { background-position: 0 0; }
 }
 
-/* ---------- the glass ---------- */
-.scene { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
-.scene canvas { display: block; width: 100%; height: 100%; }
-.skull { position: fixed; inset: 0; z-index: 0; opacity: 0.35; pointer-events: none; }
-.skull canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+/* ---------- the scene ---------- */
+.scene { position: fixed; inset: 0; z-index: 1; background: #000; overflow: hidden; }
+.poster {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+.scene canvas {
+  position: absolute; inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%; height: 100%;
+}
 
-/* ---------- labels anchored by the scene ---------- */
+/* ---------- labels projected by the scene ---------- */
 .labels { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
 .hud {
   position: absolute;
@@ -90,7 +110,7 @@ body::after {
 .corner {
   position: fixed;
   top: 10px;
-  z-index: 6;
+  z-index: 8;
   font-size: 10px;
   letter-spacing: 0.14em;
   color: var(--dim);
@@ -100,12 +120,38 @@ body::after {
 .corner-tl { left: 12px; }
 .corner-tr { right: 12px; color: var(--blood); }
 
-/* ---------- scroll rail ---------- */
+/* ---------- scroll rail: 500vh of room, one chapter per 100vh ---------- */
 .rail { position: relative; z-index: 2; pointer-events: none; }
 .rail-seg { height: 100vh; }
-.rail-end { position: relative; }
+
+/* ---------- chapter 0 intro ---------- */
+.intro {
+  position: fixed;
+  left: 14px;
+  bottom: calc(var(--term-h) + 22px);
+  z-index: 4;
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+  max-width: min(430px, calc(100vw - 28px));
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 300ms;
+}
+.intro-line {
+  color: var(--bone);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+.intro .btn { pointer-events: auto; }
+/* fade the intro out of every chapter but 0 */
+body:not([data-chapter="0"]) .intro { opacity: 0; }
+
+/* ---------- chapter 4 ending ---------- */
+.end { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
 .zero {
-  position: absolute;
+  position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
@@ -120,9 +166,24 @@ body::after {
   color: var(--bone);
   text-transform: uppercase;
   opacity: 0;
-  transition: opacity 200ms;
+  transition: opacity 400ms;
   padding: 0 12px;
 }
+.token-line {
+  position: fixed;
+  left: 0; right: 0;
+  bottom: 15vh;
+  padding: 0 16px;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+  opacity: 0;
+  transition: opacity 400ms;
+}
+body[data-chapter="4"] .zero { opacity: 1; }
+body[data-chapter="4"] .token-line { opacity: 1; }
 
 /* ---------- the terminal ---------- */
 .term {
@@ -132,9 +193,12 @@ body::after {
   height: var(--term-h);
   display: flex;
   flex-direction: column;
-  background: rgba(11, 11, 15, 0.92);
+  background: rgba(11, 11, 15, 0.94);
   border-top: 1px solid var(--glass-border);
+  transition: height 300ms ease;
 }
+/* chapter 3: the terminal rises to full height */
+.term.rise { height: 100dvh; }
 .term-head {
   display: flex;
   align-items: center;
@@ -145,6 +209,7 @@ body::after {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--dim);
+  flex: none;
 }
 .term-fold {
   background: none;
@@ -186,6 +251,7 @@ body::after {
   padding: 9px 14px;
   border-top: 1px solid var(--glass-border);
   background: rgba(11, 11, 15, 0.4);
+  flex: none;
 }
 .ps1 { color: var(--signal); white-space: nowrap; }
 .prompt {
@@ -298,11 +364,13 @@ legend { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; col
   .pay-out { grid-template-columns: 1fr; }
   .qr { width: 160px; }
   .corner-tr { display: none; }
+  .intro { bottom: calc(var(--term-h) + 16px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  .grain { animation: none; }
   .cursor::after { animation: none; }
   .hud { transition: none; }
-  .zero { transition: none; }
+  .intro, .zero, .token-line, .term { transition: none; }
 }
