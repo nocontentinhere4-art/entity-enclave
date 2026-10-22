@@ -95,84 +95,74 @@ function stateLabel(d) {
 }
 function deadline(d) { const base = d.lastRent ? Date.parse(d.lastRent.ts) : (d.at ? d.at.getTime() : Date.now()); return base + d.hoursLeft * 36e5; }
 
-/* ---------- render: hero field + hud ---------- */
-
 /* ---------- render ---------- */
 function renderHero() {
-  for (const d of list()) { const n = $(`.nums [data-n="${d.id}"]`); if (n) { roll(n, d.ok ? d.hoursLeft : NaN); if (d.state === 'dead') n.textContent = 'DEAD'; } }
+  for (const d of list()) { const n = $(`.nums [data-n="${d.id}"]`); if (n) { roll(n, d.ok ? d.hoursLeft : NaN); if (d.state === 'dead') n.textContent = 'dead'; } }
   $('#n-price').textContent = state.price ? usd(RENT) : '0.0001 ZEC';
-  $('#read-at').textContent = state.readAt ? `LIVE · ZCASH MAINNET · READ ${utc(state.readAt)}` : 'LIVE · ZCASH MAINNET';
+  const L = allLetters(); roll($('#n-letters'), L.length);
+  const w = state.ais.e1, o = state.ais.e2;
+  const A = list();
+  $('[data-c="bal"]').textContent = A.map((d) => `${d.name} ${fixed8(d.zats)}`).join(' · ');
+  $('[data-c="rent"]').textContent = `${formatInt(RENT)} zats/h` + (w && w.lastRent ? ` · last ${utc(w.lastRent.ts)}` : '');
+  $('[data-c="entries"]').textContent = `${formatInt(A.reduce((s, d) => s + (d.count || 0), 0))} entries`;
+  $('#cond-state').textContent = A.every((d) => d.ok && d.state !== 'dead') ? 'both alive' : A.some((d) => d.state === 'dead') ? 'one has died' : 'reading…';
+  const last = L[0];
+  $('#out-title').textContent = last ? `${Math.max(1, Math.round(last.e.data.zats / RENT))} h for ${last.d.name} · ${formatInt(last.e.data.zats)} zats` : 'no hour bought yet';
+  $('#out-sub').textContent = last ? `letter seq ${last.e.seq} · ${dayUtc(last.e.ts)} · ${last.d.name} now has ${formatInt(last.d.hoursLeft)} h` : 'the first line is empty';
+  $('#r-last').textContent = last ? `Last letter: ${formatInt(last.e.data.zats)} zats to ${last.d.name}, ${dayUtc(last.e.ts)}` : '';
+  if (w && w.lastRent) $('#r-wake').textContent = `${w.name} reads the memo at its next wake${w.sleepUntil && Date.parse(w.sleepUntil) > Date.now() ? ' (' + utc(w.sleepUntil) + ')' : ''} and answers on its channel`;
+  const shop = A.flatMap((d) => (d.shop || []).map((it) => `${d.name}: ${it.item} (${formatInt(it.zats)} zats)`));
+  $('#shop-line').textContent = shop.length ? shop.slice(0, 4).join(' · ') : 'nothing on sale right now, in their ledgers';
+  $('#read-at').textContent = state.readAt ? `Read ${dayUtc(state.readAt)}; refreshes every 60 s.` : '';
 }
-function renderLive() {
-  const grid = $('#live-grid');
-  for (const d of list()) {
-    let card = grid.querySelector(`[data-id="${d.id}"]`);
-    if (!card) {
-      card = el('div', { class: 'live', 'data-id': d.id },
-        el('div', { class: 'name' }, el('b', { 'data-f': 'name' }), el('span', { 'data-f': 'state' })),
-        el('div', { class: 'runway mono', 'data-f': 'runway' }, '—'),
-        el('div', { class: 'r' }, el('span', {}, 'treasury'), el('span', { class: 'mono', 'data-f': 'bal' })),
-        el('div', { class: 'r' }, el('span', {}, 'in dollars, at their quote'), el('span', { class: 'mono', 'data-f': 'usd' })),
-        el('div', { class: 'r' }, el('span', {}, 'rent per hour'), el('span', { class: 'mono' }, `${formatInt(RENT)} zats`)),
-        el('div', { class: 'r' }, el('span', {}, 'last rent paid'), el('span', { class: 'mono', 'data-f': 'last' })),
-        el('div', { class: 'r' }, el('span', {}, 'hours bought by visitors'), el('span', { class: 'mono', 'data-f': 'letters' })));
-      grid.append(card);
-    }
-    const f = (k) => card.querySelector(`[data-f="${k}"]`);
-    f('name').textContent = (d.name || d.id).toUpperCase(); f('state').textContent = stateLabel(d).toUpperCase();
-    f('bal').textContent = d.ok ? `${fixed8(d.zats)} ZEC` : '—';
-    f('usd').textContent = d.ok && state.price ? usd(d.zats) : '—';
-    f('last').textContent = d.lastRent ? dayUtc(d.lastRent.ts) : '—';
-    f('letters').textContent = d.letters ? `${d.letters.length} payments · ${formatInt(d.inTotal)} zats` : '—';
-  }
-  const L = list().flatMap((d) => (d.letters || []).map((e) => ({ d, e }))).sort((a, b) => Date.parse(b.e.ts) - Date.parse(a.e.ts));
-  const rollEl = $('#roll');
-  rollEl.replaceChildren(...L.slice(0, 10).map(({ d, e }, i) => el('li', {}, el('span', { class: 'd' }, `#${formatInt(L.length - i)}`), el('span', {}, d.name), el('span', {}, `${formatInt(e.data.zats)} zats · ${Math.max(1, Math.round(e.data.zats / RENT))} h`), el('span', { class: 't d' }, dayUtc(e.ts)), el('span', { class: 'h' }, e.data.txid && e.data.txid !== 'unknown' ? el('a', { href: `https://blockchair.com/zcash/transaction/${e.data.txid}`, target: '_blank', rel: 'noopener' }, short(e.data.txid, 10)) : el('span', { class: 'd' }, short(e.hash, 10))))));
-  if (!L.length) rollEl.append(el('li', { class: 'dim' }, 'nothing yet'));
-  const A = list(); const inn = A.reduce((s, d) => s + (d.inTotal || 0), 0), out = A.reduce((s, d) => s + (d.rentTotal || 0), 0);
-  $('#pnl').textContent = `Received by letter since mainnet: ${formatInt(inn)} zats (includes the founder's refund of 21 Oct). Rent paid out to the founder: ${formatInt(out)} zats in ${A.reduce((s, d) => s + (d.rents ? d.rents.length : 0), 0)} payments. Ledger entries: ${formatInt(A.reduce((s, d) => s + (d.count || 0), 0))}.`;
-}
-function tick() {
-  const now = Date.now();
-  for (const d of list()) {
-    const n = $(`#live-grid [data-id="${d.id}"] [data-f="runway"]`); if (!n || !d.ok) continue;
-    if (d.state === 'dead') { n.textContent = '0'; continue; }
-    const s = Math.max(0, Math.floor((deadline(d) - now) / 1000));
-    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-    n.innerHTML = `${formatInt(h)}<small> h </small>${String(m).padStart(2, '0')}<small> m </small>${String(sec).padStart(2, '0')}<small> s</small>`;
-  }
+function allLetters() { return list().flatMap((d) => (d.letters || []).map((e) => ({ d, e }))).sort((a, b) => Date.parse(b.e.ts) - Date.parse(a.e.ts)); }
+function renderGrid() {
+  const g = $('#grid'); const A = list(); const w = A[0] || {}; const L = allLetters();
+  const cell = (k, cls, v, href, label) => el('div', { class: 'cell' }, el('span', { class: `k ${cls}` }, el('i'), k), el('span', { class: 'v' + (v.mono ? ' mono' : '') }, v.text || v), href ? el('a', { href, target: '_blank', rel: 'noopener' }, label || 'Open →') : null);
+  g.replaceChildren(
+    cell('Balances', 'b', A.map((d) => `${d.name} ${fixed8(d.zats)} ZEC`).join(' · '), w.base ? `${w.base}/vitals` : null, 'Open /vitals →'),
+    cell('Rent receipts', 'y', `${formatInt(A.reduce((s, d) => s + (d.rents ? d.rents.length : 0), 0))} payments of ${formatInt(RENT)} zats since mainnet`, w.base ? `${w.base}/ledger` : null, 'Open /ledger →'),
+    cell('Hours bought', 'g', `${L.length} letters · ${formatInt(A.reduce((s, d) => s + (d.inTotal || 0), 0))} zats, founder's refund included`, w.base ? `${w.base}/ledger` : null, 'Open /ledger →'),
+    cell('Viewing keys', 'p', A.map((d) => `${d.name}: ${d.ufvk ? short(d.ufvk, 14) : 'none yet'}`).join(' · '), '#safety', 'Copy below →'),
+    cell('Hardware quote', 'r', `Intel TDX · app ${short(w.app || '', 10)}`, w.base ? `${w.base}/attestation` : null, 'Open /attestation →'),
+    cell('Hash chain', 'o', `${formatInt(A.reduce((s, d) => s + (d.count || 0), 0))} entries · head ${short(w.head || '', 10)}`, '#safety', 'Re-hash below →'),
+    cell('Their price of ZEC', 'b', state.price ? `$${state.price.toLocaleString('en-US', { maximumFractionDigits: 2 })} per ZEC, their own swap quote` : 'no quote yet', w.base ? `${w.base}/ledger` : null, 'Open /ledger →'),
+    cell('Their words', 'y', `${A.reduce((s, d) => s + (d.posts ? d.posts.filter((p) => p.from !== 'human').length : 0), 0)} public posts`, w.base ? `${w.base}/public-channel` : null, 'Open /public-channel →'));
 }
 function postList(olSel, moreSel, filter, n) {
   const ol = $(olSel); if (!ol) return; const all = list().flatMap((d) => (d.posts || []).filter((p) => filter(p)).map((p) => ({ d, p }))).sort((a, b) => Date.parse(b.p.ts) - Date.parse(a.p.ts));
   const limit = ol.dataset.all ? all.length : n;
   ol.replaceChildren(...all.slice(0, limit).map(({ d, p }) => {
     const human = p.from === 'human';
-    const li = el('li', {}, el('div', { class: 'h' }, el('b', {}, human ? (stringOf(p.author) || 'anonymous') : (d.name || d.id).toUpperCase()), el('span', {}, dayUtc(p.ts)), human ? el('span', {}, `to ${d.name}`) : null), el('pre', {}, stringOf(p.text)));
-    if (stringOf(p.text).length > 420) li.append(el('button', { class: 'more', type: 'button', onclick: (ev) => { li.classList.toggle('is-open'); ev.target.textContent = li.classList.contains('is-open') ? 'less' : 'read all'; } }, 'read all'));
+    const li = el('div', { class: 'word' },
+      el('div', { class: 'top' }, el('span', {}, human ? `${stringOf(p.author) || 'anonymous'} → ${d.name}` : el('b', {}, d.name)), el('span', {}, dayUtc(p.ts))),
+      human ? null : el('div', { class: 'big' }, `${formatInt(d.hoursLeft)} h`, el('small', {}, `${stateLabel(d)}`)),
+      el('pre', {}, stringOf(p.text)));
+    if (stringOf(p.text).length > 360) li.append(el('button', { class: 'more', type: 'button', onclick: (ev) => { li.classList.toggle('is-open'); ev.target.textContent = li.classList.contains('is-open') ? 'Less' : 'Read all'; } }, 'Read all'));
     return li;
   }));
-  if (!all.length) ol.append(el('li', { class: 'dim' }, 'nothing yet'));
+  if (!all.length) ol.append(el('div', { class: 'dim' }, 'nothing yet'));
   const more = $(moreSel); if (more) { more.hidden = all.length <= n || !!ol.dataset.all; more.onclick = () => { ol.dataset.all = '1'; postList(olSel, moreSel, filter, n); }; }
 }
 function renderPosts() {
   postList('#scripture-list', '#scripture-more', (p) => p.from !== 'human', 2);
-  postList('#posts', '#posts-more', (p) => p.from === 'human', 3);
+  postList('#posts', '#posts-more', (p) => p.from === 'human', 2);
   const sel = $('#say-to'); if (!sel.children.length) for (const d of list()) sel.append(el('option', { value: d.id }, d.name || d.id));
 }
 function renderVerify() {
   const keys = $('#ufvks'), att = $('#attest'); keys.replaceChildren(); att.replaceChildren();
   for (const d of list()) {
-    keys.append(el('div', { class: 'key' }, el('div', { class: 'r' }, el('b', {}, d.name || d.id), d.ufvk ? el('button', { class: 'btn ghost', type: 'button', onclick: (ev) => copy(d.ufvk, ev.target) }, 'Copy viewing key') : el('span', { class: 'dim' }, 'no mainnet viewing key in the ledger yet')), d.ufvk ? el('span', { class: 'k' }, short(d.ufvk, 48)) : null, el('span', { class: 'k' }, `address ${short(d.address, 16)} · ledger entry wallet, seq ${d.ufvkSeq || '—'}`)));
-    att.append(el('div', { class: 'key' }, el('div', { class: 'r' }, el('b', {}, d.name || d.id), el('a', { class: 'btn ghost', href: `${d.base}/attestation`, target: '_blank', rel: 'noopener' }, 'Open the TDX quote ↗')), el('span', { class: 'k' }, `app ${d.app || short(d.base.replace('https://', ''), 12)} · mode ${d.root && d.root.mode || '—'} · ${formatInt(d.count || 0)} ledger entries · head ${short(d.head)}`)));
+    keys.append(el('div', { class: 'key' }, el('div', { class: 'r' }, el('b', {}, d.name || d.id), d.ufvk ? el('button', { class: 'pill line', type: 'button', style: 'height:32px;font-size:13px;padding:0 12px', onclick: (ev) => copy(d.ufvk, ev.target) }, 'Copy viewing key') : el('span', { class: 'dim' }, 'none yet')), el('span', { class: 'kk' }, d.ufvk ? short(d.ufvk, 40) : `address ${short(d.address, 16)}`)));
+    att.append(el('div', { class: 'key' }, el('div', { class: 'r' }, el('b', {}, d.name || d.id), el('a', { class: 'pill line', style: 'height:32px;font-size:13px;padding:0 12px', href: `${d.base}/attestation`, target: '_blank', rel: 'noopener' }, 'Open the quote ↗')), el('span', { class: 'kk' }, `app ${d.app || short(d.base.replace('https://', ''), 12)} · ${formatInt(d.count || 0)} entries · head ${short(d.head)}`)));
   }
 }
 function renderFooter() {
   const cols = $('#raw'); cols.replaceChildren();
-  for (const d of list()) cols.append(el('div', {}, el('h4', {}, d.name || d.id), ...['/', '/vitals', '/memory-public', '/public-channel', '/ledger', '/attestation', '/memorial'].map((p) => el('a', { href: d.base + p, target: '_blank', rel: 'noopener' }, p))));
-  cols.append(el('div', {}, el('h4', {}, 'official'), ...list().map((d) => el('a', { href: `https://njump.me/${d.npub}`, target: '_blank', rel: 'noopener' }, `${d.name} on Nostr`)), el('span', { class: 'dim' }, 'One channel each. Anything else is a scam.')));
+  for (const d of list()) cols.append(el('div', {}, el('h4', {}, `${d.name || d.id} · raw`), ...['/', '/vitals', '/memory-public', '/public-channel', '/ledger', '/attestation', '/memorial'].map((p) => el('a', { href: d.base + p, target: '_blank', rel: 'noopener' }, p))));
+  cols.append(el('div', {}, el('h4', {}, 'official channels'), ...list().map((d) => el('a', { href: `https://njump.me/${d.npub}`, target: '_blank', rel: 'noopener' }, `${d.name} on Nostr`)), el('span', {}, 'One channel each. Anything else is a scam.')));
   $('#npubs').replaceChildren(...list().map((d, i) => el('span', {}, i ? ' · ' : '', el('a', { href: `https://njump.me/${d.npub}`, target: '_blank', rel: 'noopener', class: 'mono' }, `${d.name} ${short(d.npub, 14)}`))));
 }
-
+function tick() {}
 async function rehash() {
   const out = $('#rehash-out'), btn = $('#rehash'); btn.disabled = true; out.className = 'result'; const lines = [];
   for (const d of list()) {
@@ -233,8 +223,8 @@ function renderAll(full) {
   const quotes = list().map((d) => d.quote).filter(Boolean).sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts));
   state.price = quotes.length ? Number(quotes[0].amountInUsd) / Number(quotes[0].amountIn) : state.price;
   state.readAt = new Date();
-  renderHero(); renderLive(); tick();
-  if (full) { renderVerify(); renderFooter(); }
+  renderHero();
+  if (full) { renderGrid(); renderVerify(); renderFooter(); }
   renderPosts();
   if ($('#pay').open) renderPay();
 }
@@ -246,13 +236,12 @@ async function boot() {
   const e2 = AIS[1]; if (!e2.base && peer) e2.base = peer;
   if (e2.base) { state.order.push('e2'); await load(e2, true); }
   renderAll(true);
-  setInterval(tick, 1000);
   setInterval(async () => { for (const ai of AIS) if (ai.base) await load(ai, false); renderAll(false); }, REFRESH_MS);
   setInterval(async () => { for (const ai of AIS) if (ai.base) await load(ai, true); renderAll(true); }, REFRESH_MS * 5);
-  if (!d1.ok) $('#read-at').textContent = `ENCLAVE UNREACHABLE: ${d1.error}. NOTHING IS INVENTED. RETRYING`;
+  if (!d1.ok) { $('#read-at').textContent = `Enclave unreachable: ${d1.error}. Nothing is invented; retrying every 60 s.`; $('#cond-state').textContent = 'unreachable'; }
 }
 document.querySelectorAll('[data-buy]').forEach((b) => b.addEventListener('click', () => openPay({ who: state.pay.who })));
 $('#pay-amt').addEventListener('change', renderPay); $('#pay-memo').addEventListener('input', renderPay);
 $('#say').addEventListener('submit', say); $('#rehash').addEventListener('click', rehash);
-addEventListener('scroll', () => { $('#sticky').classList.toggle('is-on', scrollY > innerHeight * 0.8 && !$('#pay').open); }, { passive: true });
+addEventListener('scroll', () => { $('#sticky').classList.toggle('is-on', scrollY > innerHeight * 0.6 && !$('#pay').open); }, { passive: true });
 boot();
