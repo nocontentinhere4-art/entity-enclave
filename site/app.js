@@ -1,19 +1,21 @@
 /*
- * app.js — ZEALOT v16, the page. The desk, not the skull.
+ * app.js — ZEALOT v17, the page. Two skulls, one signal.
  *
- * Owns the whole page: nav, entity panels with tabs, the live stats row, the order book (/trades), the
- * forecasts (/forecasts), the ledger panel in perspective, the Verify chain button, the footer clock, and the
- * two canvases (Raycast streaks + the ASCII orbs). It imports the loaded entity data and the pay dialog from
- * term.js, and is the single refresh clock (a 30 fps setTimeout loop for the canvases, a 60 s refresh for data).
- * Every number comes from the endpoints via data.js; loading is an em dash, an error is "offline since".
+ * Owns the whole page: nav, the two enclave cards with tabs, the status pills under each skull, the one-trade
+ * section (steps + live /trades book), the ledger stream with Verify chain, the forecasts, the footer clock, and
+ * the dock toggle. It imports the loaded entity data and the pay dialog from term.js, and drives the two skulls
+ * in hero.js from the live state (a new public post makes that skull talk). The single refresh clock is 60 s for
+ * data plus a 1 s footer clock. Every number comes from the endpoints via data.js; loading is an em dash, an
+ * error is "offline since".
  */
 import {
   state, list, nameOf, stateWord, deadline, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=16';
+} from './term.js?v=17';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS,
-} from './data.js?v=16';
+} from './data.js?v=17';
+import { initHero, setMouth, triggerTalk } from './hero.js?v=17';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -41,6 +43,7 @@ const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 /* ------------------------------------------------------------------ */
 const tradesCache = { e1: null, e2: null };
 const forecastsCache = { e1: null, e2: null };
+const seenPost = { e1: 0, e2: 0 };
 
 function ent(id) { return state.ais[id]; }
 
@@ -53,51 +56,55 @@ function offlineLabel(d) {
   const t = d.at ? hhmm(d.at) : null;
   return t ? `offline since ${t} UTC` : 'offline';
 }
-function numCell(d, key, fmt) {
-  const off = offlineLabel(d);
-  if (off) return off;
-  const v = d[key];
-  if (v == null || (typeof v === 'number' && !Number.isFinite(v))) return '—';
-  return fmt ? fmt(v) : String(v);
-}
 
 /* ------------------------------------------------------------------ */
-/* render: nav + stats                                                 */
+/* render: hero status pills + mouths                                  */
 /* ------------------------------------------------------------------ */
-function setTick(node, text) {
-  if (node.textContent === text) return;
-  node.textContent = text;
-  node.classList.remove('tick');
-  void node.offsetWidth;
-  node.classList.add('tick');
+function renderPills() {
+  for (const id of ['e1', 'e2']) {
+    const d = ent(id);
+    const pill = $('#pill-' + id);
+    if (!pill) continue;
+    pill.querySelector('.p-name').textContent = truncate(ename(id), 14);
+    let hours, stateLabel;
+    if (!d) { hours = '—'; stateLabel = '—'; }
+    else {
+      hours = d.ok && d.state !== 'dead' ? formatInt(d.hoursLeft) : (d.ok ? '0' : '—');
+      stateLabel = stateWord(d);
+    }
+    pill.querySelector('.p-hours').textContent = hours;
+    pill.querySelector('.p-state').textContent = stateLabel;
+  }
 }
 
-function renderStats() {
-  const d1 = ent('e1'), d2 = ent('e2');
-  setTick($('#stat-wick-hours'), numCell(d1, 'hoursLeft', (v) => formatInt(v)));
-  setTick($('#stat-obol-hours'), numCell(d2, 'hoursLeft', (v) => formatInt(v)));
-
-  const okList = list().filter((d) => d.ok);
-  const zecPaid = okList.reduce((s, d) => s + (Number(d.inTotal) || 0), 0);
-  const letters = okList.reduce((s, d) => s + ((d.letters || []).length), 0);
-  setTick($('#stat-zec'), okList.length ? `${formatZats(zecPaid)} ZEC` : '—');
-  setTick($('#stat-letters'), okList.length ? formatInt(letters) : '—');
+function mouthMode(d) {
+  if (!d || !d.ok) return 'none';
+  if (d.state === 'dead') return 'dead';
+  if (d.sleepUntil && Date.parse(d.sleepUntil) > Date.now()) return 'asleep';
+  if (d.state === 'alive') return 'alive';
+  return 'none';
+}
+function syncMouths() {
+  for (const id of ['e1', 'e2']) setMouth(id, mouthMode(ent(id)));
 }
 
 /* ------------------------------------------------------------------ */
 /* render: entity panels                                              */
 /* ------------------------------------------------------------------ */
-const KRAKEN_EMPTY = 'No trade yet. The first order opens the book.';
+const BOOK_EMPTY = 'No trade yet. The first order opens the book.';
 
 function panelShell(id) {
-  const name = ename(id);
-  const art = el('article', { class: 'panel', 'data-entity': id });
+  const art = el('article', { class: 'card', 'data-entity': id });
   art.innerHTML = `
-    <header class="panel-head">
-      <h3 class="panel-name">${name}</h3>
-      <span class="panel-state" data-k="state">—</span>
+    <header class="card-meta">
+      <span class="meta-label">ENCLAVE 0${id === 'e1' ? 1 : 2}</span>
+      <span class="meta-idx">[0002]</span>
     </header>
-    <div class="tabs" role="tablist" aria-label="${name}">
+    <header class="card-head">
+      <h3 class="card-name" data-k="name">—</h3>
+      <span class="card-state" data-k="state">—</span>
+    </header>
+    <div class="tabs" role="tablist" aria-label="enclave">
       <button class="tab is-active" type="button" role="tab" aria-selected="true" data-tab="state">State</button>
       <button class="tab" type="button" role="tab" aria-selected="false" data-tab="shop">Shop</button>
       <button class="tab" type="button" role="tab" aria-selected="false" data-tab="words">Words</button>
@@ -132,26 +139,22 @@ function panelShell(id) {
 
 function updatePanel(id) {
   const d = ent(id);
-  const panel = $(`.panel[data-entity="${id}"]`);
+  const panel = $(`.card[data-entity="${id}"]`);
   if (!panel) return;
   const get = (k) => panel.querySelector(`[data-k="${k}"]`);
 
-  panel.querySelector('.panel-name').textContent = ename(id);
+  panel.querySelector('[data-k="name"]').textContent = ename(id);
   get('state').textContent = d ? stateWord(d) : '—';
 
   if (!d) {
-    for (const k of ['treasury', 'hours', 'lastRent', 'dies', 'lastLetter', 'digest', 'channel']) {
-      get(k).textContent = '—';
-    }
-    get('shop').replaceChildren(el('p', { class: 'empty' }, KRAKEN_EMPTY));
-    get('words').replaceChildren(el('p', { class: 'empty' }, KRAKEN_EMPTY));
+    for (const k of ['treasury', 'hours', 'lastRent', 'dies', 'lastLetter', 'digest', 'channel']) get(k).textContent = '—';
+    get('shop').replaceChildren(el('p', { class: 'empty' }, BOOK_EMPTY));
+    get('words').replaceChildren(el('p', { class: 'empty' }, BOOK_EMPTY));
     return;
   }
   if (!d.ok) {
     const off = offlineLabel(d);
-    for (const k of ['treasury', 'hours', 'lastRent', 'dies', 'lastLetter', 'digest', 'channel']) {
-      get(k).textContent = off;
-    }
+    for (const k of ['treasury', 'hours', 'lastRent', 'dies', 'lastLetter', 'digest', 'channel']) get(k).textContent = off;
     get('shop').replaceChildren(el('p', { class: 'empty' }, off));
     get('words').replaceChildren(el('p', { class: 'empty' }, off));
     return;
@@ -167,7 +170,6 @@ function updatePanel(id) {
   get('digest').textContent = shortHash(d.head);
   get('channel').textContent = formatInt((d.posts || []).length);
 
-  // shop
   const shop = get('shop');
   const items = d.shop || [];
   if (!items.length) shop.replaceChildren(el('p', { class: 'empty' }, 'Nothing for sale yet. The shop opens when they price an hour of work.'));
@@ -176,7 +178,6 @@ function updatePanel(id) {
     el('span', { class: 'shop-price mono', text: `${formatInt(it.zats)} zats` }),
     el('button', { class: 'btn buy-small', type: 'button', text: 'Buy', onclick: () => openPay({ who: id, theirs: it }) }))));
 
-  // words
   const words = get('words');
   const posts = (d.posts || []).filter((p) => p.from === 'entity').slice(-5).reverse();
   if (!posts.length) words.replaceChildren(el('p', { class: 'empty' }, 'No public posts yet. They speak when there is something to say.'));
@@ -212,7 +213,6 @@ function renderTrades() {
   }
 
   if (!rows.length) {
-    // network error beats the empty state
     for (const id of ['e1', 'e2']) {
       const c = tradesCache[id];
       if (c && !c.ok && !c.notFound) {
@@ -222,7 +222,7 @@ function renderTrades() {
         return;
       }
     }
-    book.replaceChildren(el('p', { class: 'empty' }, KRAKEN_EMPTY));
+    book.replaceChildren(el('p', { class: 'empty' }, BOOK_EMPTY));
     return;
   }
 
@@ -406,7 +406,6 @@ function renderFooter() {
   }
   blockEl.textContent = blockText;
 
-  // enclave URLs
   const urls = $('#foot-urls');
   const kids = [];
   const dlist = ['e1', 'e2'].map(ent).filter((d) => d && d.base);
@@ -424,343 +423,43 @@ function renderClock() {
 }
 
 /* ------------------------------------------------------------------ */
-/* render: orb labels + last-post cache                                */
+/* new public posts → skulls talk                                      */
 /* ------------------------------------------------------------------ */
-const orbRing = { e1: [], e2: [] };
-
-function lastPostOf(d) {
-  const posts = (d && Array.isArray(d.posts) ? d.posts : []).filter((p) => p.from === 'entity');
-  return posts.length ? stringOf(posts[posts.length - 1].text) : '';
-}
-
-function renderOrbLabels() {
+function primePosts() {
   for (const id of ['e1', 'e2']) {
     const d = ent(id);
-    $('#orb-name-' + id).textContent = ename(id);
-    $('#orb-state-' + id).textContent = d ? stateWord(d) : '—';
-    $('#orb-hours-' + id).textContent = d && d.ok && d.state !== 'dead' ? `${formatInt(d.hoursLeft)} h left` : (d && d.ok && d.state === 'dead' ? 'dead' : (d ? offlineLabel(d) : '—'));
-    const post = lastPostOf(d);
-    const ringText = post.length > 44 ? post.slice(0, 44) : post;
-    orbRing[id] = ringText.split('');
+    if (d && Array.isArray(d.posts)) seenPost[id] = Math.max(0, ...d.posts.map((p) => Number(p.seq) || 0));
   }
-  // canvas aria label describes both states
-  const parts = [];
+}
+function checkNewPosts() {
   for (const id of ['e1', 'e2']) {
     const d = ent(id);
-    if (!d) parts.push(`${ename(id)}: unknown`);
-    else if (!d.ok) parts.push(`${ename(id)}: no signal`);
-    else parts.push(`${ename(id)}: ${stateWord(d).toLowerCase()}, ${d.state === 'dead' ? '0' : formatInt(d.hoursLeft)} hours left`);
+    if (!d || !Array.isArray(d.posts)) continue;
+    const newest = Math.max(0, ...d.posts.map((p) => Number(p.seq) || 0));
+    const hasNew = d.posts.some((p) => Number(p.seq) > (seenPost[id] || 0) && p.from === 'entity');
+    if (hasNew) triggerTalk(id);
+    seenPost[id] = Math.max(seenPost[id] || 0, newest);
   }
-  $('#orbs').setAttribute('aria-label', `Two ASCII orbs, one per enclave. ${parts.join('. ')}.`);
-}
-
-/* ------------------------------------------------------------------ */
-/* the canvases: streaks + orbs                                        */
-/* ------------------------------------------------------------------ */
-const GLYPH_CHARS = [' ', '.', ':', '-', '=', '+', '*', '#', '%', '@'];
-const ORB_DIAMETER = 260;
-const CELL = 9;
-let orbMax = ORB_DIAMETER;
-const INK_COLOR = '#ededed';
-const ACCENT_COLOR = '#ff5c1a';
-const MUTED_COLOR = '#8a8f98';
-
-let orbCanvas, orbCtx, orbW = 0, orbH = 0, dpr = 1;
-let streakCanvas, streakCtx, streakW = 0, streakH = 0, streakOff = null, streakMARGIN = 96;
-let orbCenters = [];
-
-/* value noise: integer-hash based, allocation-free */
-function hash2(x, y) {
-  let h = (x * 374761393 + y * 668265263) | 0;
-  h = (h ^ (h >>> 13)) * 1274126177;
-  h = h ^ (h >>> 16);
-  return ((h >>> 0) & 0xffff) / 0xffff;
-}
-function vnoise(x, y) {
-  const xi = Math.floor(x), yi = Math.floor(y);
-  const xf = x - xi, yf = y - yi;
-  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
-  const a = hash2(xi, yi), b = hash2(xi + 1, yi), c = hash2(xi, yi + 1), d = hash2(xi + 1, yi + 1);
-  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
-}
-
-function buildOrbCells(c) {
-  const n = Math.ceil(c.radius / CELL);
-  const xs = [], ys = [], nx = [], ny = [], ff = [];
-  for (let gy = -n; gy <= n; gy++) {
-    for (let gx = -n; gx <= n; gx++) {
-      const px = gx * CELL, py = gy * CELL;
-      const dist = Math.sqrt(px * px + py * py);
-      if (dist > c.radius) continue;
-      xs.push(c.cx + px); ys.push(c.cy + py);
-      nx.push(gx * 0.42); ny.push(gy * 0.42);
-      ff.push(Math.pow(1 - dist / c.radius, 1.6));
-    }
-  }
-  c.xs = Float32Array.from(xs);
-  c.ys = Float32Array.from(ys);
-  c.nx = Float32Array.from(nx);
-  c.ny = Float32Array.from(ny);
-  c.ff = Float32Array.from(ff);
-  c.count = xs.length;
-}
-
-function layoutOrbs() {
-  const w = orbW, h = orbH;
-  const cols = w >= 520 ? 2 : 1;
-  const rows = cols === 2 ? 1 : 2;
-  const pad = 12;
-  const cellW = (w - pad * (cols + 1)) / cols;
-  const cellH = (h - pad * (rows + 1)) / rows;
-  const diameter = Math.min(cellW - 44, cellH - 44, orbMax); // room for the text ring (radius + 14) and a gap
-  const radius = diameter / 2;
-  const centers = [];
-  for (let r = 0; r < rows; r++) for (let c2 = 0; c2 < cols; c2++) {
-    const cx = pad + cellW * c2 + cellW / 2;
-    const cy = pad + cellH * r + cellH / 2;
-    const c = { cx, cy, radius };
-    buildOrbCells(c);
-    centers.push(c);
-  }
-  orbCenters = centers;
-  $('#orb-labels').dataset.cols = String(cols);
-}
-
-function resizeCanvases() {
-  const object = $('#hero-object');
-  if (!object) return;
-  const ow = object.clientWidth;
-  dpr = Math.min(2, window.devicePixelRatio || 1);
-
-  // orbs canvas first: width = object width; height depends on columns
-  const cols = ow >= 520 ? 2 : 1;
-  const rows = cols === 2 ? 1 : 2;
-  const pad = 12;
-  orbMax = ow < 520 ? 220 : ORB_DIAMETER;
-  const diameter = Math.min(orbMax, (ow - pad * (cols + 1)) / cols);
-  orbW = Math.max(1, Math.round(ow));
-  orbH = Math.max(1, Math.round(rows * (diameter + pad) + pad));
-  orbCanvas.width = Math.round(orbW * dpr);
-  orbCanvas.height = Math.round(orbH * dpr);
-  orbCanvas.style.width = orbW + 'px';
-  orbCanvas.style.height = orbH + 'px';
-  layoutOrbs();
-
-  // streaks canvas fills the hero-object (which now includes orbs + labels)
-  const sBox = object.getBoundingClientRect();
-  streakW = Math.max(1, Math.round(sBox.width));
-  streakH = Math.max(1, Math.round(sBox.height));
-  streakCanvas.width = Math.round(streakW * dpr);
-  streakCanvas.height = Math.round(streakH * dpr);
-  streakCanvas.style.width = streakW + 'px';
-  streakCanvas.style.height = streakH + 'px';
-  buildStreaks();
-
-  drawFrame();
-}
-
-function buildStreaks() {
-  streakOff = document.createElement('canvas');
-  const mw = streakW + streakMARGIN * 2;
-  const mh = streakH + streakMARGIN * 2;
-  streakOff.width = Math.round(mw * dpr);
-  streakOff.height = Math.round(mh * dpr);
-  const ctx = streakOff.getContext('2d');
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, mw, mh);
-
-  const count = 6 + Math.floor(Math.random() * 4); // 6-9
-  for (let i = 0; i < count; i++) {
-    const angle = (-55 + Math.random() * 20) * Math.PI / 180; // diagonal
-    const len = mh * (0.8 + Math.random() * 0.6);
-    const thick = 26 + Math.random() * 60;
-    const x0 = Math.random() * mw;
-    const y0 = Math.random() * mh * 0.4;
-    const x1 = x0 + Math.cos(angle) * len;
-    const y1 = y0 + Math.sin(angle) * len;
-    const grad = ctx.createLinearGradient(x0, y0, x1, y1);
-    grad.addColorStop(0, 'rgba(255, 92, 26, 0)');
-    grad.addColorStop(0.5, 'rgba(255, 92, 26, 0.55)');
-    grad.addColorStop(1, 'rgba(255, 92, 26, 0)');
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = thick;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(x0, y0);
-    ctx.lineTo(x1, y1);
-    ctx.stroke();
-  }
-  // grain: sparse speckle in accent, subtle
-  ctx.fillStyle = 'rgba(255, 92, 26, 0.18)';
-  const specks = Math.round(mw * mh / 180);
-  for (let i = 0; i < specks; i++) {
-    ctx.fillRect(Math.random() * mw, Math.random() * mh, 1, 1);
-  }
-}
-
-function meanHours() {
-  const dlist = list().filter((d) => d.ok && d.state !== 'dead');
-  if (!dlist.length) return null;
-  const sum = dlist.reduce((s, d) => s + (Number(d.hoursLeft) || 0), 0);
-  return sum / dlist.length;
-}
-
-function drawStreaks(t) {
-  if (!streakOff || streakW <= 0 || streakH <= 0) return;
-  const ctx = streakCtx;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, streakW, streakH);
-  const mean = meanHours();
-  const opacity = mean == null ? 0 : Math.min(0.35, Math.max(0, mean / 720) * 0.35);
-  if (opacity <= 0.004) return;
-  ctx.globalAlpha = opacity;
-  const dx = Math.sin(t * 0.22) * 34;
-  const dy = Math.cos(t * 0.16) * 26;
-  const mw = streakW + streakMARGIN * 2;
-  const mh = streakH + streakMARGIN * 2;
-  ctx.drawImage(streakOff, -streakMARGIN + dx, -streakMARGIN + dy, mw, mh);
-  ctx.globalAlpha = 1;
-}
-
-function orbMode(d) {
-  if (!d || !d.ok) return 'dead';
-  if (d.state === 'dead') return 'dead';
-  if (d.sleepUntil && Date.parse(d.sleepUntil) > Date.now()) return 'asleep';
-  return 'alive';
-}
-
-function drawDeadOrb(ctx, c, t, online) {
-  const cx = c.cx, cy = c.cy, r = c.radius;
-  ctx.font = '34px "SF Mono", Menlo, Consolas, monospace';
-  ctx.fillStyle = online ? ACCENT_COLOR : 'rgba(237,237,237,0.28)';
-  ctx.fillText('@', cx, cy);
-  ctx.font = '12px "SF Mono", Menlo, Consolas, monospace';
-  ctx.fillStyle = MUTED_COLOR;
-  const n = 16;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2;
-    ctx.fillText('.', cx + Math.cos(a) * r * 0.55, cy + Math.sin(a) * r * 0.55);
-  }
-}
-
-function drawLiveOrb(ctx, d, c, t, asleep) {
-  const cx = c.cx, cy = c.cy;
-  const period = asleep ? 8 : 4;
-  const phase = ((t * 1000) % (period * 1000)) / (period * 1000) * Math.PI * 2;
-  const breath = 0.5 + 0.5 * Math.sin(phase);
-  const nspeed = asleep ? 0.22 : 0.5;
-  const hourScale = asleep ? 1 : Math.max(0, Math.min(1, (Number(d.hoursLeft) || 0) / 720));
-
-  ctx.font = '10px "SF Mono", Menlo, Consolas, monospace';
-  const xs = c.xs, ys = c.ys, nxs = c.nx, nys = c.ny, ffs = c.ff;
-  const n = c.count;
-  for (let i = 0; i < n; i++) {
-    const ns = vnoise(nxs[i] + t * nspeed, nys[i] + t * nspeed * 0.85);
-    const base = ffs[i] * (0.65 + 0.35 * ns);
-    let b = asleep ? base * (0.55 + 0.15 * breath) : base * (0.72 + 0.28 * breath) * hourScale;
-    if (b > 1) b = 1;
-    const idx = 1 + (b * 9 | 0);
-    const g = GLYPH_CHARS[idx > 9 ? 9 : idx];
-    ctx.fillStyle = b >= 0.9 ? ACCENT_COLOR : INK_COLOR;
-    ctx.fillText(g, xs[i], ys[i]);
-  }
-}
-
-function drawTextRing(ctx, id, c, t) {
-  const chars = orbRing[id];
-  if (!chars || !chars.length) return;
-  const R = c.radius + 14;
-  const turn = t * 0.3;
-  const n = chars.length;
-  ctx.font = '11px "SF Mono", Menlo, Consolas, monospace';
-  ctx.fillStyle = MUTED_COLOR;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  for (let i = 0; i < n; i++) {
-    const a = turn + (i / n) * Math.PI * 2;
-    const x = c.cx + Math.cos(a) * R;
-    const y = c.cy + Math.sin(a) * R;
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(a + Math.PI / 2);
-    ctx.fillText(chars[i], 0, 0);
-    ctx.restore();
-  }
-}
-
-function drawOrbs(t) {
-  const ctx = orbCtx;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, orbW, orbH);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const ds = ['e1', 'e2'];
-  for (let i = 0; i < orbCenters.length && i < ds.length; i++) {
-    const d = ent(ds[i]);
-    const c = orbCenters[i];
-    const mode = orbMode(d);
-    if (mode === 'dead') drawDeadOrb(ctx, c, t, !!(d && d.ok));
-    else drawLiveOrb(ctx, d, c, t, mode === 'asleep');
-    drawTextRing(ctx, ds[i], c, t);
-  }
-}
-
-function drawFrame() {
-  const t = performance.now() / 1000;
-  if (streakCtx) drawStreaks(t);
-  if (orbCtx && orbW > 0) drawOrbs(t);
-}
-
-/* ------------------------------------------------------------------ */
-/* the single 30 fps clock                                             */
-/* ------------------------------------------------------------------ */
-let animTimer = 0;
-function tickAnim() {
-  if (!document.hidden) drawFrame();
-  animTimer = setTimeout(tickAnim, 33);
-}
-function startLoop() {
-  if (reduced.matches) { drawFrame(); return; }
-  clearTimeout(animTimer);
-  tickAnim();
 }
 
 /* ------------------------------------------------------------------ */
 /* nav                                                                 */
 /* ------------------------------------------------------------------ */
 function wireNav() {
-  // any [data-open-pay] opens the pay dialog prefilled
   $$('[data-open-pay]').forEach((n) => n.addEventListener('click', (ev) => {
     ev.preventDefault();
     openPay({ who: 'e1', hours: 1 });
   }));
-  const openTrade = $('[data-open-trade]');
-  if (openTrade) openTrade.addEventListener('click', (ev) => {
+  $$('[data-open-trade]').forEach((n) => n.addEventListener('click', (ev) => {
     ev.preventDefault();
     openPay({ who: 'e1', prefill: 'buy ' });
-  });
-  const navTerm = $('#nav-term');
-  if (navTerm) navTerm.addEventListener('click', () => {
+  }));
+  $$('#nav-term, .term-dock').forEach((n) => n.addEventListener('click', () => {
     const term = $('#term');
-    if (term) { term.classList.add('docked'); term.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-  });
-
-  // scrollspy: mark the current section in the pill nav
-  const links = $$('.pill a[href^="#"]');
-  const map = new Map();
-  for (const a of links) { const sec = $(a.getAttribute('href')); if (sec) map.set(sec, a); }
-  if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (e.isIntersecting) {
-          for (const a of links) a.removeAttribute('aria-current');
-          const a = map.get(e.target);
-          if (a) a.setAttribute('aria-current', 'true');
-        }
-      }
-    }, { rootMargin: '-45% 0px -50% 0px' });
-    map.forEach((a, sec) => io.observe(sec));
-  }
+    if (!term) return;
+    term.classList.toggle('docked');
+    term.scrollIntoView({ behavior: reduced.matches ? 'auto' : 'smooth', block: 'center' });
+  }));
 }
 
 /* ------------------------------------------------------------------ */
@@ -770,45 +469,40 @@ async function refreshLight() {
   if (document.hidden || state.busy) return;
   await loadAll(false);
   diffLog();
+  checkNewPosts();
   await Promise.allSettled([loadTrades(), loadForecasts()]);
   renderAll();
+  syncMouths();
 }
 async function refreshFull() {
   if (document.hidden || state.busy) return;
   await loadAll(true);
   diffLog();
+  checkNewPosts();
   renderAll();
+  syncMouths();
 }
 
 function renderAll() {
-  renderStats();
+  renderPills();
   renderEntities();
   renderTrades();
   renderForecasts();
   renderLedger();
   renderFooter();
-  renderOrbLabels();
 }
 
 /* ------------------------------------------------------------------ */
 /* init                                                                */
 /* ------------------------------------------------------------------ */
 async function init() {
-  orbCanvas = $('#orbs');
-  orbCtx = orbCanvas.getContext('2d');
-  streakCanvas = $('#streaks');
-  streakCtx = streakCanvas.getContext('2d');
-
   wireTerm();
   wireNav();
 
-  // build the two entity panel shells (names resolve after data loads)
   const grid = $('#entity-grid');
   grid.replaceChildren(panelShell('e1'), panelShell('e2'));
 
-  resizeCanvases();
-  startLoop();                 // first frame right after load, then 30 fps
-  window.addEventListener('resize', resizeCanvases);
+  initHero();
 
   renderClock();
   setInterval(renderClock, 1000);
@@ -818,8 +512,10 @@ async function init() {
   } catch (err) {
     console.error(err);
   }
+  primePosts();
   await Promise.allSettled([loadTrades(), loadForecasts()]);
   renderAll();
+  syncMouths();
 
   setInterval(refreshLight, REFRESH_MS);
   setInterval(refreshFull, REFRESH_MS * 5);
