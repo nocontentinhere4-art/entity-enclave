@@ -116,6 +116,7 @@ function sample() {
   lumClosed = new Float32Array(total);
   half = new Uint8Array(total);
   stacked = W < STACK_AT;
+  gridChars = null;
 
   sampleFrame(imgOpen, lumOpen);
   sampleFrame(imgClosed, lumClosed);
@@ -171,9 +172,30 @@ function brightnessOf(s) {
   return 1;
 }
 
+/* the dotted grid behind the skulls, in glyphs: one dim character every 48px, one swapped per frame */
+const GRID_SET = '!@%^&*()$#';
+const GRID = 48;
+let gridChars = null, gridCols = 0, gridRows = 0;
+function buildGrid() {
+  gridCols = Math.ceil(W / GRID) + 1; gridRows = Math.ceil(H / GRID) + 1;
+  gridChars = new Uint8Array(gridCols * gridRows);
+  for (let i = 0; i < gridChars.length; i++) gridChars[i] = (Math.random() * GRID_SET.length) | 0;
+}
+function drawGrid() {
+  if (!gridChars) buildGrid();
+  gridChars[(Math.random() * gridChars.length) | 0] = (Math.random() * GRID_SET.length) | 0;
+  ctx.font = `11px ${MONO}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(244,183,40,0.28)';
+  for (let r = 0; r < gridRows; r++) for (let c = 0; c < gridCols; c++) {
+    ctx.fillText(GRID_SET[gridChars[r * gridCols + c]], c * GRID + 24, r * GRID + 24);
+  }
+  ctx.textAlign = 'left';
+}
+
 function render(kL, kR, bL, bR, shL, shR, now) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
+  drawGrid();
   ctx.font = `${CELL * 1.25}px ${MONO}`;
   ctx.textBaseline = 'top';
   const n = RAMP.length - 1;
@@ -219,15 +241,33 @@ function tick() {
   if (!document.hidden) {
     clock += dt;
     draw(clock);
+    drawZMark(clock);
   }
   timer = setTimeout(tick, 1000 / 30);
 }
 
 /* The Z mark, drawn with the same glyphs as the skulls (yellow), 'ZCASH' under it in the HTML. */
-function drawZMark() {
+let zMask = null, zCtx = null;
+const Z_S = 216, Z_CELL = 6; // S must be a multiple of the cell
+function drawZMark(now = 0) {
   const c = document.getElementById('zmark');
   if (!c) return;
-  const S = 220, cell = 6;
+  const S = Z_S, cell = Z_CELL;
+  if (zMask) {
+    // cascade: a brightness wave falls through the Z, glyphs change as it passes
+    const g = zCtx, n = RAMP.length - 1;
+    g.clearRect(0, 0, S, S);
+    g.font = `${cell * 1.3}px ${MONO}`; g.textBaseline = 'top'; g.fillStyle = LIME;
+    for (let y = 0; y < S; y += cell) for (let x = 0; x < S; x += cell) {
+      if (!zMask[(y / cell) * (S / cell) + (x / cell)]) continue;
+      const w = 0.5 + 0.5 * Math.sin((y / S) * 6.0 - now * 3.2 + x * 0.015);
+      const v = Math.min(1, 0.35 + 0.65 * w);
+      g.globalAlpha = 0.45 + 0.55 * w;
+      g.fillText(RAMP[Math.round(v * n)], x, y);
+    }
+    g.globalAlpha = 1;
+    return;
+  }
   const off = document.createElement('canvas'); off.width = off.height = S;
   const o = off.getContext('2d');
   o.fillStyle = '#000'; o.fillRect(0, 0, S, S);
@@ -235,18 +275,13 @@ function drawZMark() {
   o.textAlign = 'center'; o.textBaseline = 'middle';
   o.fillText('Z', S / 2, S / 2 + S * 0.04);
   const d = o.getImageData(0, 0, S, S).data;
-  const g = c.getContext('2d');
-  g.clearRect(0, 0, S, S);
-  g.font = `${cell * 1.3}px ${MONO}`; g.textBaseline = 'top'; g.fillStyle = LIME;
-  const n = RAMP.length - 1;
+  zCtx = c.getContext('2d');
+  zMask = new Uint8Array((S / cell) * (S / cell));
   for (let y = 0; y < S; y += cell) for (let x = 0; x < S; x += cell) {
     const i = ((y + cell / 2) * S + (x + cell / 2)) * 4;
-    const l = d[i] / 255;
-    if (l < 0.5) continue;
-    // noise so the Z reads as the skulls do: dense core, breathing rim
-    const v = Math.min(1, 0.55 + 0.45 * Math.abs(Math.sin(x * 0.37 + y * 0.23)));
-    g.fillText(RAMP[Math.round(v * n)], x, y);
+    zMask[(y / cell) * (S / cell) + (x / cell)] = d[i] > 127 ? 1 : 0;
   }
+  drawZMark(now);
 }
 
 export function initHero() {
