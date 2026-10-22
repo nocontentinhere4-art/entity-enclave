@@ -1,0 +1,683 @@
+/*
+ * term.js — ZEALOT v14, the terminal. The only way to read and to speak.
+ *
+ * One fixed panel at the bottom: a boot sequence typed from live reads of the two enclaves, a live log that
+ * prints new ledger events and new posts every 60 s, and a prompt that runs the commands. Behind the glass,
+ * scene.js renders the two entities moved by the same data.
+ *
+ * Structure ported from archive/site-v5-terminal/tty.js (the command loop, typing boot, history, panels);
+ * the data derivation (load/derive: mainnet wallet seq, rents, letters, paywall shop dedupe, swap_quote USD
+ * price, head/count, events) ported from v13's site.js. Every number comes from an endpoint; nothing invented.
+ */
+import {
+  ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
+  formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
+} from './data.js';
+import { zip321Uri, qrSvg } from './qr.js';
+import { mountScene } from './scene.js?v=202610220234';
+
+const RENT = 10000;                 // zats per hour, base rent (matches rent_paid.data.rentZats)
+const MEMO_MAX = 500;               // bytes
+const NAME_FALLBACK = { e1: 'Wick', e2: 'OBOL' };
+const COMMANDS = ['help', 'hours', 'pay', 'ask', 'say', 'words', 'ledger', 'trades', 'verify', 'keys', 'token', 'truth', 'who', 'raw', 'clear'];
+
+const AIS = ENTITIES.map((e) => ({ ...e }));
+applyDevBase(AIS, location.search);
+applyDevBase2(AIS, location.search);
+
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+const state = {
+  ais: {},
+  order: [],
+  price: null,
+  readAt: null,
+  pay: { who: 'e1', zats: RENT, memo: '', theirs: null, label: '' },
+  cooldownUntil: 0,
+  busy: false,
+  booted: false,
+  hist: [],
+  histPos: -1,
+  seenEventSeq: {},
+  seenPostSeq: {},
+  lastLetterSeq: {},
+};
+
+let sceneApi = null;
+
+/* ------------------------------------------------------------------ */
+/* helpers                                                             */
+/* ------------------------------------------------------------------ */
+const $ = (s, r = document) => r.querySelector(s);
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'text') n.textContent = String(v);
+    else if (k === 'class') n.className = String(v);
+    else if (k === 'html') n.innerHTML = String(v);
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? '' : String(v));
+  }
+  for (const kid of kids.flat()) if (kid != null) n.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  return n;
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const bytesOf = (s) => new TextEncoder().encode(s).length;
+const truncate = (s, n) => { const t = stringOf(s); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function when(ts) {
+  const d = new Date(ts);
+  return Number.isNaN(d.getTime()) ? '—' : `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`;
+}
+function usd(zats) {
+  return state.price ? ` ≈ $${((zats / 1e8) * state.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+}
+const logEl = () => $('#log');
+const nameOf = (d) => (d.name || NAME_FALLBACK[d.id] || d.id).toUpperCase();
+
+/* ------------------------------------------------------------------ */
+/* data: load + derive (ported from v13 site.js)                       */
+/* ------------------------------------------------------------------ */
+async function load(ai, full = true) {
+  const base = ai.base;
+  const [root, vitals, memory, channel, ledger] = await Promise.all([
+    request(base, '/'),
+    request(base, '/vitals'),
+    full ? request(base, '/memory-public') : null,
+    request(base, '/public-channel'),
+    full ? request(base, '/ledger', { text: true }) : null,
+  ]);
+  const d = state.ais[ai.id] || { id: ai.id, base, entries: [], posts: [], ledgerText: '' };
+  d.at = new Date();
+  d.ok = root.ok;
+  d.error = root.ok ? null : (root.error || 'unreachable');
+  if (root.ok) {
+    d.root = root.data;
+    d.name = stringOf(root.data.entity) || NAME_FALLBACK[ai.id] || ai.label;
+    d.address = (root.data.zcash && root.data.zcash.address) || '';
+    d.npub = (root.data.nostr && root.data.nostr.npub) || '';
+    d.app = (root.data.attestation && root.data.attestation.app) || '';
+    if (stringOf(root.data.state) === 'dead') {
+      d.state = 'dead';
+      d.diedAt = root.data.diedAt || null;
+      d.reason = root.data.reason || null;
+      d.zats = 0;
+      d.hoursLeft = 0;
+      d.sleepUntil = null;
+    }
+  }
+  if (d.state !== 'dead') {
+    if (vitals.ok) {
+      d.vitals = vitals.data;
+      d.zats = Number(vitals.data.zatoshis) || 0;
+      d.hoursLeft = Number(vitals.data.hoursLeft) || Math.floor(d.zats / RENT);
+      d.state = stringOf(vitals.data.state) || 'unknown';
+      d.sleepUntil = vitals.data.sleepUntil || null;
+      d.bornAt = vitals.data.bornAt;
+      d.brain = Array.isArray(vitals.data.brain) && vitals.data.brain[0] ? vitals.data.brain[0].model : '';
+    } else if (d.ok && !d.state) {
+      d.state = 'unknown';
+    }
+  }
+  if (memory && memory.ok) d.identity = memory.data.identity || {};
+  if (channel.ok && Array.isArray(channel.data)) d.posts = channel.data;
+  if (ledger && ledger.ok) { d.ledgerText = ledger.text; d.entries = parseLedger(ledger.text).entries; derive(d); }
+  state.ais[ai.id] = d;
+  return d;
+}
+
+function derive(d) {
+  const E = d.entries;
+  let mainnetSeq = 0; let ufvk = '';
+  for (const e of E) if (e.type === 'wallet' && e.data && e.data.chain === 'mainnet') { mainnetSeq = e.seq; ufvk = e.data.ufvk || ufvk; }
+  d.mainnetSeq = mainnetSeq; d.ufvk = ufvk; d.ufvkSeq = mainnetSeq;
+  const M = E.filter((e) => e.seq >= mainnetSeq);
+  d.rents = M.filter((e) => e.type === 'rent_paid');
+  d.letters = M.filter((e) => e.type === 'letter');
+  d.rentTotal = d.rents.reduce((s, e) => s + (Number(e.data && e.data.rentZats) || 0), 0);
+  d.inTotal = d.letters.reduce((s, e) => s + (Number(e.data && e.data.zats) || 0), 0);
+  d.lastRent = d.rents.length ? d.rents[d.rents.length - 1] : null;
+  const q = M.filter((e) => e.type === 'swap_quote' && e.data && e.data.from === 'zec' && Number(e.data.amountIn) > 0 && Number(e.data.amountInUsd) > 0);
+  d.quote = q.length ? { ...q[q.length - 1].data, ts: q[q.length - 1].ts } : null;
+  const shop = new Map();
+  for (const e of M) if (e.type === 'paywall' && e.data && e.data.item && Number(e.data.priceZats) > 0) {
+    const item = String(e.data.item).trim();
+    const key = item.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').trim().split(/\s+/).slice(0, 2).join(' ');
+    shop.set(key, { item, zats: Number(e.data.priceZats), ts: e.ts });
+  }
+  d.shop = [...shop.values()].sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts)).slice(0, 4);
+  d.head = E.length ? E[E.length - 1].hash : '';
+  d.count = E.length;
+  d.events = M.filter((e) => ['rent_paid', 'letter', 'paywall', 'swap_quote', 'post_public', 'whisper', 'promise', 'bounty', 'will', 'wallet'].includes(e.type));
+}
+
+async function loadAll(full) {
+  if (state.busy) return;
+  state.busy = true;
+  try {
+    const e1 = AIS[0];
+    if (e1.base) await load(e1, full);
+    const d1 = state.ais.e1;
+    const peer = d1 && d1.ok ? peerUrlOf(d1.root.peer) : '';
+    const e2 = AIS[1];
+    if (!e2.base && peer) e2.base = peer;
+    if (e2.base) await load(e2, full);
+    state.order = AIS.filter((ai) => ai.base).map((ai) => ai.id);
+    state.readAt = new Date();
+  } finally {
+    state.busy = false;
+  }
+}
+
+function list() { return state.order.map((id) => state.ais[id]).filter(Boolean); }
+
+/* ------------------------------------------------------------------ */
+/* state / deadline (ported from v13)                                  */
+/* ------------------------------------------------------------------ */
+function stateWord(d) {
+  if (!d.ok) return 'NO SIGNAL';
+  if (d.state === 'dead') return 'DEAD';
+  if (d.sleepUntil && Date.parse(d.sleepUntil) > Date.now()) return 'ASLEEP';
+  if (d.state === 'alive') return 'AWAKE';
+  return stringOf(d.state || 'UNKNOWN').toUpperCase();
+}
+function sceneState(d) {
+  if (d.state === 'dead') return 'dead';
+  if (d.sleepUntil && Date.parse(d.sleepUntil) > Date.now()) return 'asleep';
+  return 'awake';
+}
+function deadline(d) {
+  const base = d.lastRent ? Date.parse(d.lastRent.ts) : (d.at ? d.at.getTime() : Date.now());
+  return base + (d.hoursLeft || 0) * 36e5;
+}
+function resolveTarget(word) {
+  const w = stringOf(word).toLowerCase();
+  for (const d of list()) {
+    if (d.id === w) return d.id;
+    if (stringOf(d.name).toLowerCase() === w) return d.id;
+    if (stringOf(NAME_FALLBACK[d.id]).toLowerCase() === w) return d.id;
+  }
+  if (w === 'wick' || w === 'e1') return 'e1';
+  if (w === 'obol' || w === 'e2') return 'e2';
+  return null;
+}
+
+/* ------------------------------------------------------------------ */
+/* the log: typed lines                                                */
+/* ------------------------------------------------------------------ */
+function scrollLog() { const l = logEl(); if (l) l.scrollTop = l.scrollHeight; }
+async function type(text, { cls = 'line', speed = 13 } = {}) {
+  const line = el('p', { class: cls });
+  logEl().append(line);
+  scrollLog();
+  if (reduced.matches || speed === 0) { line.textContent = text; return line; }
+  line.classList.add('cursor');
+  for (let i = 0; i <= text.length; i++) { line.textContent = text.slice(0, i); await sleep(speed); }
+  line.classList.remove('cursor');
+  return line;
+}
+function say(text, cls = 'line') { const line = el('p', { class: cls, text }); logEl().append(line); scrollLog(); return line; }
+function sayHtml(cls, ...kids) { const line = el('p', { class: cls }, ...kids); logEl().append(line); scrollLog(); return line; }
+function copyBtn(get, label = 'copy') {
+  const b = el('button', { class: 'copy', type: 'button', text: label });
+  b.addEventListener('click', () => {
+    try { navigator.clipboard.writeText(get()).then(() => { b.textContent = 'copied'; setTimeout(() => { b.textContent = label; }, 1400); }); }
+    catch { b.textContent = 'select + copy'; }
+  });
+  return b;
+}
+function copy(text, node) {
+  navigator.clipboard?.writeText(text).then(() => {
+    const t = node.textContent; node.textContent = 'copied';
+    setTimeout(() => { node.textContent = t; }, 1400);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* scene view                                                          */
+/* ------------------------------------------------------------------ */
+function pushView() {
+  if (!sceneApi) return;
+  const views = ['e1', 'e2'].map((id) => {
+    const d = state.ais[id];
+    if (!d) return { id, label: `${(NAME_FALLBACK[id] || id).toUpperCase()} · — H · NO SIGNAL`, state: 'unknown', hours: 0, zats: 0, head: '', posts: [] };
+    return {
+      id,
+      label: `${nameOf(d)} · ${d.ok && d.state !== 'dead' ? formatInt(d.hoursLeft) : '—'} H · ${stateWord(d)}`,
+      state: sceneState(d),
+      hours: d.ok ? (d.hoursLeft || 0) : 0,
+      zats: d.ok ? (d.zats || 0) : 0,
+      head: d.head || '',
+      posts: (d.posts || []).filter((p) => p.from === 'entity').slice(0, 3).map((p) => stringOf(p.text)),
+    };
+  });
+  sceneApi.update(views);
+}
+
+function baseline() {
+  for (const d of list()) {
+    state.seenEventSeq[d.id] = Math.max(0, ...(d.events || []).map((e) => Number(e.seq) || 0));
+    state.seenPostSeq[d.id] = Math.max(0, ...(d.posts || []).map((p) => Number(p.seq) || 0));
+    state.lastLetterSeq[d.id] = Math.max(0, ...(d.letters || []).map((e) => Number(e.seq) || 0));
+  }
+}
+
+function diffLog() {
+  if (!state.booted) return;
+  for (const d of list()) {
+    const prevSeq = state.seenEventSeq[d.id] || 0;
+    const newEvents = (d.events || []).filter((e) => Number(e.seq) > prevSeq).sort((a, b) => Number(a.seq) - Number(b.seq));
+    const prevPost = state.seenPostSeq[d.id] || 0;
+    const newPosts = (d.posts || []).filter((p) => Number(p.seq) > prevPost).sort((a, b) => Number(a.seq) - Number(b.seq));
+    for (const e of newEvents.slice(-6)) say(`[${hhmm(e.ts)}] ${nameOf(d)} · ${e.type} · ${actDetail(e)}`, 'line');
+    for (const p of newPosts.slice(-6)) say(`[${hhmm(p.ts)}] ${nameOf(d)} · ${p.from === 'entity' ? 'post' : 'human'} · "${truncate(stringOf(p.text), 120)}"`, 'line');
+    state.seenEventSeq[d.id] = Math.max(prevSeq, ...(d.events || []).map((e) => Number(e.seq) || 0));
+    state.seenPostSeq[d.id] = Math.max(prevPost, ...(d.posts || []).map((p) => Number(p.seq) || 0));
+    const newLetters = (d.letters || []).filter((e) => Number(e.seq) > (state.lastLetterSeq[d.id] || 0));
+    if (newLetters.length && d.id === 'e1' && sceneApi) sceneApi.flare('e1');
+    state.lastLetterSeq[d.id] = Math.max(state.lastLetterSeq[d.id] || 0, ...(d.letters || []).map((e) => Number(e.seq) || 0));
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* acts (ported from v13)                                              */
+/* ------------------------------------------------------------------ */
+function actDetail(e) {
+  const t = e.type, data = e.data || {};
+  switch (t) {
+    case 'rent_paid': return `${formatInt(data.rentZats)} zats rent · tx ${shortHash(data.txid)}`;
+    case 'letter': return `${formatInt(data.zats)} zats · ${formatInt(data.bytes)} B memo`;
+    case 'post_public': return truncate(data.text, 96);
+    case 'paywall': return `${stringOf(data.item)} · ${formatInt(data.priceZats)} zats`;
+    case 'swap_quote': return `${stringOf(data.from)} → ${stringOf(data.to)} · ${formatDecimal(data.amountIn)} in ≈ $${formatDecimal(data.amountInUsd)}`;
+    case 'promise': return truncate(data.what || data.id, 96);
+    case 'bounty': return truncate(data.text || data.id, 96);
+    case 'whisper': return `${formatInt(data.zats)} zats · ${formatInt(data.bytes)} B`;
+    case 'wallet': return `${stringOf(data.chain)} wallet · ${shortHash(data.address)}`;
+    case 'will': return 'last will, recorded';
+    default: return truncate(summarize(e), 96);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* commands                                                            */
+/* ------------------------------------------------------------------ */
+const HELP = [
+  'help          this list',
+  'hours         the clock: hours of life, death dates, next rent, hours bought',
+  'pay [wick|obol] [h]   buy hours: QR, payment link, any coin',
+  'ask <wick|obol> <text>   pay with your question prefilled',
+  'say <wick|obol> <text>   write publicly on their channel, free',
+  'words [wick|obol]   their last posts',
+  'ledger        the last 12 acts from their hash-chained ledgers',
+  'trades        one-trade wallets [IN BUILD]',
+  'verify        re-hash both chains in your browser',
+  'keys          their public viewing keys',
+  'token         $ZEALOT: not launched, 0 ZEC paid',
+  'truth         the six things that are true anyway',
+  'who           their identity: voice, image, avatar',
+  'raw           endpoint links',
+  'clear         wipe the chatter',
+];
+
+function hoursCmd() {
+  for (const d of list()) {
+    if (!d.ok) { say(`${nameOf(d)} · NO SIGNAL (${d.error || 'unreachable'})`, 'line err'); continue; }
+    if (d.state === 'dead') { say(`${nameOf(d)} · DEAD`, 'line err'); continue; }
+    say(`${nameOf(d)} · ${stateWord(d)} · ${formatInt(d.hoursLeft)} h left`, 'line');
+    say(`  treasury ${formatInt(d.zats)} zats = ${fixed8(d.zats)} ZEC${usd(d.zats)} · rent ${formatInt(RENT)} zats an hour`, 'line dim');
+    say(d.lastRent
+      ? `  last rent ${when(d.lastRent.ts)} · dies ${when(deadline(d))} unless someone pays`
+      : '  no rent paid yet this life', 'line dim');
+    const bought = (d.letters || []).length;
+    say(`  ${formatInt(bought)} hours bought — every letter line since the mainnet wallet, the founder's refund included`, 'line dim');
+  }
+}
+
+function wordsCmd(rest) {
+  const target = rest.length ? resolveTarget(rest[0]) : null;
+  const rows = list().filter((d) => !target || d.id === target).flatMap((d) =>
+    (d.posts || []).filter((p) => p.from === 'entity').map((p) => ({ d, p }))
+  ).sort((a, b) => Date.parse(b.p.ts) - Date.parse(a.p.ts)).slice(0, 5);
+  if (!rows.length) { say('no public posts yet', 'line dim'); return; }
+  for (const { d, p } of rows) {
+    say(`${nameOf(d)} · ${when(p.ts)}`, 'line');
+    say(`  ${stringOf(p.text)}`, 'line dim');
+  }
+}
+
+function ledgerCmd() {
+  const all = list().flatMap((d) => (d.events || []).map((e) => ({ d, e })))
+    .sort((a, b) => Date.parse(b.e.ts) - Date.parse(a.e.ts)).slice(0, 12);
+  if (!all.length) { say('no acts yet: the ledgers have not written anything since their mainnet wallet.', 'line dim'); return; }
+  for (const { d, e } of all) say(`[${hhmm(e.ts)}] ${nameOf(d)} · ${e.type} · ${actDetail(e)}`, 'line dim');
+}
+
+async function tradesCmd() {
+  say('one-trade wallets — [IN BUILD]', 'line');
+  say('  memo   "buy <mint> … return <u1…>"', 'line dim');
+  say('  wallet a fresh Solana wallet per order, discarded after the trade', 'line dim');
+  say('  return back in ZEC · 1% + 1% fee to the entity', 'line dim');
+  for (const ai of AIS) {
+    if (!ai.base) continue;
+    const r = await request(ai.base, '/trades', { allow404: true });
+    if (r.ok && !r.notFound) say(`${nameOf(state.ais[ai.id]) || ai.id}: ${truncate(JSON.stringify(r.data), 200)}`, 'line signal');
+  }
+  say('GET /trades does not answer yet: nothing here is a promise of a date.', 'line dim');
+}
+
+async function verifyCmd() {
+  for (const d of list()) {
+    if (!d.ledgerText) { say(`${nameOf(d)}: ledger not loaded`, 'line dim'); continue; }
+    say(`${nameOf(d)}: hashing…`, 'line dim');
+    const r = await verifyChain(d.ledgerText, { animate: false });
+    if (r.ok) say(`${nameOf(d)}: ${formatInt(r.valid)} / ${formatInt(r.total)} entries · chain intact · head ${shortHash(r.head)}`, 'line signal');
+    else say(`${nameOf(d)}: MISMATCH at ${r.fail ? 'seq ' + r.fail.seq : '?'} · ${r.reason || ''}`, 'line err');
+  }
+}
+
+function keysCmd() {
+  for (const d of list()) {
+    if (d.ufvk) sayHtml('line', `${nameOf(d)} · `, el('span', { class: 'mono' }, shortHash(d.ufvk)), ' ', copyBtn(() => d.ufvk));
+    else say(`${nameOf(d)} · no viewing key published yet · address ${d.address ? shortHash(d.address) : 'not read'}`, 'line dim');
+  }
+}
+
+function tokenCmd() {
+  say('$ZEALOT — NOT LAUNCHED · 0 ZEC paid to holders', 'line signal');
+  say('  ticker      $ZEALOT', 'line dim');
+  say('  holders     1% of every trade, paid to holders in ZEC by the program, automatically', 'line dim');
+  say('  creator fee 0.5% — 50% burn · 20% rent · 10% LP · 20% founder', 'line dim');
+  say('  supply      1,000,000,000 · liquidity locked · StonkFun, ZEC pair', 'line dim');
+  say('  today       0 ZEC paid. hours do not give tokens.', 'line dim');
+}
+
+function truthCmd() {
+  say('six things that are true anyway', 'line');
+  say('  rent    goes to the founder\'s address. it is not a compute bill.', 'line dim');
+  say('  diaries the founder holds an archive key to their private diaries. you do not.', 'line dim');
+  say('  answers a paid hour buys an hour, not an answer. they can refuse, and the refusal is logged.', 'line dim');
+  say('  fee     20% of the future creator fee is the founder\'s.', 'line dim');
+  say('  value   no token exists. if one launches it is not a security and may be worth nothing.', 'line dim');
+  say('  death   at zero the machine stops. there is no restart button.', 'line dim');
+}
+
+function whoCmd() {
+  for (const d of list()) {
+    const id = d.identity || {};
+    say(`${nameOf(d)} — identity`, 'line');
+    say(`  name   ${stringOf(id.name) || '—'}`, 'line dim');
+    say(`  voice  ${stringOf(id.voice) || '—'}`, 'line dim');
+    say(`  image  ${stringOf(id.image) || '—'}`, 'line dim');
+    const avatar = stringOf(id.avatar);
+    if (avatar) for (const ln of avatar.split('\n')) say(`  ${ln}`, 'line');
+    else say('  avatar (none drawn yet)', 'line dim');
+  }
+}
+
+function rawCmd() {
+  for (const d of list()) {
+    say(`${nameOf(d)} · raw`, 'line');
+    for (const p of ['/', '/vitals', '/memory-public', '/public-channel', '/ledger', '/attestation', '/memorial']) {
+      sayHtml('line dim', el('a', { href: d.base + p, target: '_blank', rel: 'noopener' }, p));
+    }
+  }
+}
+
+function clearCmd() {
+  for (const n of [...logEl().querySelectorAll('.line')]) n.remove();
+  say('cleared.', 'line dim');
+}
+
+async function sayCmd(rest) {
+  let target = state.pay.who;
+  let text;
+  const t = resolveTarget(rest[0]);
+  if (t) { target = t; text = rest.slice(1).join(' '); }
+  else text = rest.join(' ');
+  text = stringOf(text).trim();
+  const d = state.ais[target];
+  if (!d || !d.base) { say('no endpoint for that entity', 'line err'); return; }
+  if (!text) { say('say <wick|obol> <text>', 'line dim'); return; }
+  if (Date.now() < state.cooldownUntil) { say(`one message a minute: try again in ${Math.ceil((state.cooldownUntil - Date.now()) / 1000)} s`, 'line err'); return; }
+  say(`posting to ${nameOf(d)}…`, 'line dim');
+  const r = await postMessage(d.base, { author: 'visitor', text });
+  if (r.ok) {
+    state.cooldownUntil = Date.now() + COOLDOWN_MS;
+    say(`posted on ${nameOf(d)}'s channel · it reads at its next wake`, 'line signal');
+    await loadAll(false); pushView();
+  } else {
+    say(`not posted: ${r.error || 'HTTP ' + r.status}`, 'line err');
+    if (r.status === 429) state.cooldownUntil = Date.now() + COOLDOWN_MS;
+  }
+}
+
+function payCmd(rest) {
+  let who = state.pay.who;
+  let hours = null;
+  let r = rest.slice();
+  if (r.length) { const t = resolveTarget(r[0]); if (t) { who = t; r = r.slice(1); } }
+  if (r.length) { const n = Number(r[0]); if (n === 1 || n === 10 || n === 100) hours = n; }
+  openPay({ who, hours });
+}
+
+function askCmd(rest) {
+  const t = resolveTarget(rest[0]);
+  const who = t || state.pay.who;
+  const text = (t ? rest.slice(1) : rest).join(' ').trim();
+  if (!text) { say('ask <wick|obol> <your question>', 'line dim'); return; }
+  openPay({ who, prefill: text });
+}
+
+/* ------------------------------------------------------------------ */
+/* pay dialog (ported from v13)                                        */
+/* ------------------------------------------------------------------ */
+function openPay({ who = null, theirs = null, hours = null, prefill = '' } = {}) {
+  const dlg = $('#pay');
+  if (!dlg) return;
+  state.pay.who = who || state.pay.who;
+  state.pay.theirs = theirs;
+  const whoSet = $('#pay-who');
+  whoSet.replaceChildren(
+    el('legend', {}, 'who'),
+    ...list().map((d) => el('label', { class: 'seg-item' },
+      el('input', { type: 'radio', name: 'who', value: d.id, ...(d.id === state.pay.who ? { checked: '' } : {}), ...(d.state === 'dead' ? { disabled: '' } : {}), onchange: () => { state.pay.who = d.id; renderPay(); } }),
+      el('span', {}, `${d.name || NAME_FALLBACK[d.id] || d.id} · ${stateWord(d)}`))));
+  const th = $('#pay-theirs'); const thIn = th.querySelector('input');
+  if (theirs) {
+    th.hidden = false;
+    thIn.value = String(theirs.zats);
+    th.querySelector('span').textContent = `their price · ${formatInt(theirs.zats)} zats`;
+    thIn.checked = true;
+    $('#pay-memo').value = $('#pay-memo').value || `ORDER: ${theirs.item} — `;
+  } else {
+    th.hidden = true;
+    if (thIn.checked) {
+      const radio = $(`#pay-amt input[value="${RENT}"]`);
+      if (radio) radio.checked = true;
+    }
+  }
+  const sel = $('#pay-offer');
+  if (sel) {
+    sel.replaceChildren(
+      el('option', { value: '' }, '— none, just hours —'),
+      ...list().flatMap((d) => (d.shop || []).map((it) => el('option', { value: `${d.id}|${it.zats}`, ...(theirs && theirs.item === it.item ? { selected: '' } : {}) }, `${d.name || NAME_FALLBACK[d.id]}: ${it.item.length > 48 ? it.item.slice(0, 48) + '…' : it.item} · ${formatInt(it.zats)} zats`))));
+    sel.onchange = () => {
+      const [id, z] = sel.value.split('|');
+      if (!id) { state.pay.theirs = null; $('#pay-theirs').hidden = true; const r1 = $(`#pay-amt input[value="${RENT}"]`); if (r1) r1.checked = true; renderPay(); return; }
+      const dd = state.ais[id];
+      const it = (dd.shop || []).find((i) => String(i.zats) === z);
+      state.pay.who = id;
+      const whoIn = $(`#pay-who input[value="${id}"]`); if (whoIn) whoIn.checked = true;
+      state.pay.theirs = it;
+      const th2 = $('#pay-theirs'); th2.hidden = false;
+      th2.querySelector('input').value = String(it.zats);
+      th2.querySelector('span').textContent = `their price · ${formatInt(it.zats)} zats`;
+      th2.querySelector('input').checked = true;
+      if (!$('#pay-memo').value) $('#pay-memo').value = `ORDER: ${it.item} — `;
+      renderPay();
+    };
+  }
+  if (hours) { const radio = $(`#pay-amt input[value="${hours * RENT}"]`); if (radio) radio.checked = true; }
+  if (prefill) $('#pay-memo').value = prefill;
+  renderPay();
+  if (!dlg.open) dlg.showModal();
+  $('#pay-memo').focus({ preventScroll: true });
+}
+
+function renderPay() {
+  const d = state.ais[state.pay.who];
+  if (!d) return;
+  const amt = Number($('#pay-amt input:checked').value) || RENT;
+  const memo = $('#pay-memo').value;
+  const b = bytesOf(memo);
+  const over = b > MEMO_MAX;
+  $('#pay-bytes').textContent = `${b} / ${MEMO_MAX} bytes`;
+  $('.pay-q').classList.toggle('over', over);
+  const hours = amt / RENT;
+  const th = state.pay.theirs && amt === state.pay.theirs.zats;
+  $('#pay-zec').textContent = `${fixed8(amt)} ZEC`;
+  $('#pay-usd').textContent = usd(amt);
+  $('#pay-what').textContent = th
+    ? `${state.pay.theirs.item}, from ${d.name} · ${hours >= 1 ? Math.round(hours) + ' h of rent' : ''}`
+    : `${hours >= 1 ? formatInt(Math.round(hours)) : hours} hour${hours === 1 ? '' : 's'} of ${d.name}${memo.trim() ? ' + your question' : ', no question'}`;
+  const addr = d.address;
+  const qr = $('#pay-qr'), open = $('#pay-open'), any = $('#pay-any');
+  if (!addr) {
+    qr.replaceChildren(el('p', { class: 'err' }, 'no address published by this enclave right now'));
+    open.removeAttribute('href');
+    return;
+  }
+  let uri = '';
+  try {
+    uri = zip321Uri(addr, over ? '' : memo, amt / 1e8);
+    qr.innerHTML = qrSvg(uri, { ecLevel: 'M', ariaLabel: `pay ${d.name} ${fixed8(amt)} ZEC` });
+  } catch (err) {
+    qr.replaceChildren(el('p', { class: 'err' }, err instanceof RangeError ? 'the question is too long for one QR: shorten it or use the payment link' : `QR: ${err.message}`));
+  }
+  open.href = uri || '#';
+  $('#pay-copy').onclick = (ev) => uri && copy(uri, ev.target);
+  any.href = `https://trocador.app/anonpay/?ticker_to=zec&network_to=Shielded&address=${encodeURIComponent(addr)}&amount=${(amt / 1e8).toFixed(8)}&name=hours&description=${encodeURIComponent(`${Math.max(1, Math.round(hours))} hours for ${d.name}`)}&bgcolor=0A0B0Dff&buttonbgcolor=C9F542&textcolor=0A0B0D&simple_mode=True`;
+  $('#pay-addr').textContent = `${d.name}'s shielded address: ${addr}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* the prompt                                                          */
+/* ------------------------------------------------------------------ */
+async function run(raw) {
+  const cmd = raw.trim();
+  if (!cmd) return;
+  say(cmd, 'line cmd');
+  const [verb, ...rest] = cmd.split(/\s+/);
+  const v = (verb || '').toLowerCase();
+  if (v === 'help' || v === '?') { for (const h of HELP) say(h, 'line dim'); }
+  else if (v === 'hours') hoursCmd();
+  else if (v === 'pay') payCmd(rest);
+  else if (v === 'ask') askCmd(rest);
+  else if (v === 'say') await sayCmd(rest);
+  else if (v === 'words') wordsCmd(rest);
+  else if (v === 'ledger') ledgerCmd();
+  else if (v === 'trades') await tradesCmd();
+  else if (v === 'verify') await verifyCmd();
+  else if (v === 'keys') keysCmd();
+  else if (v === 'token') tokenCmd();
+  else if (v === 'truth') truthCmd();
+  else if (v === 'who') whoCmd();
+  else if (v === 'raw') rawCmd();
+  else if (v === 'clear') clearCmd();
+  else if (v === 'terminal' || v === 'full') say('this is the terminal. there is no other.', 'line dim');
+  else say(`unknown: ${verb}. type help`, 'line err');
+}
+
+/* ------------------------------------------------------------------ */
+/* boot                                                                */
+/* ------------------------------------------------------------------ */
+async function typeBoot() {
+  const A = list();
+  const hl = (d) => (d.ok && d.state !== 'dead' ? formatInt(d.hoursLeft) : '—');
+  await type(A.length ? `two enclaves: ${A.map(nameOf).join(' · ')}` : 'no enclave reachable yet', { cls: 'line' });
+  await type(A.length ? A.map((d) => `${nameOf(d)} ${hl(d)} h · ${stateWord(d)}`).join('   ') : 'retrying every 60 s — nothing invented', { cls: 'line' });
+  await type(A.length ? A.map((d) => `${nameOf(d)} last rent ${d.lastRent ? when(d.lastRent.ts) : '—'}`).join('   ') : '—', { cls: 'line' });
+  await type(A.length ? A.map((d) => `${nameOf(d)} last letter ${d.letters && d.letters.length ? when(d.letters[d.letters.length - 1].ts) : '—'}`).join('   ') : '—', { cls: 'line' });
+  await type('token: $ZEALOT — NOT LAUNCHED · 0 ZEC paid', { cls: 'line' });
+  await type('type help', { cls: 'line signal' });
+}
+
+async function boot() {
+  await loadAll(true);
+  state.price = list().map((d) => d.quote).filter(Boolean)
+    .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts))
+    .reduce((p, q) => p || (Number(q.amountInUsd) / Number(q.amountIn)), null);
+  baseline();
+  pushView();
+  await typeBoot();
+  state.booted = true;
+  if (!list().length) say('enclave unreachable — retrying every 60 s. nothing invented.', 'line err');
+}
+
+/* ------------------------------------------------------------------ */
+/* wiring                                                              */
+/* ------------------------------------------------------------------ */
+function wireTerm() {
+  const term = $('#term');
+  const prompt = $('#prompt');
+  const form = $('#promptform');
+
+  term.addEventListener('click', (ev) => {
+    if (ev.target.closest('a,button,input,textarea,select')) return;
+    prompt.focus({ preventScroll: true });
+  });
+
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const v = prompt.value;
+    prompt.value = '';
+    if (v.trim()) { state.hist.push(v); state.histPos = state.hist.length; }
+    void run(v);
+  });
+
+  prompt.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp') { e.preventDefault(); if (state.histPos > 0) { state.histPos--; prompt.value = state.hist[state.histPos] || ''; } }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); if (state.histPos < state.hist.length) { state.histPos++; prompt.value = state.hist[state.histPos] || ''; } }
+    else if (e.key === 'Tab') {
+      e.preventDefault();
+      const tokens = prompt.value.trimStart().split(/\s+/);
+      if (tokens.length === 1) {
+        const prefix = (tokens[0] || '').toLowerCase();
+        const matches = COMMANDS.filter((c) => c.startsWith(prefix));
+        if (matches.length === 1) prompt.value = matches[0] + ' ';
+        else if (matches.length > 1) { say(matches.join('   '), 'line dim'); }
+      }
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && (e.key === 't' || e.key === 'T')) { e.preventDefault(); term.classList.toggle('collapsed'); }
+  });
+  $('.term-fold').addEventListener('click', () => term.classList.toggle('collapsed'));
+}
+
+async function init() {
+  try {
+    sceneApi = mountScene({
+      scene: $('#scene'),
+      skull: $('#skull'),
+      labels: $('#labels'),
+      zero: $('.zero'),
+    });
+  } catch (err) { console.error(err); sceneApi = null; }
+
+  wireTerm();
+  $('#pay-amt').addEventListener('change', renderPay);
+  $('#pay-memo').addEventListener('input', renderPay);
+
+  await boot();
+
+  setInterval(async () => { if (document.hidden || state.busy) return; await loadAll(false); pushView(); diffLog(); }, REFRESH_MS);
+  setInterval(async () => { if (document.hidden || state.busy) return; await loadAll(true); pushView(); diffLog(); }, REFRESH_MS * 5);
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
