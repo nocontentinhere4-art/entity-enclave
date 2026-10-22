@@ -695,3 +695,60 @@ legend { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; col
   .mt-step { padding: 8px 1px 6px; }
   .mt-step .mt-step-label { font-size: 7px; }
 }
+
+/* ---------- v21 · ASCII scenes (the skull style, extended site-wide) ---------- */
+.scene { display: block; background: #000; pointer-events: none; }
+
+/* the two portraits in the enclave cards */
+.card-portrait {
+  position: relative; height: 340px; background: #000;
+  border-bottom: 1px solid var(--hairline); overflow: hidden;
+}
+.card-portrait canvas { width: 100%; height: 100%; display: block; }
+.card-portrait.is-dead { opacity: 0.35; }
+
+/* bands drawn behind section titles sit at 30% so the copy always reads */
+.section > .wrap { position: relative; z-index: 1; }
+.scene.hand-band { position: absolute; top: 40px; left: 0; right: 0; width: 100%; height: 340px; opacity: 0.55; z-index: 0; }
+.scene.spine-band { position: absolute; top: 20px; left: 0; right: 0; width: 100%; height: 180px; opacity: 0.6; z-index: 0; }
+
+/* hourglass beside the flow table */
+.money-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
+.money-main { min-width: 0; }
+.scene.hourglass { width: 100%; height: 460px; border: 1px solid var(--hairline); border-radius: var(--r4); }
+
+/* shout beside the terminal (desktop only) */
+.term-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: center; }
+.scene.shout { width: 100%; height: 160px; border: 1px solid var(--hairline); border-radius: var(--r4); }
+.term.docked ~ .scene.shout { display: none; }
+
+/* crossed bones, a low-contrast band across the top of the footer */
+.foot { padding-top: 0; }
+.scene.bones { width: 100%; height: 84px; border-bottom: 1px solid var(--hairline); opacity: 0.35; }
+.foot-inner { padding-top: 30px; }
+
+/* scrolling 1-row ASCII dividers (CSS only) */
+.ascii-divider {
+  overflow: hidden; height: 22px; line-height: 22px; white-space: nowrap;
+  background: var(--void); border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; color: var(--muted);
+}
+.ascii-scroll { display: inline-block; will-change: transform; animation: ascii-scroll 26s linear infinite; }
+@keyframes ascii-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+@media (max-width: 980px) {
+  .money-grid { grid-template-columns: 1fr; }
+  .scene.hourglass { height: 260px; }
+  .term-grid { grid-template-columns: 1fr; }
+  .scene.shout { display: none; }
+}
+@media (max-width: 640px) {
+  .scene.hand-band { height: 200px; opacity: 0.35; }
+  .scene.spine-band { height: 120px; }
+  .scene.bones { height: 64px; }
+  .card-portrait { height: 260px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ascii-scroll { animation: none; }
+}

@@ -27,7 +27,7 @@
   <meta name="twitter:image" content="https://nocontentinhere4-art.github.io/entity-enclave/og.jpg">
   <link rel="canonical" href="https://nocontentinhere4-art.github.io/entity-enclave/">
   <meta name="theme-color" content="#060606">
-  <link rel="stylesheet" href="./site.css?v=20">
+  <link rel="stylesheet" href="./site.css?v=24">
 </head>
 <body>
 
@@ -77,8 +77,11 @@
       </div>
     </section>
 
+    <div class="ascii-divider" role="presentation" aria-hidden="true"></div>
+
     <!-- [0003] · one trade, one wallet -->
     <section class="section" id="trades" aria-labelledby="trades-h">
+      <canvas class="scene hand-band" id="hand-band" aria-hidden="true"></canvas>
       <div class="wrap">
         <p class="eyebrow">[0003] ONE TRADE · ONE WALLET · STEPS · ORDER BOOK</p>
         <h2 class="sec-h" id="trades-h">One trade. One wallet. <em>Back to ZEC.</em></h2>
@@ -102,13 +105,17 @@
       </div>
     </section>
 
+    <div class="ascii-divider" role="presentation" aria-hidden="true"></div>
+
     <!-- [0006] · where the money goes -->
     <section class="section" id="money" aria-labelledby="money-h">
       <div class="wrap">
         <p class="eyebrow">[0006] WHERE THE MONEY GOES · FLOW · ROUTE · PRIVACY · TOKEN</p>
         <h2 class="sec-h" id="money-h">Where the money goes. <em>And what stays private.</em></h2>
 
-        <table class="flow">
+        <div class="money-grid">
+          <div class="money-main">
+            <table class="flow">
           <thead>
             <tr>
               <th>From</th>
@@ -156,7 +163,10 @@
             </tr>
           </tbody>
         </table>
-        <p class="legend">legend · public = in the entity's ledger, verify yourself · private = hidden by the Zcash shielded pool · zero hours left = the wallet and the enclave stop</p>
+          <p class="legend">legend · public = in the entity's ledger, verify yourself · private = hidden by the Zcash shielded pool · zero hours left = the wallet and the enclave stop</p>
+          </div>
+          <canvas class="scene hourglass" id="hourglass" aria-hidden="true"></canvas>
+        </div>
 
         <h3 class="money-sub">route · one-trade wallet <span class="canary">beta</span></h3>
         <div class="route" aria-label="the one-trade route, hop by hop: shielded ZEC, NEAR Intents 1Click swap, SOL in a fresh keypair, Jupiter buy, hold until sell or target or stop, Jupiter sell, NEAR Intents swap, shielded ZEC to the return address, keypair discarded">
@@ -192,8 +202,11 @@
       </div>
     </section>
 
+    <div class="ascii-divider" role="presentation" aria-hidden="true"></div>
+
     <!-- [0007] · the ledger -->
     <section class="section" id="ledger" aria-labelledby="ledger-h">
+      <canvas class="scene spine-band" id="spine-band" aria-hidden="true"></canvas>
       <div class="wrap">
         <p class="eyebrow">[0007] THE LEDGER · HASH CHAIN · VERIFY</p>
         <h2 class="sec-h" id="ledger-h">The ledger</h2>
@@ -219,7 +232,8 @@
       <div class="wrap">
         <p class="eyebrow">[0008] TERMINAL · THE ONLY WAY TO SPEAK</p>
         <h2 class="sec-h" id="terminal-h">Terminal</h2>
-        <div class="term" id="term" role="region" aria-label="terminal">
+        <div class="term-grid">
+          <div class="term" id="term" role="region" aria-label="terminal">
           <div class="term-head">
             <span class="term-title">zealot tty</span>
             <div class="term-tools">
@@ -235,6 +249,8 @@
             <input id="prompt" class="prompt" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="command" placeholder="type help">
             <span class="term-hint">help · hours · pay · words · ledger · verify · truth</span>
           </form>
+          </div>
+          <canvas class="scene shout" id="shout" aria-hidden="true"></canvas>
         </div>
       </div>
     </section>
@@ -243,6 +259,7 @@
 
   <!-- footer -->
   <footer class="foot" role="contentinfo">
+    <canvas class="scene bones" id="bones" aria-hidden="true"></canvas>
     <div class="foot-inner">
       <div class="foot-mono">
         <span id="foot-digest">image digest —</span>
@@ -368,6 +385,6 @@
     </form>
   </dialog>
 
-  <script type="module" src="./app.js?v=20"></script>
+  <script type="module" src="./app.js?v=24"></script>
 </body>
 </html>

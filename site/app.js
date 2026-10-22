@@ -10,13 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=20';
+} from './term.js?v=24';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger,
-} from './data.js?v=20';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=20';
-import { initHero, setMouth, triggerTalk } from './hero.js?v=20';
+} from './data.js?v=24';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=24';
+import { initHero, setMouth, triggerTalk } from './hero.js?v=24';
+import { mountAscii, RAMP } from './ascii.js?v=24';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -101,6 +102,7 @@ function panelShell(id) {
       <span class="meta-label">ENCLAVE 0${id === 'e1' ? 1 : 2}</span>
       <span class="meta-idx">[0002]</span>
     </header>
+    <div class="card-portrait" data-portrait><canvas role="img" aria-label="ASCII portrait of ${id === 'e1' ? 'WICK' : 'OBOL'}"></canvas></div>
     <header class="card-head">
       <h3 class="card-name" data-k="name">—</h3>
       <span class="card-state" data-k="state">—</span>
@@ -649,7 +651,7 @@ function openTrade({ who = null } = {}) {
     ...list().map((d) => el('label', { class: 'seg-item' },
       el('input', { type: 'radio', name: 'trade-who', value: d.id, ...(d.id === tradeState.who ? { checked: '' } : {}), ...(d.state === 'dead' ? { disabled: '' } : {}), onchange: () => { tradeState.who = d.id; void checkTradeLive(d.id); } }),
       el('span', {}, `${nameOf(d)} · ${stateWord(d)}`))));
-  if (!dlg.open) dlg.showModal();
+  if (!dlg.open) { dlg.showModal(); document.dispatchEvent(new CustomEvent('zealot:trade-open')); }
   void checkTradeLive(tradeState.who);
   const tok = $('#trade-token');
   if (tok) tok.focus({ preventScroll: true });
@@ -1227,8 +1229,10 @@ function renderLedger() {
 
   const container = $('#ledger-lines');
   const frag = document.createDocumentFragment();
+  let added = false;
   for (const { d, e } of last) {
     const key = `${d.id}|${e.seq}`;
+    if (!renderedLedger.has(key)) added = true;
     const line = el('div', { class: 'ledger-line' + (renderedLedger.has(key) ? '' : ' new') },
       el('span', { class: 'l-e' }, nameOf(d)),
       el('span', { class: 'l-seq mono' }, stringOf(e.seq)),
@@ -1239,6 +1243,7 @@ function renderLedger() {
     frag.append(line);
   }
   container.replaceChildren(frag);
+  if (added) document.dispatchEvent(new CustomEvent('zealot:ledger-new'));
 }
 
 /* ------------------------------------------------------------------ */
@@ -1384,6 +1389,260 @@ function renderAll() {
   renderLedger();
   renderFooter();
   renderTradeGate();
+  syncScenes();
+}
+
+/* ------------------------------------------------------------------ */
+/* ASCII scenes — the skull style extended site-wide (ascii.js)        */
+/* ------------------------------------------------------------------ */
+const RAMP_N = RAMP.length - 1;
+const rampIdx = (c) => RAMP.indexOf(c);
+const frac = (v) => v - Math.floor(v);
+const clampI = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+/* deterministic per-cell pseudo-random: smooth, stable flicker, no Math.random per frame */
+function cellRand(i, k) {
+  let h = (i * 2654435761) ^ (k * 40503);
+  h ^= h >>> 13; h ^= h << 8; h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+/* [0002] WICK — the candle flame near the top jitters '!*^' + yellow, intensity follows hoursLeft */
+function wickScene() {
+  const g = { cols: 0, rows: 0, t: 0, hours: 1, dead: false };
+  const F = [rampIdx('!'), rampIdx('*'), rampIdx('^')];
+  const lum = (i, x, y, base) => base;
+  const alpha = (i, x, y, base) => {
+    if (y > g.rows * 0.7 || base < 0.5) return 1;
+    const f = cellRand(i, (g.t * 9) | 0);
+    const intensity = Math.min(1, 0.25 + g.hours / 600);
+    return (0.55 + 0.45 * intensity) * (0.6 + 0.4 * f);
+  };
+  const char = (i, x, y, base) => {
+    if (y > g.rows * 0.7 || base < 0.5) return Math.round(base * RAMP_N);
+    const f = cellRand(i, (g.t * 9) | 0);
+    return F[f < 0.34 ? 0 : f < 0.67 ? 1 : 2];
+  };
+  const yellow = (i, x, y, base) => (y <= g.rows * 0.7 && base >= 0.5 ? true : null);
+  const live = { lum, alpha, char, yellow };
+  const dead = { yellow: false };
+  return {
+    g,
+    opts: {
+      src: './vendor/wick-candle.jpg', cell: 6, fit: 'contain',
+      motion: (inst, t) => { g.cols = inst.cols; g.rows = inst.rows; g.t = t; return g.dead ? dead : live; },
+    },
+  };
+}
+
+/* [0002] OBOL — the two coins glint: a diagonal shine sweeps the bright cells every few seconds */
+function obolScene() {
+  const g = { cols: 0, rows: 0, t: 0, dead: false };
+  const P = 6;
+  const shineAt = (x, y) => {
+    const d = (x / g.cols + y / g.rows) / 2;
+    let dist = Math.abs(d - frac(g.t / P));
+    if (dist > 0.5) dist = 1 - dist;
+    return Math.max(0, 1 - dist * 7);
+  };
+  const lum = (i, x, y, base) => (base < 0.4 ? base : base + shineAt(x, y) * 0.45);
+  const live = { lum };
+  const dead = { yellow: false };
+  return {
+    g,
+    opts: {
+      src: './vendor/obol-coins.jpg', cell: 6, fit: 'contain',
+      motion: (inst, t) => { g.cols = inst.cols; g.rows = inst.rows; g.t = t; return g.dead ? dead : live; },
+    },
+  };
+}
+
+/* [0003] Trades — the hand reaches: cells reveal left→right on a slow loop; the coin pulses yellow on trade-open */
+function handScene() {
+  const g = { cols: 0, rows: 0, t: 0, pulseUntil: -1 };
+  const SCAN = 9, PULSE = 0.8;
+  const lum = (i, x, y, base) => {
+    if (g.t < g.pulseUntil && base > 0.55 && y < g.rows * 0.75) {
+      return base + ((g.pulseUntil - g.t) / PULSE) * 0.45;
+    }
+    return base;
+  };
+  const alpha = (i, x, y, base) => {
+    const edge = frac(g.t / SCAN) * g.cols;
+    const ahead = x - edge;
+    return ahead < 0 ? 1 : (ahead < 2.5 ? 0.5 : 0.35);
+  };
+  const yellow = (i, x, y, base) => (g.t < g.pulseUntil && base > 0.55 && y < g.rows * 0.75 ? true : null);
+  const live = { lum, alpha, yellow };
+  return {
+    g,
+    opts: {
+      src: './vendor/hand-coin.jpg', cell: 6, fit: 'contain', align: 'right',
+      motion: (inst, t) => { g.cols = inst.cols; g.rows = inst.rows; g.t = t; return live; },
+    },
+  };
+}
+
+/* [0006] Money — the sand falls through the neck, the bottom pile slowly brightens; speed mirrors the hourly rent */
+function hourglassScene() {
+  const g = { cols: 0, rows: 0, t: 0 };
+  const RENT = 10000;
+  const speed = RENT / 10000;   // 1× today; purely visual
+  const lum = (i, x, y, base) => {
+    let l = base;
+    const cx = x / g.cols, cy = y / g.rows;
+    if (Math.abs(cx - 0.5) < 0.07 && cy > 0.18 && cy < 0.9) {
+      const ph = frac(cy - g.t * 0.45 * speed);
+      l = Math.min(1, l + Math.max(0, 1 - Math.abs(ph - 0.5) * 5) * 0.65);
+    }
+    if (cy > 0.5 && base > 0.12) {
+      l = Math.min(1, l + 0.22 * (0.5 + 0.5 * Math.sin(g.t * 0.5)));
+    }
+    return l;
+  };
+  const live = { lum };
+  return {
+    g,
+    opts: {
+      src: './vendor/hourglass.jpg', cell: 7, fit: 'contain',
+      motion: (inst, t) => { g.cols = inst.cols; g.rows = inst.rows; g.t = t; return live; },
+    },
+  };
+}
+
+/* [0007] Ledger — the spine is a hash chain: a yellow pulse travels vertebra→vertebra, one fires per new line */
+function spineScene() {
+  const g = { cols: 0, rows: 0, t: 0, pulses: [] };
+  const LOOP = 7, DUR = 2.2, W = 4;
+  const lum = (i, x, y, base) => {
+    if (base < 0.25) return base;
+    let boost = 0;
+    let d = Math.abs(x - frac(g.t / LOOP) * g.cols);
+    if (d < W) boost = Math.max(boost, (1 - d / W) * 0.6);
+    for (let k = 0; k < g.pulses.length; k++) {
+      const age = g.t - g.pulses[k];
+      if (age < 0 || age > DUR) continue;
+      const dd = Math.abs(x - (age / DUR) * g.cols);
+      if (dd < W) boost = Math.max(boost, (1 - dd / W) * 0.7);
+    }
+    return Math.min(1, base + boost);
+  };
+  const yellow = (i, x, y, base) => {
+    if (base < 0.25) return null;
+    if (Math.abs(x - frac(g.t / LOOP) * g.cols) < W) return true;
+    for (let k = 0; k < g.pulses.length; k++) {
+      const age = g.t - g.pulses[k];
+      if (age < 0 || age > DUR) continue;
+      if (Math.abs(x - (age / DUR) * g.cols) < W) return true;
+    }
+    return null;
+  };
+  const live = { lum, yellow };
+  const addPulse = () => {
+    g.pulses.push(performance.now() / 1000);
+    if (g.pulses.length > 12) g.pulses.splice(0, g.pulses.length - 12);
+  };
+  return {
+    g, addPulse,
+    opts: {
+      src: './vendor/spine.jpg', cell: 6, fit: 'cover',
+      motion: (inst, t) => { g.cols = inst.cols; g.rows = inst.rows; g.t = t; return live; },
+    },
+  };
+}
+
+/* [0008] Terminal — the jaw talks while a line is being typed */
+function shoutScene() {
+  const g = { cols: 0, rows: 0, t: 0, talkUntil: -1 };
+  const lum = (i, x, y, base) => (
+    g.t < g.talkUntil && y > g.rows * 0.5 && base > 0.3
+      ? base + cellRand(i, (g.t * 12) | 0) * 0.15
+      : base);
+  const char = (i, x, y, base) => {
+    const c = Math.round(base * RAMP_N);
+    if (g.t < g.talkUntil && y > g.rows * 0.5 && base > 0.3) {
+      const f = cellRand(i, (g.t * 12) | 0);
+      return clampI(c + (f > 0.5 ? 1 : -1), 0, RAMP_N);
+    }
+    return c;
+  };
+  const yellow = (i, x, y, base) => (g.t < g.talkUntil && y > g.rows * 0.5 && base > 0.7 ? true : null);
+  const live = { lum, char, yellow };
+  return {
+    g,
+    opts: {
+      src: './vendor/shout.jpg', cell: 6, fit: 'contain',
+      motion: (inst, t) => { g.cols = inst.cols; g.rows = inst.rows; g.t = t; return live; },
+    },
+  };
+}
+
+/* Footer — crossed bones, low contrast, glyphs slowly drift on a wave */
+function bonesScene() {
+  const g = { cols: 0, rows: 0, t: 0 };
+  const char = (i, x, y, base) => {
+    const drift = Math.round(Math.sin(g.t * 0.6 + x * 0.35 + y * 0.45) * 2.5);
+    return clampI(Math.round(base * RAMP_N) + drift, 0, RAMP_N);
+  };
+  const live = { char };
+  return {
+    g,
+    opts: {
+      src: './vendor/bones.jpg', cell: 5, fit: 'cover', yellow: false,
+      motion: (inst, t) => { g.cols = inst.cols; g.rows = inst.rows; g.t = t; return live; },
+    },
+  };
+}
+
+const scenes = { wick: null, obol: null, hand: null, hourglass: null, spine: null, shout: null, bones: null };
+
+function mountScenes() {
+  scenes.wick = wickScene();
+  scenes.obol = obolScene();
+  const wickCanvas = $('#entity-grid .card[data-entity="e1"] [data-portrait] canvas');
+  const obolCanvas = $('#entity-grid .card[data-entity="e2"] [data-portrait] canvas');
+  if (wickCanvas) scenes.wick.handle = mountAscii(wickCanvas, scenes.wick.opts);
+  if (obolCanvas) scenes.obol.handle = mountAscii(obolCanvas, scenes.obol.opts);
+
+  const hand = $('#hand-band');
+  if (hand) { scenes.hand = handScene(); scenes.hand.handle = mountAscii(hand, scenes.hand.opts); }
+  const hg = $('#hourglass');
+  if (hg) { scenes.hourglass = hourglassScene(); scenes.hourglass.handle = mountAscii(hg, scenes.hourglass.opts); }
+  const spine = $('#spine-band');
+  if (spine) { scenes.spine = spineScene(); scenes.spine.handle = mountAscii(spine, scenes.spine.opts); }
+  const shout = $('#shout');
+  if (shout) { scenes.shout = shoutScene(); scenes.shout.handle = mountAscii(shout, scenes.shout.opts); }
+  const bones = $('#bones');
+  if (bones) { scenes.bones = bonesScene(); scenes.bones.handle = mountAscii(bones, scenes.bones.opts); }
+
+  document.addEventListener('zealot:ledger-new', () => { if (scenes.spine) scenes.spine.addPulse(); });
+  document.addEventListener('zealot:trade-open', () => { if (scenes.hand) scenes.hand.g.pulseUntil = performance.now() / 1000 + 0.8; });
+  document.addEventListener('zealot:term-print', () => { if (scenes.shout) scenes.shout.g.talkUntil = performance.now() / 1000 + 1.4; });
+
+  buildDividers();
+}
+
+function syncScenes() {
+  const wick = ent('e1');
+  if (scenes.wick) {
+    scenes.wick.g.hours = wick && wick.ok ? wick.hoursLeft : 0;
+    scenes.wick.g.dead = wick && wick.state === 'dead';
+    const wrap = $('#entity-grid .card[data-entity="e1"] [data-portrait]');
+    if (wrap) wrap.classList.toggle('is-dead', scenes.wick.g.dead);
+    if (scenes.wick.handle && scenes.wick.handle.reduced) scenes.wick.handle.redraw();
+  }
+  const obol = ent('e2');
+  if (scenes.obol) {
+    scenes.obol.g.hours = obol && obol.ok ? obol.hoursLeft : 0;
+    scenes.obol.g.dead = obol && obol.state === 'dead';
+    const wrap = $('#entity-grid .card[data-entity="e2"] [data-portrait]');
+    if (wrap) wrap.classList.toggle('is-dead', scenes.obol.g.dead);
+    if (scenes.obol.handle && scenes.obol.handle.reduced) scenes.obol.handle.redraw();
+  }
+}
+
+function buildDividers() {
+  const s = RAMP.repeat(20);
+  $$('.ascii-divider').forEach((d) => { d.innerHTML = `<span class="ascii-scroll">${s}${s}</span>`; });
 }
 
 /* ------------------------------------------------------------------ */
@@ -1399,6 +1658,7 @@ async function init() {
   grid.replaceChildren(panelShell('e1'), panelShell('e2'));
 
   initHero();
+  mountScenes();
 
   renderClock();
   setInterval(renderClock, 1000);

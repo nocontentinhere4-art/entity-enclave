@@ -12,8 +12,8 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=20';
-import { zip321Uri, qrSvg } from './qr.js?v=20';
+} from './data.js?v=24';
+import { zip321Uri, qrSvg } from './qr.js?v=24';
 
 const RENT = 10000;                 // zats per hour, base rent (matches rent_paid.data.rentZats)
 const MEMO_MAX = 500;               // bytes
@@ -127,7 +127,8 @@ async function load(ai, full = true) {
 function derive(d) {
   const E = d.entries;
   let mainnetSeq = 0; let ufvk = '';
-  for (const e of E) if (e.type === 'wallet' && e.data && e.data.chain === 'mainnet') { mainnetSeq = e.seq; ufvk = e.data.ufvk || ufvk; }
+  // the FIRST mainnet wallet line is the chain switch; later ones are restarts/redeploys of the same wallet
+  for (const e of E) if (e.type === 'wallet' && e.data && e.data.chain === 'mainnet') { if (!mainnetSeq) mainnetSeq = e.seq; ufvk = e.data.ufvk || ufvk; }
   d.mainnetSeq = mainnetSeq; d.ufvk = ufvk; d.ufvkSeq = mainnetSeq;
   const M = E.filter((e) => e.seq >= mainnetSeq);
   d.rents = M.filter((e) => e.type === 'rent_paid');
@@ -203,6 +204,7 @@ async function type(text, { cls = 'line', speed = 13 } = {}) {
   const line = el('p', { class: cls });
   logEl().append(line);
   scrollLog();
+  document.dispatchEvent(new CustomEvent('zealot:term-print'));
   if (reduced.matches || speed === 0) { line.textContent = text; return line; }
   line.classList.add('cursor');
   for (let i = 0; i <= text.length; i++) { line.textContent = text.slice(0, i); await sleep(speed); }
