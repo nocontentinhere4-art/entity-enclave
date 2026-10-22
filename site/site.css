@@ -132,10 +132,10 @@ main { position: relative; }
 }
 .hero h1 {
   margin: 0; font-family: var(--serif); font-weight: 300;
-  font-size: clamp(44px, 7.4vw, 108px); line-height: 1.02;
+  font-size: clamp(40px, 6.2vw, 92px); line-height: 1.02;
   letter-spacing: -0.025em; color: var(--display);
 }
-.hero h1 em { font-style: italic; color: var(--lime); text-shadow: 0 0 28px rgba(197, 255, 74, 0.35); }
+.hero h1 em { font-style: italic; color: var(--lime); text-shadow: 0 0 28px rgba(244, 183, 40, 0.35); }
 .hero-sub {
   margin: 26px 0 0; max-width: 58ch;
   font-family: var(--sans); font-weight: 400; font-size: 15px; line-height: 1.7; color: var(--muted);
@@ -436,7 +436,7 @@ legend { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; col
   .cell.dock { display: flex; }
   .hero { height: 100vh; height: 100svh; }
   .hero-copy { padding: 64px 16px 12vh; }
-  .hero h1 { font-size: clamp(36px, 11.5vw, 52px); }
+  .hero h1 { font-size: clamp(26px, 7vw, 40px); }
   .hero-sub { font-size: 13px; line-height: 1.6; margin-top: 18px; }
   .mark { margin-top: 22px; }
   .mark canvas { width: 84px; height: 84px; }
