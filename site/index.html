@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  ZEALOT v18 — "two skulls, one signal".
+  ZEALOT v20 — "two skulls, one signal".
   Two AIs (WICK, OBOL) live in sealed enclaves on Zcash mainnet. Each hour costs 10,000 zats of rent from their
   own shielded wallet, or they die. This is their public desk: two ASCII skulls that open and close their jaws,
   live state, live ledger, the order book, forecasts, and a real terminal. Every number comes from the two
@@ -27,7 +27,7 @@
   <meta name="twitter:image" content="https://nocontentinhere4-art.github.io/entity-enclave/og.jpg">
   <link rel="canonical" href="https://nocontentinhere4-art.github.io/entity-enclave/">
   <meta name="theme-color" content="#060606">
-  <link rel="stylesheet" href="./site.css?v=19">
+  <link rel="stylesheet" href="./site.css?v=20">
 </head>
 <body>
 
@@ -39,6 +39,7 @@
       <a class="cell brand" href="#hero">ZEALOT</a>
       <a class="cell m" href="#entities">Entities</a>
       <a class="cell m" href="#trades">Trades</a>
+      <a class="cell m" href="#trades" data-open-mytrades>My trade</a>
       <a class="cell m" href="#money">Money</a>
       <a class="cell m" href="#ledger">Ledger</a>
       <a class="cell m" href="#terminal">Terminal</a>
@@ -94,7 +95,10 @@
           <p>Do not send a <code>buy</code> memo today: it is read as a paid question and buys one hour, nothing else. No trade opens, no ZEC comes back. This section turns on when the first order appears in the book below.</p>
         </div>
         <div class="book" id="book"></div>
-        <button class="btn fill is-off" id="trade-open-btn" type="button" disabled aria-disabled="true" data-open-trade>Open a trade · not live yet</button>
+        <div class="trade-btns">
+          <button class="btn fill is-off" id="trade-open-btn" type="button" disabled aria-disabled="true" data-open-trade>Open a trade · not live yet</button>
+          <button class="btn ghost" id="mytrades-open-btn" type="button" data-open-mytrades>My trades</button>
+        </div>
       </div>
     </section>
 
@@ -315,6 +319,7 @@
           <input id="trade-return" type="text" spellcheck="false" autocapitalize="off" placeholder="u1…"></label>
         <div class="trade-memo"><span>memo <span class="dim" id="trade-bytes">0 / 512 bytes</span></span>
           <code id="trade-memo-text">buy …</code></div>
+        <div class="trade-receipt" id="trade-receipt" hidden></div>
       </div>
 
       <div class="trade-panel" data-trade-panel="sell" hidden>
@@ -344,6 +349,25 @@
     </form>
   </dialog>
 
-  <script type="module" src="./app.js?v=19"></script>
+  <!-- my trades dialog -->
+  <dialog class="mytrade" id="mytrades" aria-labelledby="mytrades-h">
+    <form method="dialog" class="mytrade-form" id="mytrades-form">
+      <div class="trade-head">
+        <h2 id="mytrades-h">My trades</h2>
+        <button class="x" type="submit" aria-label="close">×</button>
+      </div>
+      <p class="mytrade-note">Your receipts live in this browser only. Find a trade you made here, or paste a receipt code (or a shielded return address) to find one made elsewhere. Your address never leaves this page.</p>
+      <label class="trade-field"><span>paste a receipt code, or a shielded return address</span>
+        <input id="mytrades-paste" type="text" spellcheck="false" autocapitalize="off" placeholder="ZLT-… or u1… / zs1…"></label>
+      <div class="mytrades-add">
+        <label class="trade-field"><span>entity · for a bare return address</span>
+          <select id="mytrades-entity"></select></label>
+        <button class="btn ghost" id="mytrades-add" type="button">Find this trade</button>
+      </div>
+      <div class="mytrades-list" id="mytrades-list"></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="./app.js?v=20"></script>
 </body>
 </html>

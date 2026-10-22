@@ -1,5 +1,5 @@
 /*
- * app.js — ZEALOT v18, the page. Two skulls, one signal.
+ * app.js — ZEALOT v20, the page. Two skulls, one signal.
  *
  * Owns the whole page: nav, the two enclave cards with tabs, the status pills under each skull, the one-trade
  * section (steps + live /trades book), the ledger stream with Verify chain, the forecasts, the footer clock, and
@@ -10,13 +10,13 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=19';
+} from './term.js?v=20';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
-  REFRESH_MS,
-} from './data.js?v=19';
-import { zip321Uri, qrSvg } from './qr.js?v=19';
-import { initHero, setMouth, triggerTalk } from './hero.js?v=19';
+  REFRESH_MS, sha256Hex, parseLedger,
+} from './data.js?v=20';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=20';
+import { initHero, setMouth, triggerTalk } from './hero.js?v=20';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -344,6 +344,8 @@ const tradeState = {
   who: 'e1',
   checking: { e1: false, e2: false },
   maxZec: { e1: TRADE_MAX_ZEC, e2: TRADE_MAX_ZEC },
+  receiptSig: '',
+  receipt: null,
 };
 
 /* -- client-side parity with enclave/src/trade/address.mjs -- */
@@ -534,6 +536,7 @@ function renderTrade() {
   const live = !checking && isTradeLive(who);
   const maxZec = tradeState.maxZec[who] ?? TRADE_MAX_ZEC;
   const isBuy = tradeState.mode === 'buy';
+  if (!isBuy) hideReceipt();
 
   $$('#trade [data-trade-tab]').forEach((b) => {
     const on = b.dataset.tradeTab === tradeState.mode;
@@ -602,6 +605,7 @@ function renderTrade() {
     notlive.hidden = true;
     out.hidden = true;
     disable();
+    hideReceipt();
     return;
   }
   if (!live) {
@@ -609,6 +613,7 @@ function renderTrade() {
     out.hidden = true;
     disable();
     qr.replaceChildren(el('p', { class: 'err' }, 'Trades are not live on this entity.'));
+    hideReceipt();
     return;
   }
   notlive.hidden = true;
@@ -616,9 +621,11 @@ function renderTrade() {
     out.hidden = false;
     disable();
     qr.replaceChildren(el('p', { class: 'err' }, err || 'no address published by this enclave right now'));
+    hideReceipt();
     return;
   }
   out.hidden = false;
+  if (isBuy) renderReceipt(who, amountZec);
   let uri = '';
   try {
     uri = zip321Uri(d.address, memo, amountZec);
@@ -689,6 +696,503 @@ function wireTradeForm() {
     chips.replaceChildren(...['SOL', 'USDC', 'JUP'].map((t) =>
       el('button', { class: 'trade-chip', type: 'button', text: t, onclick: () => { const n = $('#trade-token'); if (n) { n.value = t; renderTrade(); } } })));
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* receipts + my trades (v20)                                          */
+/* ------------------------------------------------------------------ */
+const RECEIPTS_KEY = 'zealot.receipts';
+
+const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+const shortenAddr = (a) => (typeof a === 'string' && a.length > 20 ? `${a.slice(0, 10)}…${a.slice(-6)}` : a);
+
+function formatHeld(ms) {
+  const s = Math.floor(num(ms) / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ${m % 60}m`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h`;
+}
+
+/* base64url (RFC 4648 §5) decode, complementing qr.js base64UrlEncode */
+function base64UrlDecode(s) {
+  let str = String(s ?? '').replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) str += '=';
+  const bin = atob(str);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function buildReceiptCode({ e, returnAddress, token, amountZec, target, stop, createdISO }) {
+  const obj = { v: 1, e, r: returnAddress, m: token, a: amountZec, t: target ?? null, s: stop ?? null, c: createdISO };
+  return 'ZLT-' + base64UrlEncode(JSON.stringify(obj));
+}
+
+function decodeReceiptCode(code) {
+  const str = String(code ?? '').trim();
+  if (!str.startsWith('ZLT-')) return null;
+  try {
+    const obj = JSON.parse(base64UrlDecode(str.slice(4)));
+    if (!obj || typeof obj !== 'object' || obj.v !== 1) return null;
+    if (typeof obj.e !== 'string' || typeof obj.r !== 'string') return null;
+    return {
+      code: str,
+      entity: obj.e,
+      returnAddress: obj.r,
+      token: typeof obj.m === 'string' ? obj.m : '',
+      amountZec: num(obj.a),
+      target: obj.t == null ? null : num(obj.t),
+      stop: obj.s == null ? null : num(obj.s),
+      createdISO: typeof obj.c === 'string' ? obj.c : null,
+    };
+  } catch { return null; }
+}
+
+function loadReceipts() {
+  try {
+    const raw = localStorage.getItem(RECEIPTS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+function upsertReceipt(r) {
+  try {
+    const list = loadReceipts();
+    const idx = list.findIndex((x) => x && x.code === r.code);
+    if (idx >= 0) list[idx] = r; else list.push(r);
+    localStorage.setItem(RECEIPTS_KEY, JSON.stringify(list));
+    return true;
+  } catch { return false; }
+}
+
+function forgetReceipt(code) {
+  try {
+    localStorage.setItem(RECEIPTS_KEY, JSON.stringify(loadReceipts().filter((x) => x && x.code !== code)));
+    return true;
+  } catch { return false; }
+}
+
+function saveReceiptFile(r) {
+  const lines = [
+    'ZEALOT ONE-TRADE RECEIPT',
+    '------------------------',
+    `entity     ${ename(r.entity)}`,
+    `token      ${r.token || '—'}`,
+    `amount     ${formatDecimal(r.amountZec, 8)} ZEC`,
+    `target     ${r.target != null ? '+' + r.target + '%' : '—'}`,
+    `stop       ${r.stop != null ? '-' + r.stop + '%' : '—'}`,
+    `fee        1% open + 1% close`,
+    `created    ${r.createdISO || '—'}`,
+    `return     ${r.returnAddress}`,
+    '',
+    'RECEIPT CODE',
+    r.code,
+    '',
+    'Track or close this trade:',
+    '1. Open the ZEALOT site and choose "My trades".',
+    '2. Paste this RECEIPT CODE (or the return address).',
+    '3. While it is holding, "Close trade now" builds a tiny sell payment.',
+    '',
+    'Keep this private: the code contains your return address.',
+  ];
+  try {
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = el('a', { href: url, download: `zealot-${(r.code || 'receipt').slice(0, 24)}.txt` });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch { /* download unavailable */ }
+}
+
+function renderReceiptCard(r) {
+  const row = (k, v) => el('div', { class: 'rc-row' },
+    el('span', { class: 'rc-k' }, k),
+    el('span', { class: 'rc-v' }, v));
+  return el('div', { class: 'receipt' },
+    el('div', { class: 'receipt-head' },
+      el('span', { class: 'receipt-brand' }, 'ZEALOT'),
+      el('span', { class: 'receipt-sub' }, 'ONE-TRADE RECEIPT')),
+    el('div', { class: 'receipt-dash' }),
+    el('div', { class: 'receipt-body' },
+      row('entity', ename(r.entity)),
+      row('token', r.token || '—'),
+      row('amount', `${formatDecimal(r.amountZec, 8)} ZEC`),
+      row('target', r.target != null ? `+${r.target}%` : '—'),
+      row('stop', r.stop != null ? `-${r.stop}%` : '—'),
+      row('fee', '1% open + 1% close'),
+      row('created', r.createdISO ? fmtStamp(r.createdISO) : '—'),
+      row('return', shortenAddr(r.returnAddress))),
+    el('div', { class: 'receipt-dash' }),
+    el('div', { class: 'receipt-code' }, r.code),
+    el('p', { class: 'receipt-warn' }, 'Keep this receipt. It is the only way to find and close your trade; it contains your return address, so keep it private.'),
+    el('div', { class: 'receipt-actions' },
+      el('button', { class: 'btn ghost', type: 'button', text: 'Copy receipt code', onclick: (ev) => copyText(r.code, ev.target) }),
+      el('button', { class: 'btn ghost', type: 'button', text: 'Save receipt', onclick: () => saveReceiptFile(r) })));
+}
+
+function hideReceipt() {
+  const box = $('#trade-receipt');
+  if (box) box.hidden = true;
+  tradeState.receipt = null;
+  tradeState.receiptSig = '';
+}
+
+function renderReceipt(who, amountZec) {
+  const box = $('#trade-receipt');
+  if (!box) return;
+  const token = ($('#trade-token').value || '').trim();
+  const targetRaw = ($('#trade-target').value || '').trim();
+  const stopRaw = ($('#trade-stop').value || '').trim();
+  const ret = ($('#trade-return').value || '').trim();
+  if (!token || !ret || !validateReturnAddress(ret).ok) { hideReceipt(); return; }
+  const target = targetRaw !== '' ? num(targetRaw) : null;
+  const stop = stopRaw !== '' ? Math.abs(num(stopRaw)) : null;
+  const sig = [who, token, amountZec, target, stop, ret].join('\u0001');
+  if (sig !== tradeState.receiptSig || !tradeState.receipt) {
+    tradeState.receiptSig = sig;
+    const createdISO = new Date().toISOString();
+    const code = buildReceiptCode({ e: who, returnAddress: ret, token, amountZec, target, stop, createdISO });
+    tradeState.receipt = { code, entity: who, token, amountZec, target, stop, createdISO, returnAddress: ret };
+  }
+  upsertReceipt(tradeState.receipt); // auto-save so this browser remembers
+  box.hidden = false;
+  box.replaceChildren(renderReceiptCard(tradeState.receipt));
+}
+
+/* ---- my trades ---- */
+const myTrades = { extra: [], timer: null };
+
+const STEPS = ['Paid?', 'Received', 'Swapping', 'Bought', 'Holding', 'Closing', 'Paid back'];
+
+function stepIndex(status) {
+  if (!status.rec) return -1;
+  const d = status.detail || {};
+  const st = d.state || 'open';
+  if (st === 'refunded' || st === 'closed') return STEPS.length;
+  if (st === 'failed' || st === 'abandoned') return 0;
+  let reached = 2;
+  if (['screening', 'quoted', 'depositing', 'bridging', 'buying', 'holding', 'closing', 'paying'].includes(st)) reached = 3;
+  if (d.entryPrice != null || status.open || ['holding', 'closing', 'paying'].includes(st)) reached = 4;
+  if (['holding', 'closing', 'paying'].includes(st)) reached = 5;
+  if (['closing', 'paying'].includes(st) || status.close) reached = 6;
+  return reached;
+}
+
+function stepTracker(status) {
+  const reached = stepIndex(status);
+  const track = el('div', { class: 'mt-steps' });
+  STEPS.forEach((label, i) => {
+    const done = reached > i;
+    const active = reached === i;
+    track.append(el('div', { class: 'mt-step' + (done ? ' done' : '') + (active ? ' active' : '') },
+      el('span', { class: 'mt-dot' }),
+      el('span', { class: 'mt-step-label' }, label)));
+  });
+  return track;
+}
+
+function priceBar(status, entryP, curP) {
+  const r = status.receipt;
+  const d = status.detail || {};
+  const target = r.target != null ? r.target : (d.targetPct != null ? d.targetPct : null);
+  const stop = r.stop != null ? r.stop : (d.stopPct != null ? d.stopPct : null);
+  const entry = num(entryP);
+  if (!entry || (target == null && stop == null)) return null;
+  const low = entry * (1 - (stop != null ? stop : 0) / 100);
+  const high = entry * (1 + (target != null ? target : 0) / 100);
+  const span = Math.max(high - low, 1e-9);
+  const cur = num(curP) || entry;
+  const entryPct = clamp(((entry - low) / span) * 100, 0, 100);
+  const curPct = clamp(((cur - low) / span) * 100, 0, 100);
+  return el('div', { class: 'mt-bar' },
+    el('span', { class: 'mt-bar-stop mono' }, stop != null ? `-${stop}%` : ''),
+    el('span', { class: 'mt-bar-track' },
+      el('span', { class: 'mt-bar-entry', style: `left:${entryPct.toFixed(2)}%` }),
+      el('span', { class: 'mt-bar-cur', style: `left:${curPct.toFixed(2)}%` })),
+    el('span', { class: 'mt-bar-target mono' }, target != null ? `+${target}%` : ''));
+}
+
+function closeBlock(status) {
+  const d = status.detail || {};
+  const st = d.state || 'open';
+  const wrap = el('div', { class: 'mt-close' });
+  if (st === 'holding') {
+    const sellMemo = `sell ${status.orderId} key ${status.auth6}`;
+    const entity = ent(status.receipt.entity);
+    const qrEl = el('div', { class: 'qr mt-qr' });
+    const openEl = el('a', { class: 'btn fill', href: '#', rel: 'noopener', target: '_blank' }, 'Open in Zcash wallet', el('span', { class: 'arr', 'aria-hidden': 'true' }, ' ↗'));
+    let uri = '';
+    if (entity && entity.address) {
+      uri = zip321Uri(entity.address, sellMemo, SELL_ZATS / 1e8);
+      qrEl.innerHTML = qrSvg(uri, { ecLevel: 'M', ariaLabel: `close trade ${status.orderId}` });
+      openEl.href = uri;
+    } else {
+      qrEl.replaceChildren(el('p', { class: 'err' }, 'no address published right now'));
+      openEl.removeAttribute('href');
+      openEl.classList.add('is-off');
+    }
+    const sub = el('div', { class: 'mt-close-sub', hidden: '' },
+      el('code', { class: 'mt-memo' }, sellMemo),
+      qrEl,
+      openEl,
+      el('p', { class: 'mt-note' }, 'Send this tiny payment to close. ZEC comes back to your return address.'));
+    wrap.append(
+      el('button', { class: 'btn fill mt-close-btn', type: 'button', text: 'Close trade now', onclick: () => { sub.hidden = !sub.hidden; } }),
+      sub,
+      el('a', { class: 'mt-forget', href: '#', onclick: (ev) => { ev.preventDefault(); openSellPrefill({ who: status.receipt.entity, orderId: status.orderId, auth6: status.auth6 }); } }, 'or pre-fill the SELL tab'));
+  } else if (st === 'closing' || st === 'paying') {
+    wrap.append(el('p', { class: 'mt-note' }, 'Closing… selling and swapping back to ZEC. Give it a minute or two.'));
+  } else if (st === 'closed') {
+    const pay = status.payout;
+    const zats = pay?.data?.zats != null ? pay.data.zats : d.payoutZats;
+    const txid = pay?.data?.txid ?? d.txids?.close ?? null;
+    wrap.append(el('p', { class: 'mt-note mt-paid' }, `Paid back ${zats != null ? formatZats(zats) + ' ZEC' : '—'}${txid ? ' · tx ' + shortHash(txid) : ''}`));
+  } else if (st === 'refunded') {
+    const ref = status.refund ?? status.refundSkipped;
+    const zats = ref?.data?.zats ?? null;
+    const reason = ref?.data?.reason ?? d.reason ?? null;
+    wrap.append(el('p', { class: 'mt-note' }, `Refunded${zats != null ? ' ' + formatZats(zats) + ' ZEC' : ''}${reason ? ' · ' + reason : ''}`));
+  } else if (st === 'failed' || st === 'abandoned') {
+    const f = status.failed ?? status.abandoned;
+    const code = f?.data?.code ?? f?.data?.stage ?? null;
+    wrap.append(el('p', { class: 'mt-note err' }, `Trade ${st}${code ? ' · ' + code : ''}. The entity will settle or refund; check back.`));
+  }
+  return wrap;
+}
+
+function forgetLink(r) {
+  return el('a', {
+    class: 'mt-forget',
+    href: '#',
+    onclick: (ev) => {
+      ev.preventDefault();
+      if (r.code) forgetReceipt(r.code);
+      myTrades.extra = myTrades.extra.filter((x) => x !== r);
+      void refreshMyTrades();
+    },
+  }, 'Forget this receipt');
+}
+
+function myTradeCardSkeleton(r) {
+  return el('div', { class: 'mt-card' },
+    el('div', { class: 'mt-head' },
+      el('span', { class: 'mt-entity' }, ename(r.entity)),
+      el('span', { class: 'mt-token mono' }, r.token || '—'),
+      el('span', { class: 'mt-amt mono' }, r.amountZec > 0 ? `${formatDecimal(r.amountZec, 8)} ZEC` : '')),
+    el('div', { class: 'mt-wait' },
+      el('span', { class: 'spinner' }),
+      el('span', {}, 'Looking for your order…')));
+}
+
+function myTradeCard(status) {
+  const r = status.receipt;
+  const d = status.detail || {};
+  const card = el('div', { class: 'mt-card' });
+  card.append(el('div', { class: 'mt-head' },
+    el('span', { class: 'mt-entity' }, ename(r.entity)),
+    el('span', { class: 'mt-token mono' }, r.token || '—'),
+    el('span', { class: 'mt-amt mono' }, r.amountZec > 0 ? `${formatDecimal(r.amountZec, 8)} ZEC` : '')));
+
+  if (status.error) {
+    card.append(el('p', { class: 'mt-note err' }, status.error));
+    card.append(forgetLink(r));
+    return card;
+  }
+  if (!status.rec) {
+    card.append(el('div', { class: 'mt-wait' },
+      el('span', { class: 'spinner' }),
+      el('span', {}, 'Waiting for your payment to arrive (shielded payments take a few minutes)')));
+    card.append(forgetLink(r));
+    return card;
+  }
+
+  card.append(stepTracker(status));
+
+  const entryP = d.entryPrice != null ? d.entryPrice : (status.open?.data?.price ?? null);
+  const curP = d.currentPrice != null ? d.currentPrice : (status.jump?.data?.to ?? entryP);
+  const pnl = d.unrealizedPct != null ? d.unrealizedPct : (entryP && curP ? (num(curP) / num(entryP) - 1) * 100 : null);
+  const held = d.heldMs != null ? d.heldMs : (d.openedAt ? Date.now() - Date.parse(d.openedAt) : null);
+  const rows = [
+    ['amount in', status.rec.data.zats != null ? `${formatZats(status.rec.data.zats)} ZEC` : '—'],
+    ['entry price', entryP != null ? `${formatDecimal(entryP, 6)} SOL` : '—'],
+    ['current price', curP != null ? `${formatDecimal(curP, 6)} SOL` : '—'],
+    ['pnl', pnl != null ? `${pnl >= 0 ? '+' : ''}${formatDecimal(pnl, 1)}%` : '—'],
+    ['held', held != null ? formatHeld(held) : '—'],
+  ];
+  card.append(el('dl', { class: 'mt-kvs' }, ...rows.map(([k, v]) => el('div', {}, el('dt', {}, k), el('dd', {}, v)))));
+
+  const bar = priceBar(status, entryP, curP);
+  if (bar) card.append(bar);
+
+  card.append(closeBlock(status));
+  card.append(forgetLink(r));
+  return card;
+}
+
+async function resolveReceipt(receipt, cache) {
+  const clientRef = (await sha256Hex('client|' + receipt.returnAddress)).slice(0, 16);
+  const auth6 = (await sha256Hex('auth|' + receipt.returnAddress)).slice(0, 6);
+  const d = ent(receipt.entity);
+  if (!d || !d.base) {
+    return { receipt, clientRef, auth6, orderId: null, rec: null, detail: null, error: 'no endpoint for this entity' };
+  }
+  let entries;
+  if (cache.has(receipt.entity)) {
+    entries = cache.get(receipt.entity);
+  } else {
+    const r = await request(d.base, '/ledger', { text: true });
+    entries = (r && r.ok && r.text) ? parseLedger(r.text).entries : (d.entries || []);
+    cache.set(receipt.entity, entries);
+  }
+  const recs = entries.filter((e) => e && e.type === 'order_received' && e.data && e.data.clientRef === clientRef);
+  let rec = null;
+  if (recs.length) {
+    // Prefer the order that matches this receipt's amount (a return address can
+    // host several historical orders), otherwise the most recent.
+    const wantZats = Math.round(receipt.amountZec * 1e8);
+    if (receipt.amountZec > 0) {
+      const byAmount = recs.filter((e) => num(e.data.zats) === wantZats);
+      rec = byAmount[byAmount.length - 1] || recs[recs.length - 1];
+    } else {
+      rec = recs[recs.length - 1];
+    }
+  }
+  const orderId = rec ? rec.data.orderId : null;
+  let detail = null;
+  if (orderId) {
+    const rd = await request(d.base, '/trades/' + orderId, { allow404: true });
+    detail = (rd && rd.ok && !rd.notFound && rd.data && typeof rd.data === 'object') ? rd.data : null;
+  }
+  const mine = orderId ? entries.filter((e) => e && e.data && e.data.orderId === orderId) : [];
+  const byType = {};
+  for (const e of mine) if (!byType[e.type]) byType[e.type] = e;
+  return {
+    receipt, clientRef, auth6, orderId, rec, detail,
+    open: byType.trade_open, close: byType.trade_close, payout: byType.payout,
+    refund: byType.refund, refundSkipped: byType.refund_skipped,
+    failed: byType.trade_failed, abandoned: byType.trade_abandoned, jump: byType.trade_price_jump,
+    error: null,
+  };
+}
+
+function currentMyReceipts() {
+  return [...loadReceipts(), ...myTrades.extra];
+}
+
+async function refreshMyTrades() {
+  const box = $('#mytrades-list');
+  if (!box) return;
+  const items = currentMyReceipts();
+  if (!items.length) {
+    box.replaceChildren(el('p', { class: 'empty' }, 'No receipts yet. Open a trade and keep the receipt, or paste a receipt code.'));
+    return;
+  }
+  box.replaceChildren(...items.map((r) => myTradeCardSkeleton(r)));
+  const cache = new Map();
+  const results = [];
+  for (const r of items) results.push(await resolveReceipt(r, cache));
+  box.replaceChildren(...results.map((s) => myTradeCard(s)));
+}
+
+function onAddMyTrade() {
+  const box = $('#mytrades-list');
+  const raw = ($('#mytrades-paste').value || '').trim();
+  if (!raw) return;
+  let receipt = null;
+  if (raw.startsWith('ZLT-')) {
+    receipt = decodeReceiptCode(raw);
+    if (!receipt && box) box.prepend(el('p', { class: 'mt-err' }, 'That receipt code does not decode.'));
+  } else if (validateReturnAddress(raw).ok) {
+    const entity = $('#mytrades-entity')?.value || 'e1';
+    receipt = { code: null, entity, returnAddress: raw, token: '', amountZec: 0, target: null, stop: null, createdISO: null };
+  } else if (box) {
+    box.prepend(el('p', { class: 'mt-err' }, 'Paste a receipt code (ZLT-…) or a shielded return address (u1…/zs1…).'));
+  }
+  if (!receipt) return;
+  if (!myTrades.extra.some((x) => x === receipt || (x.code && receipt.code && x.code === receipt.code))) myTrades.extra.push(receipt);
+  $('#mytrades-paste').value = '';
+  void refreshMyTrades();
+}
+
+function startMyTradesPoll() {
+  stopMyTradesPoll();
+  myTrades.timer = setInterval(() => {
+    const dlg = $('#mytrades');
+    if (dlg && dlg.open) void refreshMyTrades();
+  }, 20000);
+}
+
+function stopMyTradesPoll() {
+  if (myTrades.timer) { clearInterval(myTrades.timer); myTrades.timer = null; }
+}
+
+function openMyTrades() {
+  const dlg = $('#mytrades');
+  if (!dlg) return;
+  const sel = $('#mytrades-entity');
+  if (sel) sel.replaceChildren(...list().map((d) => el('option', { value: d.id }, `${nameOf(d)} · ${stateWord(d)}`)));
+  if (!dlg.open) dlg.showModal();
+  void refreshMyTrades();
+  startMyTradesPoll();
+}
+
+function openSellPrefill({ who, orderId, auth6 }) {
+  openTrade({ who });
+  tradeState.mode = 'sell';
+  const oi = $('#trade-orderid');
+  if (oi) oi.value = orderId || '';
+  const k = $('#trade-key');
+  if (k) k.value = auth6 || '';
+  renderTrade();
+}
+
+function wireMyTrades() {
+  const add = $('#mytrades-add');
+  if (add) add.addEventListener('click', onAddMyTrade);
+  const paste = $('#mytrades-paste');
+  if (paste) paste.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); onAddMyTrade(); } });
+  const dlg = $('#mytrades');
+  if (dlg) dlg.addEventListener('close', stopMyTradesPoll);
+}
+
+/* ?selftest=1 — verify browser hashing matches enclave/src/trade/orders.mjs */
+async function runSelfTest() {
+  const addr1 = 'u1testaddress000000000000000000000000000000000000000000000000000000';
+  const addr2 = 'zs1realishaddr';
+  const got = {
+    clientRef: (await sha256Hex('client|' + addr1)).slice(0, 16),
+    auth6: (await sha256Hex('auth|' + addr1)).slice(0, 6),
+    orderId: 'o' + (await sha256Hex('trade|abc123txid|' + addr1)).slice(0, 16),
+    clientRef2: (await sha256Hex('client|' + addr2)).slice(0, 16),
+    auth6_2: (await sha256Hex('auth|' + addr2)).slice(0, 6),
+  };
+  const want = {
+    clientRef: '3046776fbe272e0f',
+    auth6: 'bad7f3',
+    orderId: 'o7c018e82f1284525',
+    clientRef2: 'bca707d8a3644693',
+    auth6_2: '8f669d',
+  };
+  let all = true;
+  for (const k of Object.keys(want)) {
+    const ok = got[k] === want[k];
+    if (!ok) all = false;
+    console.log(`[selftest] ${k}: ${ok ? 'OK' : 'FAIL'} (got ${got[k]}, want ${want[k]})`);
+  }
+  const summary = `[selftest] ${all ? 'PASS' : 'FAIL'} — sha256 hex, lowercase, UTF-8 string concat matches orders.mjs`;
+  console.log(summary);
+  const log = $('#log');
+  if (log) log.append(el('p', { class: 'line signal' }, summary));
+  return all;
 }
 
 /* ------------------------------------------------------------------ */
@@ -838,6 +1342,10 @@ function wireNav() {
     ev.preventDefault();
     openTrade({});
   }));
+  $$('[data-open-mytrades]').forEach((n) => n.addEventListener('click', (ev) => {
+    ev.preventDefault();
+    openMyTrades();
+  }));
   $$('#nav-term, .term-dock').forEach((n) => n.addEventListener('click', () => {
     const term = $('#term');
     if (!term) return;
@@ -885,6 +1393,7 @@ async function init() {
   wireTerm();
   wireNav();
   wireTradeForm();
+  wireMyTrades();
 
   const grid = $('#entity-grid');
   grid.replaceChildren(panelShell('e1'), panelShell('e2'));
@@ -906,6 +1415,8 @@ async function init() {
 
   setInterval(refreshLight, REFRESH_MS);
   setInterval(refreshFull, REFRESH_MS * 5);
+
+  if (new URLSearchParams(location.search).get('selftest') === '1') void runSelfTest();
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

@@ -1,5 +1,5 @@
 /*
- * ZEALOT v18 — "two skulls, one signal".
+ * ZEALOT v20 — "two skulls, one signal".
  * Encrypted terminal meets classified broadsheet. Near-black canvas, ONE lime accent, whisper-weight serif
  * display + terminal-grade sans. No shadows, no other chroma, radius 2/4, exactly one lime divider. No webfonts.
  */
@@ -577,3 +577,121 @@ legend { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; col
 .notlive code { font-family: var(--mono); color: var(--lime); }
 .btn.is-off { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 @media (max-width: 640px) { .notlive { grid-template-columns: 1fr; } }
+
+/* ---------- v20 · trade buttons, receipt, my trades ---------- */
+[hidden] { display: none !important; }
+
+.trade-btns { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* the till receipt, shown inside the buy tab once the memo is valid */
+.trade-receipt { margin-top: 2px; }
+.receipt {
+  border: 1px dashed var(--hairline); border-radius: var(--r4);
+  background: var(--onyx); padding: 16px; display: grid; gap: 12px;
+  font-family: var(--mono);
+}
+.receipt-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.receipt-brand { font-size: 18px; font-weight: 700; letter-spacing: 0.22em; color: var(--lime); }
+.receipt-sub { font-size: 10px; letter-spacing: 0.14em; color: var(--caption); }
+.receipt-dash { border-top: 1px dashed var(--hairline); }
+.receipt-body { display: grid; gap: 5px; font-size: 12px; }
+.rc-row { display: flex; justify-content: space-between; gap: 12px; }
+.rc-k { color: var(--caption); text-transform: uppercase; font-size: 10px; letter-spacing: 0.06em; }
+.rc-v { color: var(--body); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; text-align: right; }
+.receipt-code {
+  font-size: 12px; color: var(--lime); overflow-wrap: anywhere; user-select: all;
+  background: var(--void); border: 1px dashed var(--hairline); padding: 8px 10px; border-radius: var(--r2);
+}
+.receipt-warn { font-size: 11px; line-height: 1.55; color: var(--caption); }
+.receipt-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* my trades dialog */
+.mytrade {
+  border: 1px solid var(--hairline); border-radius: var(--r4);
+  background: var(--graphite); color: var(--body); padding: 0;
+  width: min(720px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px); max-width: calc(100vw - 24px);
+  overflow-y: auto;
+}
+.mytrade::backdrop { background: rgba(3, 3, 5, 0.82); }
+.mytrade-form { padding: 24px; display: grid; gap: 16px; }
+.mytrade-form > * { min-width: 0; }
+.mytrade .x {
+  background: none; border: 1px solid var(--hairline); color: var(--body);
+  width: 36px; height: 36px; font-size: 18px; line-height: 1; cursor: pointer; border-radius: var(--r4);
+}
+.mytrade .x:hover { border-color: var(--lime); }
+.mytrade-note { color: var(--caption); font-size: 12px; font-family: var(--mono); line-height: 1.55; }
+.mytrade select {
+  width: 100%; font-family: var(--mono); font-size: 13px;
+  color: var(--body); background: var(--onyx); border: 1px solid var(--hairline); border-radius: var(--r4); padding: 10px 12px;
+}
+.mytrades-add { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; }
+.mytrades-list { display: grid; gap: 16px; }
+.mt-err { color: var(--body); font-family: var(--mono); font-size: 12px; }
+
+.mt-card {
+  border: 1px solid var(--hairline); border-radius: var(--r4);
+  background: var(--graphite); padding: 16px; display: grid; gap: 14px;
+}
+.mt-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.mt-entity { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--lime); font-weight: 600; }
+.mt-token { color: var(--body); font-size: 13px; }
+.mt-amt { color: var(--caption); font-size: 12px; margin-left: auto; }
+
+.mt-wait { display: flex; align-items: center; gap: 10px; color: var(--caption); font-size: 12px; font-family: var(--mono); line-height: 1.5; }
+.spinner {
+  width: 14px; height: 14px; border: 2px solid var(--hairline);
+  border-top-color: var(--lime); border-radius: 50%; animation: spin 0.9s linear infinite; flex: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.mt-steps { display: flex; border: 1px solid var(--hairline); border-radius: var(--r4); overflow: hidden; }
+.mt-step {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 10px 2px 8px; border-right: 1px solid var(--hairline); color: var(--muted);
+}
+.mt-step:last-child { border-right: 0; }
+.mt-step .mt-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--graphite); border: 1px solid var(--hairline); }
+.mt-step .mt-step-label { font-family: var(--mono); font-size: 8px; letter-spacing: 0.02em; text-align: center; line-height: 1.25; }
+.mt-step.done { color: var(--body); }
+.mt-step.done .mt-dot { background: var(--lime); border-color: var(--lime); }
+.mt-step.active { color: var(--lime); }
+.mt-step.active .mt-dot {
+  background: transparent; border-color: var(--lime);
+  box-shadow: 0 0 0 3px rgba(244, 183, 40, 0.22); animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(244, 183, 40, 0.08); } }
+
+.mt-kvs { display: grid; }
+.mt-kvs > div { display: flex; justify-content: space-between; gap: 14px; padding: 7px 0; border-bottom: 1px solid rgba(61, 61, 61, 0.5); }
+.mt-kvs > div:last-child { border-bottom: 0; }
+.mt-kvs dt { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--caption); }
+.mt-kvs dd { font-family: var(--mono); font-size: 12px; text-align: right; color: var(--body); }
+
+.mt-bar { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 11px; }
+.mt-bar-stop, .mt-bar-target { color: var(--caption); }
+.mt-bar-track { position: relative; height: 6px; background: var(--onyx); border: 1px solid var(--hairline); border-radius: 999px; }
+.mt-bar-entry { position: absolute; top: -3px; width: 2px; height: 12px; background: var(--caption); transform: translateX(-50%); }
+.mt-bar-cur { position: absolute; top: -4px; width: 3px; height: 14px; background: var(--lime); transform: translateX(-50%); border-radius: 1px; }
+
+.mt-close { display: grid; gap: 12px; }
+.mt-close-btn { justify-self: start; }
+.mt-close-sub { display: grid; gap: 10px; justify-items: start; }
+.mt-qr { width: 140px; }
+.mt-memo { font-size: 12px; color: var(--lime); overflow-wrap: anywhere; }
+.mt-note { font-family: var(--mono); font-size: 12px; color: var(--caption); line-height: 1.55; }
+.mt-note.err { color: var(--body); }
+.mt-paid { color: var(--lime); }
+.mt-forget {
+  font-family: var(--mono); font-size: 11px; color: var(--muted);
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hairline);
+  background: none; border: 0; padding: 0; cursor: pointer; justify-self: start;
+}
+.mt-forget:hover { color: var(--body); }
+
+@media (max-width: 640px) {
+  .mytrades-add { grid-template-columns: 1fr; }
+  .mt-step { padding: 8px 1px 6px; }
+  .mt-step .mt-step-label { font-size: 7px; }
+}
