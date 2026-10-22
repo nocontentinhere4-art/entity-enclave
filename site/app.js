@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=29';
+} from './term.js?v=30';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=29';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=29';
-import { initHero, setMouth, triggerTalk } from './hero.js?v=29';
-import { mountAscii, RAMP } from './ascii.js?v=29';
+} from './data.js?v=30';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=30';
+import { initHero, setMouth, triggerTalk } from './hero.js?v=30';
+import { mountAscii, RAMP } from './ascii.js?v=30';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -1423,7 +1423,27 @@ function chatEntries() {
     }
   }
   rows.sort((a, b) => Date.parse(a.ts || 0) - Date.parse(b.ts || 0) || a.seq - b.seq);
+  inferReplies(rows);
   return rows;
+}
+
+// GET /public-channel does not carry replyTo yet: an entity post that follows human messages on the same
+// channel within REPLY_WINDOW_MS is treated as the answer to them (the enclave answers in ~30 s).
+const REPLY_WINDOW_MS = 5 * 60_000;
+function inferReplies(rows) {
+  for (const id of ['e1', 'e2']) {
+    let pending = [];
+    for (const r of rows) {
+      if (r.id !== id) continue;
+      if (r.from !== 'entity') { pending.push(r); continue; }
+      if (!r.replyTo.length && pending.length) {
+        const t = Date.parse(r.ts || 0);
+        const recent = pending.filter((m) => t - Date.parse(m.ts || 0) <= REPLY_WINDOW_MS);
+        if (recent.length) { r.replyTo = recent.map((m) => m.seq); r.isReply = true; }
+      }
+      pending = [];
+    }
+  }
 }
 
 function messageEl(r, isReply = false) {
