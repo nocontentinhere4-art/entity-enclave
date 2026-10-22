@@ -185,7 +185,7 @@ function drawGrid() {
   if (!gridChars) buildGrid();
   gridChars[(Math.random() * gridChars.length) | 0] = (Math.random() * GRID_SET.length) | 0;
   ctx.font = `11px ${MONO}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(244,183,40,0.28)';
+  ctx.fillStyle = W < STACK_AT ? 'rgba(244,183,40,0.12)' : 'rgba(244,183,40,0.28)'; // quieter on phones, where the skulls stack over it
   for (let r = 0; r < gridRows; r++) for (let c = 0; c < gridCols; c++) {
     ctx.fillText(GRID_SET[gridChars[r * gridCols + c]], c * GRID + 24, r * GRID + 24);
   }
