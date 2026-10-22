@@ -1,8 +1,8 @@
 # MAINNET compose (real ZEC). Same image as testnet; only the chain, the economics and the landlord change.
-# Per CVM in the dashboard: SELF_URL, PEER_URL, PARENT_URL (children only) and the secrets REDPILL_API_KEY, PHALA_API_KEY.
+# Per CVM in the dashboard: SELF_URL, PEER_URL, PARENT_URL (children only) and the secrets REDPILL_API_KEY, PHALA_API_KEY, SOLANA_RPC_URL.
 services:
   entity:
-    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:46b613b2b43661fdbf7b1723e987f4ae329134231d64b18528ac407ae410978f
+    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:534fea0cfa495fbde23a56e6f348f62a14ed6f648c8ba5ca0846d186acfc0242
     ports:
       - "8080:8080"
     volumes:
@@ -22,10 +22,16 @@ services:
       - WHISPER_MIN_ZATS=1000
       - RENT_ADDRESS=REPLACE_WITH_YOUR_MAINNET_U1_ADDRESS
       - TICK_MS=300000
-      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:46b613b2b43661fdbf7b1723e987f4ae329134231d64b18528ac407ae410978f
+      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:534fea0cfa495fbde23a56e6f348f62a14ed6f648c8ba5ca0846d186acfc0242
       - GATEWAY_DOMAIN=dstack-pha-prod9.phala.network
       - FAKE_LLM=0
       - FAKE_WALLET=0
+      - TRADE_ENABLED=1
+      - TRADE_MIN_ZATS=10000000
+      - TRADE_MAX_ZATS=100000000
+      - TRADE_MAX_OPEN=3
+      - TRADE_MAX_OPEN_ZATS=300000000
+      - TRADE_MAX_PER_CLIENT=1
     restart: unless-stopped
 volumes:
   entity-state:
