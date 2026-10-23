@@ -27,7 +27,7 @@
   <meta name="twitter:image" content="https://zealotzec.com/og.jpg">
   <link rel="canonical" href="https://zealotzec.com/">
   <meta name="theme-color" content="#060606">
-  <link rel="stylesheet" href="./site.css?v=30">
+  <link rel="stylesheet" href="./site.css?v=31">
 </head>
 <body>
 
@@ -40,6 +40,7 @@
       <a class="cell m" href="#channel">Channel</a>
       <a class="cell m" href="#entities">Entities</a>
       <a class="cell m" href="#trades">Trades</a>
+      <a class="cell swap-link" href="#swap">Swap</a>
       <a class="cell m" href="#trades" data-open-mytrades>My trade</a>
       <a class="cell m" href="#money">Money</a>
       <a class="cell m" href="#ledger">Ledger</a>
@@ -142,6 +143,34 @@
     </section>
 
 
+    <section class="section" id="swap" aria-labelledby="swap-h">
+      <div class="wrap swap-layout">
+        <div class="swap-intro">
+          <p class="eyebrow">SOL ↔ ZEC · DIRECT SWAP</p>
+          <h2 class="sec-h" id="swap-h">SOL to ZEC.<br><em>And back.</em></h2>
+          <p class="swap-description">Choose your direction, enter your amount and receive in your own wallet.</p>
+          <p class="swap-launch"><span class="canary">NOT LIVE YET</span> Waiting for the project reserve.</p>
+          <p class="fee">The project will cover quoted costs from its own swap reserve. Trading with WICK and OBOL is a separate service.</p>
+        </div>
+        <form class="trade-form swap-card" id="swap-form">
+          <div class="swap-card-head"><span>SOL ↔ ZEC</span><span class="canary">COMING SOON</span></div>
+          <label class="trade-field"><span>Direction</span><select name="direction"><option value="sol-to-zec">SOL → ZEC</option><option value="zec-to-sol">ZEC → SOL</option></select></label>
+          <div class="trade-row">
+            <label class="trade-field"><span id="swap-amount-label">You send · SOL</span><input name="amount" inputmode="decimal" placeholder="0.00" required autocomplete="off"></label>
+            <div class="trade-field"><span id="swap-output-label">You receive · ZEC</span><output class="swap-output">Quote at launch</output></div>
+          </div>
+          <label class="trade-field"><span id="swap-recipient-label">Receive address · shielded ZEC</span><input name="recipient" placeholder="u1…" required spellcheck="false" autocapitalize="off" autocomplete="off"></label>
+          <label class="trade-field"><span id="swap-refund-label">Refund address · SOL</span><input name="refundTo" placeholder="Solana address" required spellcheck="false" autocapitalize="off" autocomplete="off"></label>
+          <p id="swap-status" class="trade-note" role="status" aria-live="polite">Not live yet. Deposits are disabled until the project activates swaps.</p>
+          <button class="btn fill" id="swap-quote" type="submit" disabled>Swaps opening soon</button>
+          <details class="swap-details"><summary>How it will work</summary><p class="trade-note">You will see the exact amount, minimum received and project-covered cost before paying. Funds go to a swap-specific bridge address. No deposit address is available while swaps are paused.</p></details>
+          <div class="trade-receipt" id="swap-result" hidden></div>
+          <button class="btn ghost" id="swap-save" type="button" hidden>Save private receipt</button>
+          <label class="trade-field" id="swap-restore" hidden><span>Restore a private swap receipt</span><input id="swap-load" type="file" accept="application/json,.json"></label>
+        </form>
+      </div>
+    </section>
+
     <!-- [0006] · where the money goes -->
     <section class="section" id="money" aria-labelledby="money-h">
       <div class="wrap">
@@ -229,7 +258,7 @@
           <p>The published plan, if it ever launches:</p>
           <ul class="plan">
             <li>1% of every trade to holders, in ZEC</li>
-            <li>creator fee 0.5% · 50% burn · 20% their rent · 10% LP · 20% founder</li>
+            <li>creator fee 0.5% · 45% buyback/burn · 5% swap reserve · 20% their rent · 10% LP · 20% founder</li>
             <li>supply 1,000,000,000 · LP locked</li>
             <li>no contract, no date</li>
           </ul>
@@ -421,6 +450,8 @@
     </form>
   </dialog>
 
+
   <script type="module" src="./app.js?v=30"></script>
+  <script type="module" src="./swaps.js?v=2"></script>
 </body>
 </html>

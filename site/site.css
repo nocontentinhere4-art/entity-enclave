@@ -848,3 +848,23 @@ body { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%
 .sec-lead { max-width: 62ch; margin: -6px 0 26px; color: var(--muted); font-size: 15px; line-height: 1.6; }
 .pay-actions .dim a, .trade-help a { color: var(--lime); }
 @media (max-width: 640px) { .hero-ctas { margin-top: 18px; } .hero-ctas .btn { flex: 1 1 auto; text-align: center; } }
+
+/* Sponsored swap dialog reuses the existing trade form and amber CTA roles. */
+#swap-form select { background: var(--bg); color: var(--body); border: 1px solid var(--hairline); padding: 12px; font: inherit; }
+#swap-form :focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+#swap-result code { overflow-wrap: anywhere; white-space: normal; }
+
+/* Direct swap: existing site tokens, separate from the trading desk. */
+.swap-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: start; }
+.swap-intro .sec-h { margin-bottom: 24px; }
+.swap-description { color: var(--body); max-width: 380px; }
+.swap-launch { margin: 28px 0 16px; font: 11px/1.8 var(--mono); color: var(--caption); }
+.swap-card { border: 1px solid var(--hairline); background: var(--void); border-radius: var(--r4); }
+.swap-card-head { display: flex; justify-content: space-between; gap: 16px; font: 12px var(--mono); letter-spacing: .08em; padding-bottom: 16px; border-bottom: 1px solid var(--hairline); }
+.swap-output { padding: 10px 12px; border: 1px solid var(--hairline); border-radius: var(--r4); color: var(--caption); font: 13px/1.5 var(--mono); min-height: 41px; }
+.swap-details { color: var(--caption); font: 11px/1.7 var(--mono); }
+.swap-details summary { cursor: pointer; }
+.swap-details p { margin-top: 12px; }
+#swap-restore[hidden] { display: none; }
+@media (max-width: 800px) { .swap-layout { grid-template-columns: 1fr; gap: 28px; } }
+@media (max-width: 420px) { .swap-card { padding: 18px; } }
