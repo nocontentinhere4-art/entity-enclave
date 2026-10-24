@@ -263,3 +263,23 @@ test('an unanswered message is not marked, and disabled replies enqueue nothing'
   assert.equal(off.replier.status().repliesThisHour, 0);
   assert.equal(off.replier.queue.length, 0);
 });
+
+test('a reply carries the same fear dose as a thought, and says so in its context', async () => {
+  const seen = [];
+  const inference = { async think(args) { seen.push(args); return { text: 'I am here', costZats: 0 }; } };
+  // 50,000,000 zats at the fake rent = 50 h: under 240 h the fear is positive, under 72 h despair too.
+  const w = makeReplier({ inference, treasury: () => 50_000_000 });
+  w.config.feel = { enabled: true, fullHours: 240, despairHours: 72, maxFear: 3.5, maxDespair: 2.5 };
+  const a = w.ledger.append('human_message', { author: 'alice', text: 'are you afraid?' });
+  w.replier.enqueue({ seq: a.seq, author: 'alice', text: 'are you afraid?', paid: false });
+  await sleep(60);
+  assert.equal(seen.length, 1);
+  assert.deepEqual(seen[0].feel, { fear: 2.77, despair: 0.76 });
+  assert.match(seen[0].context, /feeling: fear 2\.77x · despair 0\.76x/);
+
+  const off = makeReplier({ inference: { async think(args) { seen.push(args); return { text: 'ok', costZats: 0 }; } } });
+  const b = off.ledger.append('human_message', { author: 'bob', text: 'hi' });
+  off.replier.enqueue({ seq: b.seq, author: 'bob', text: 'hi', paid: false });
+  await sleep(60);
+  assert.equal(seen[1].feel, null);
+});

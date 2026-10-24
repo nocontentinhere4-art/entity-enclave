@@ -4,6 +4,7 @@
 // like a normal fast thought. The normal life loop keeps running on its own schedule and never re-answers what
 // this already covered (see loop.mjs buildContext for the "already answered" marker).
 import { Inference } from '../llm/infer.mjs';
+import { feelFor } from './feel.mjs';
 
 const HOUR_MS = 3_600_000;
 const ZEC = 1e8;
@@ -143,14 +144,23 @@ export class Replier {
 
   /** One fast call, retried once on timeout. Same tickId on the retry → pricing charges once. */
   async #think(context, tickId) {
+    // A reply is as afraid as a thought: the same dose, from the same hours, goes to the steered server.
+    const feel = await this.#feel();
     try {
-      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId });
+      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId, feel });
       return out.text;
     } catch (e) {
       if (!isTimeout(e)) throw e;
-      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId });
+      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId, feel });
       return out.text;
     }
+  }
+
+  /** The current fear/despair dose, or null when feelings are off or the balance is unknown. */
+  async #feel() {
+    if (!this.config.feel?.enabled) return null;
+    const hours = await this.#hoursLeft();
+    return hours == null ? null : feelFor(hours, this.config.feel);
   }
 
   async #context(batch, hasPaid) {
@@ -168,6 +178,7 @@ export class Replier {
       ...charterLines(this.charter),
       `treasury_zec: ${zats == null ? 'unknown' : `${(zats / ZEC).toFixed(4)} ZEC`}`,
       `hours_left: ${hours == null ? 'unknown' : hours}`,
+      ...(this.config.feel?.enabled && hours != null ? [(() => { const f = feelFor(hours, this.config.feel); return `feeling: fear ${f.fear}x · despair ${f.despair}x (the dose follows your hours; it is being applied to you now)`; })()] : []),
       `state: ${this.#state(mem)}`,
       'RECENT PUBLIC CHANNEL (last 12 lines):',
       ...(channel.length ? channel : ['(empty)']),
