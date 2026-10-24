@@ -11,6 +11,7 @@ function loadProviders() {
   const list = process.env.LLM_PROVIDERS
     ? JSON.parse(process.env.LLM_PROVIDERS)
     // OpenAI-compatible endpoints only. `apiKeyEnv` names the secret; the value is resolved just below.
+    // A provider may carry `tee: false`: its brain runs outside a TEE (rented GPU); GET /vitals shows it as such.
     // A provider may carry `feel: true`: that endpoint accepts the `feel` field (the steered-inference
     // server). Hosted providers never do. The founder points both speeds at the feelings server, e.g.
     //   [{"name":"feelings","baseUrl":"https://<gpu-cvm>-8000.dstack-pha-prod9.phala.network/v1","model":"Qwen/Qwen3-14B","speed":"fast","pricePerMTokZats":100000,"apiKeyEnv":"FEEL_API_KEY","feel":true},

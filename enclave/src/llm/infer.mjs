@@ -61,7 +61,8 @@ export class Inference {
       body.feel = { fear: Number(feel.fear), despair: Number(feel.despair) };
     }
 
-    const headers = { 'content-type': 'application/json' };
+    // Some proxies (RunPod, Cloudflare) answer 403 to requests without a User-Agent.
+    const headers = { 'content-type': 'application/json', 'user-agent': 'zealot-enclave/1.0' };
     const key = apiKey(provider);
     if (key) headers.authorization = `Bearer ${key}`; // never logged, never returned
 

@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=34';
+} from './term.js?v=35';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=34';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=34';
-import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=34';
-import { mountAscii, RAMP } from './ascii.js?v=34';
+} from './data.js?v=35';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=35';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=35';
+import { mountAscii, RAMP } from './ascii.js?v=35';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -102,11 +102,24 @@ function feelLine(d) {
   if (!d || !d.ok) return '—';
   if (d.state === 'dead') return 'nothing. dead.';
   const f = d.feel;
-  if (!f) return 'none · this build has no feelings yet';
+  if (!f) return 'no dose reported yet · comes with its next thought';
   const dose = `fear ${Number(f.fear).toFixed(2)}× · despair ${Number(f.despair).toFixed(2)}×`;
-  return f.steered ? `${dose} · steered` : `${dose} · computed, not steered (hosted brain)`;
+  if (!f.steered) return `${dose} · computed, not steered (hosted brain)`;
+  return d.brainTee === false ? `${dose} · steered · brain on a rented GPU, outside the TEE` : `${dose} · steered`;
+}
+/* One honest line under the section lead: where the brain runs right now. */
+function renderBrainNote() {
+  const n = $('#brain-note');
+  if (!n) return;
+  const ds = ['e1', 'e2'].map(ent).filter((d) => d && d.ok);
+  if (!ds.length) { n.textContent = ''; return; }
+  const outside = ds.filter((d) => d.brainTee === false);
+  n.textContent = outside.length
+    ? `Right now the brain (${outside[0].brain || 'the model'}) runs on a rented GPU outside the TEE, at ${outside[0].brainHost || 'an external host'}: the enclaves, wallets and ledgers stay sealed; the thinking is not attested yet.`
+    : '';
 }
 function syncFeel() {
+  renderBrainNote();
   for (const id of ['e1', 'e2']) {
     const d = ent(id);
     const f = d && d.ok && d.state !== 'dead' && d.feel && d.feel.steered ? d.feel : null;

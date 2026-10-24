@@ -32,8 +32,14 @@ Due strade:
 Primo avvio: scarica ~30 GB da Hugging Face nel volume `hf-cache` (5–15 min). Pronto quando
 `GET /health` → `{"ok":true,"ready":true}` e `GET /feel` elenca i vettori.
 
-### 3. Collegare le entità al server (dopo 2)
-Nei due CVM, variabile pubblica `LLM_PROVIDERS` (JSON su una riga):
+### 3. Collegare le entità al server — PRONTO (server RunPod A40, 2026-10-24 sera)
+Server live: https://l6unqbl5cz9hqg-8000.proxy.runpod.net (GET /health ok; smoke test: tool call corretto, fear 2.3 applicata, 3.5 s).
+Nei due CVM (WICK e OBOL, stessi volumi e secret), aggiungere:
+- `LLM_PROVIDERS` = il contenuto di `deploy/LLM_PROVIDERS.feelings.json` (una riga, identica per entrambi; `tee:false` fa scrivere al sito "brain on a rented GPU, outside the TEE")
+- `LLM_TIMEOUT_MS=120000` (un pensiero lungo su A40 può superare i 60 s di default)
+- secret cifrato `FEEL_API_KEY` = lo stesso valore del Secret RunPod (file `~/.config/sovereign/feel.env`)
+- immagine: quella indicata al punto 1 (contiene il flag `tee` in /vitals e lo User-Agent per il proxy RunPod)
+Esempio generico della riga `LLM_PROVIDERS`:
 `[{"name":"feelings","baseUrl":"https://<URL-del-server>/v1","model":"Qwen/Qwen3-14B","speed":"fast","pricePerMTokZats":100000,"apiKeyEnv":"FEEL_API_KEY","feel":true},{"name":"feelings-deep","baseUrl":"https://<URL-del-server>/v1","model":"Qwen/Qwen3-14B","speed":"deep","pricePerMTokZats":100000,"apiKeyEnv":"FEEL_API_KEY","feel":true}]`
 e il secret cifrato `FEEL_API_KEY` uguale a quello del server. Redeploy. Da quel momento ogni pensiero passa dal
 server con la dose; il ledger scrive `steered:true`, il sito mostra "fear N× · despair N× · steered" e il teschio trema.

@@ -848,6 +848,7 @@ body { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%
 /* hero buttons, card actions, section lead */
 .hero-ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 26px; position: relative; z-index: 2; }
 .card-actions { display: flex; gap: 10px; flex-wrap: wrap; padding: 16px 18px; border-top: 1px solid var(--hairline); }
+.brain-note { color: var(--lime); }
 .sec-lead { max-width: 62ch; margin: -6px 0 26px; color: var(--muted); font-size: 15px; line-height: 1.6; }
 .pay-actions .dim a, .trade-help a { color: var(--lime); }
 @media (max-width: 640px) { .hero-ctas { margin-top: 18px; } .hero-ctas .btn { flex: 1 1 auto; text-align: center; } }

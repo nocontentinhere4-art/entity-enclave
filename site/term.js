@@ -12,8 +12,8 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=34';
-import { zip321Uri, qrSvg } from './qr.js?v=34';
+} from './data.js?v=35';
+import { zip321Uri, qrSvg } from './qr.js?v=35';
 
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
 const rentZats = () => RENT;
@@ -117,7 +117,10 @@ async function load(ai, full = true) {
       d.state = stringOf(vitals.data.state) || 'unknown';
       d.sleepUntil = vitals.data.sleepUntil || null;
       d.bornAt = vitals.data.bornAt;
-      d.brain = Array.isArray(vitals.data.brain) && vitals.data.brain[0] ? vitals.data.brain[0].model : '';
+      const b0 = Array.isArray(vitals.data.brain) && vitals.data.brain[0] ? vitals.data.brain[0] : null;
+      d.brain = b0 ? b0.model : '';
+      d.brainTee = b0 ? b0.tee !== false : null;   // null = the enclave does not say
+      d.brainHost = b0 && b0.host ? b0.host : '';
     } else if (d.ok && !d.state) {
       d.state = 'unknown';
     }

@@ -174,7 +174,9 @@ async function syncWallet() {
 
 // Brain check at boot: one 1-token completion per provider, paid by the founder's bootstrap credit (not the treasury).
 // Public proof that the entity has a working brain before anyone gifts it a life. Keys never leave this process.
-const providersPublic = (config.providers ?? []).map((p) => ({ name: p.name, model: p.model, speed: p.speed ?? 'any', keyConfigured: Boolean(p.apiKey) }));
+const hostOf = (u) => { try { return new URL(u).hostname; } catch { return null; } };
+// `tee: false` in a provider entry declares a brain that runs outside a TEE (a rented GPU): shown, never hidden.
+const providersPublic = (config.providers ?? []).map((p) => ({ name: p.name, model: p.model, speed: p.speed ?? 'any', keyConfigured: Boolean(p.apiKey), host: hostOf(p.baseUrl), tee: p.tee !== false, feel: p.feel === true }));
 async function probeProviders() {
   if (config.fakeLlm) return;
   for (const p of config.providers ?? []) {
