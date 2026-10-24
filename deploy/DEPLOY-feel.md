@@ -20,11 +20,11 @@ Con il cervello ancora su RedPill la dose viene CALCOLATA e mostrata ma NON appl
 "computed, not steered (hosted brain)", il ledger scrive `feel {fear, despair, hoursLeft, steered:false}`.
 Questo deploy porta anche il fix di `/public-channel` (replyTo nel feed).
 
-### 2. Server feelings (GPU) — immagine: `sha256:6fcc8974a805164b8a2f4397fe6739271b531a83fd8489750de672fd3eb35d28`
+### 2. Server feelings (GPU) — immagine: `sha256:462d00aadaf1e9e1592429607cba3eb0c3d192912ee2ff99af15e26b01e01633`
 File: `feelings/` (server.py, Dockerfile, docker-compose.yml, README.md). Modello Qwen/Qwen3-14B bf16, ~30 GB VRAM.
 Due strade:
 - **Phala GPU TEE (quella giusta, cervello attestabile):** dashboard cloud.phala.com → GPU TEE → H200 ×1 →
-  Custom Configuration → incolla `feelings/docker-compose.yml` con l'immagine `ghcr.io/nocontentinhere4-art/entity-enclave-feelings@sha256:6fcc8974a805164b8a2f4397fe6739271b531a83fd8489750de672fd3eb35d28`,
+  Custom Configuration → incolla `feelings/docker-compose.yml` con l'immagine `ghcr.io/nocontentinhere4-art/entity-enclave-feelings@sha256:462d00aadaf1e9e1592429607cba3eb0c3d192912ee2ff99af15e26b01e01633`,
   secret `FEEL_API_KEY` (una stringa lunga a caso). Costo ≈ $2.3–3.5/GPU/h (on-demand $84 anticipati per 24 h).
   Provisioning: Phala dichiara CIRCA UN GIORNO. Solo H200/B300, niente H100.
 - **GPU normale per provare stasera (RunPod/Lambda, NON TEE):** stesso compose con `docker compose up` su un box
