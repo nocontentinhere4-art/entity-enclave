@@ -2,7 +2,7 @@
 # Per CVM in the dashboard: SELF_URL, PEER_URL, PARENT_URL (children only) and the secrets REDPILL_API_KEY, PHALA_API_KEY, SOLANA_RPC_URL.
 services:
   entity:
-    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:39e9fcffca98e26f68ad7dcc02db6b0c3b702f923a1a63e54548f4e29c8c717a
+    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:572cb6ad645bb713522f018cc3aaf2e6da5fe574c8b0e6db50254f7a127a6a8e
     ports:
       - "8080:8080"
     volumes:
@@ -22,7 +22,7 @@ services:
       - WHISPER_MIN_ZATS=1000
       - RENT_ADDRESS=REPLACE_WITH_YOUR_MAINNET_U1_ADDRESS
       - TICK_MS=300000
-      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:39e9fcffca98e26f68ad7dcc02db6b0c3b702f923a1a63e54548f4e29c8c717a
+      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:572cb6ad645bb713522f018cc3aaf2e6da5fe574c8b0e6db50254f7a127a6a8e
       - GATEWAY_DOMAIN=dstack-pha-prod9.phala.network
       - FAKE_LLM=0
       - FAKE_WALLET=0
@@ -32,6 +32,9 @@ services:
       - TRADE_MAX_OPEN=3
       - TRADE_MAX_OPEN_ZATS=300000000
       - TRADE_MAX_PER_CLIENT=1
+      # Feelings: the dose is computed and shown from this deploy on; it is APPLIED only once LLM_PROVIDERS
+      # points at the feelings server (see deploy/DEPLOY-feel.md).
+      - FEEL_ENABLED=1
     restart: unless-stopped
 volumes:
   entity-state:
