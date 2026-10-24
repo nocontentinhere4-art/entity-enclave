@@ -228,6 +228,8 @@ main { position: relative; }
 }
 .shop-name { flex: 1; min-width: 0; font-size: 14px; color: var(--body); }
 .shop-price { color: var(--caption); font-size: 12px; }
+a.page-link { text-decoration: none; }
+a.page-link:hover .shop-name { color: var(--lime); }
 .word { padding: 0 0 12px; border-bottom: 1px solid var(--hairline); }
 .word:last-child { border-bottom: 0; padding-bottom: 0; }
 .word-text { font-size: 14px; line-height: 1.5; margin: 0 0 6px; color: var(--body); }

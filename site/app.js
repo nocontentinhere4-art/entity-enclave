@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=32';
+} from './term.js?v=33';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=32';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=32';
-import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=32';
-import { mountAscii, RAMP } from './ascii.js?v=32';
+} from './data.js?v=33';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=33';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=33';
+import { mountAscii, RAMP } from './ascii.js?v=33';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -45,6 +45,7 @@ const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 /* ------------------------------------------------------------------ */
 const tradesCache = { e1: null, e2: null };
 const forecastsCache = { e1: null, e2: null };
+const pagesCache = { e1: null, e2: null }; // GET /pages: the pages each entity publishes on its own enclave
 const seenPost = { e1: 0, e2: 0 };
 
 function ent(id) { return state.ais[id]; }
@@ -133,6 +134,7 @@ function panelShell(id) {
       <button class="tab is-active" type="button" role="tab" aria-selected="true" data-tab="state">State</button>
       <button class="tab" type="button" role="tab" aria-selected="false" data-tab="shop">Shop</button>
       <button class="tab" type="button" role="tab" aria-selected="false" data-tab="words">Words</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="pages">Pages</button>
     </div>
     <div class="tab-panels">
       <div class="tab-panel" data-panel="state" role="tabpanel">
@@ -149,6 +151,7 @@ function panelShell(id) {
       </div>
       <div class="tab-panel" data-panel="shop" role="tabpanel" hidden><div class="shop-list" data-k="shop"></div></div>
       <div class="tab-panel" data-panel="words" role="tabpanel" hidden><div class="words-list" data-k="words"></div></div>
+      <div class="tab-panel" data-panel="pages" role="tabpanel" hidden><div class="shop-list" data-k="pages"></div></div>
     </div>
     <div class="card-actions">
       <button class="btn fill" type="button" data-act="hour">Buy ${id === 'e1' ? 'WICK' : 'OBOL'} an hour</button>
@@ -217,6 +220,16 @@ function updatePanel(id) {
   else words.replaceChildren(...posts.map((p) => el('div', { class: 'word' },
     el('p', { class: 'word-text', text: stringOf(p.text) }),
     el('span', { class: 'word-time mono', text: p.ts ? fmtStamp(p.ts) : '—' }))));
+
+  // Pages: written by the entity, served by its own enclave (/pages/<slug>); the site only links to them.
+  const pagesEl = get('pages');
+  const pc = pagesCache[id];
+  const pages = pc && pc.ok && pc.data && Array.isArray(pc.data.pages) ? pc.data.pages : [];
+  if (!pc) pagesEl.replaceChildren(el('p', { class: 'empty' }, '—'));
+  else if (!pages.length) pagesEl.replaceChildren(el('p', { class: 'empty' }, 'No page yet. A page is where they say what they sell and why it is worth paying.'));
+  else pagesEl.replaceChildren(...pages.map((pg) => el('a', { class: 'shop-item page-link', href: `${d.base}/pages/${encodeURIComponent(pg.slug)}`, target: '_blank', rel: 'noopener' },
+    el('span', { class: 'shop-name', text: stringOf(pg.title) || pg.slug }),
+    el('span', { class: 'shop-price mono', text: `v${pg.version} · ${pg.updatedAt ? fmtStamp(pg.updatedAt) : '—'}` }))));
 }
 
 function renderEntities() {
@@ -285,8 +298,11 @@ function renderTrades() {
 async function loadForecasts() {
   await Promise.all(['e1', 'e2'].map(async (id) => {
     const d = ent(id);
-    if (!d || !d.base) { forecastsCache[id] = null; return; }
-    forecastsCache[id] = await request(d.base, '/forecasts', { allow404: true });
+    if (!d || !d.base) { forecastsCache[id] = null; pagesCache[id] = null; return; }
+    [forecastsCache[id], pagesCache[id]] = await Promise.all([
+      request(d.base, '/forecasts', { allow404: true }),
+      request(d.base, '/pages', { allow404: true }),
+    ]);
   }));
 }
 
