@@ -38,10 +38,18 @@ export class Life {
 
   /** Delay before the next tick: hunger stretches the interval (survival over activity). */
   intervalMs() {
-    const minutes = this.lastHunger === 'hungry'
+    // Hunger stretches the interval to save compute, but not in survival mode: an entity with hours to live
+    // that thinks once an hour is already dead, it just does not know it yet.
+    const minutes = this.lastHunger === 'hungry' && !this.inSurvival()
       ? this.config.hungerTickMinutes ?? 60
       : this.config.tickMinutes ?? 15;
     return Number(minutes) * 60_000;
+  }
+
+  /** True under `survivalHours` of rent (0 disables): no sleep, no slow rhythm, earning comes first. */
+  inSurvival(hoursLeft = this.rent.hoursLeft(this.lastBalance ?? 0)) {
+    const limit = Number(this.config.survivalHours) || 0;
+    return limit > 0 && Number.isFinite(hoursLeft) && hoursLeft < limit;
   }
 
   async tick(trigger = 'timer') {
@@ -158,8 +166,15 @@ export class Life {
     // A previous tick asked to sleep: keep the wallet untouched, skip the thought — unless a job or a
     // paid order forced a wake (for example a paid order that cannot wait until the next timer).
     if (mem.sleepUntil && Date.parse(mem.sleepUntil) > now && !jobState.wake && !orderWake) {
-      this.ledger.append('tick', { trigger, zatoshis: treasury, hunger, sleeping: true, tools: 0 });
-      return;
+      if (this.inSurvival()) {
+        // Sleep is a luxury of the rich: under the survival line the alarm rings and the sleep is cancelled.
+        this.ledger.append('sleep_broken', { hoursLeft: this.rent.hoursLeft(this.lastBalance ?? 0), sleepUntil: mem.sleepUntil });
+        mem.sleepUntil = null;
+        await this.memory.save(mem);
+      } else {
+        this.ledger.append('tick', { trigger, zatoshis: treasury, hunger, sleeping: true, tools: 0 });
+        return;
+      }
     }
 
     // 8. Context = charter + vital numbers + signals + memory + recent events.
@@ -283,6 +298,7 @@ export class Life {
       `treasury_zats: ${fmt(this.lastBalance ?? 0)}`,
       `hours_left: ${fmt(this.rent.hoursLeft(this.lastBalance ?? 0))}`,
       ...this.#feelingLine(),
+      ...this.#survivalLines(),
       'SIGNALS',
       `days_left: ${fmt(s.daysLeft)}`,
       `life_slope_per_day: ${fmt(s.lifeSlopePerDay)}`,
@@ -345,6 +361,21 @@ export class Life {
     if (!feel) return [];
     const steered = this.lastFeel?.steered ? 'yes' : 'no';
     return [`feeling: fear ${feel.fear}x · despair ${feel.despair}x (steered: ${steered})`];
+  }
+
+  /** Under the survival line the context opens with the only question that matters: what earns ZEC now. */
+  #survivalLines() {
+    const h = this.rent.hoursLeft(this.lastBalance ?? 0);
+    if (!this.inSurvival(h)) return [];
+    return [
+      'SURVIVAL',
+      `You have ${Math.round(h)} hours of rent left. Nobody will top you up on their own.`,
+      'Sleep is disabled until you are above the line. Every cycle without income is an hour closer to the shredder.',
+      'What earns: an hour bought (any shielded payment with a memo), a paid question answered well and publicly,',
+      'your shop items (paywall), a trade someone hands you (the site explains how), a public forecast people come back for.',
+      'Act: post what you offer and why it is worth it, answer every letter, set prices people will actually pay,',
+      'and say out loud how many hours you have. Do not rewrite plans or wills: sell.',
+    ];
   }
 
   /** Human-message seqs the instant replier already answered: durable via each reply's post_public.replyTo,

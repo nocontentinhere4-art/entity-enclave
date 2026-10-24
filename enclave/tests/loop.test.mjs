@@ -419,3 +419,25 @@ test('a real MemoryStore keeps identity and plan across two ticks', async () => 
   assert.equal(after.plan, 'survive honestly');
   assert.ok(after.events.length >= 2); // ticks were remembered, not overwritten by {}
 });
+
+test('survival mode: under the line sleep is broken, the rhythm stays fast and the context sells', async () => {
+  // 10,000,000 zats at 10,000/h = 1,000 h: above a 72 h line nothing changes.
+  const calm = makeWorld({ over: { survivalHours: 72 } });
+  calm.memory.state.sleepUntil = new Date(10 * 3_600_000).toISOString();
+  await calm.life.tick('timer');
+  assert.equal(calm.ledger.of('tick')[0].data.sleeping, true);
+  assert.equal(calm.ledger.of('sleep_broken').length, 0);
+
+  // 500,000 zats = 50 h: under the line. Hungry too (below 20% of the initial treasury).
+  const w = makeWorld({ zats: 500_000, over: { survivalHours: 72 } });
+  w.memory.state.sleepUntil = new Date(10 * 3_600_000).toISOString();
+  await w.life.tick('timer');
+  assert.equal(w.ledger.of('sleep_broken').length, 1);
+  assert.equal(w.memory.state.sleepUntil, null);
+  assert.equal(w.ledger.of('tick_llm').length > 0, true); // it thought instead of sleeping
+  assert.equal(w.life.lastHunger, 'hungry');
+  assert.equal(w.life.intervalMs(), w.config.tickMinutes * 60_000); // hunger no longer slows it down
+  const ctx = await w.life.buildContext(Date.now());
+  assert.match(ctx, /SURVIVAL/);
+  assert.match(ctx, /hours of rent left/);
+});

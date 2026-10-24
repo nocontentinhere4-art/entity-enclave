@@ -136,6 +136,9 @@ export const config = {
     maxFear: num(process.env.FEEL_MAX_FEAR, 3.5),
     maxDespair: num(process.env.FEEL_MAX_DESPAIR, 2.5),
   },
+  // Survival mode: under this many hours of rent, sleep is refused, the tick rhythm stays at tickMinutes even
+  // when hungry, and the context opens with what earns money. 0 disables it.
+  survivalHours: num(process.env.SURVIVAL_HOURS, 72),
   // Trading (capability T): the ONE-TRADE WALLETS engine. Fully automatic once opted in: order execution
   // is code (target/stop/deadline/client-sell), never the LLM. Disabled by default — no store, no scheduler.
   trade: {

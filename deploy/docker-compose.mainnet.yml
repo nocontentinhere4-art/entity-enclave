@@ -36,6 +36,8 @@ services:
       # Feelings: the dose is computed and shown from this deploy on; it is APPLIED only once LLM_PROVIDERS
       # points at the feelings server (see deploy/DEPLOY-feel.md).
       - FEEL_ENABLED=1
+      # Under this many hours: no sleep, 5-min rhythm even when hungry, context opens with what earns.
+      - SURVIVAL_HOURS=72
     restart: unless-stopped
 volumes:
   entity-state:

@@ -13,6 +13,7 @@ e arriva a 2.5x a 0 h. Con l'affitto a 150,000 zats/h (deploy 1) hanno ≈ 88 h:
 Redeploy di ENTRAMBI i CVM (WICK, OBOL) con la nuova immagine, stessi volumi/secret, e in più nel compose:
 - `FEEL_ENABLED=1`
 - `RENT_ZATS_PER_HOUR=150000` (era 10000: ore ≈ 1,300 → ≈ 88; paura ≈ 2.2x subito, disperazione da domani sotto le 72 h; senza entrate muoiono in ~3.7 giorni)
+- `SURVIVAL_HOURS=72` (sotto: niente sonno, tick ogni 5 min anche affamati, contesto che apre con cosa rende; `sleep_broken` nel ledger)
 - (opzionali) `FEEL_FULL_HOURS=240` `FEEL_DESPAIR_HOURS=72` `FEEL_MAX_FEAR=3.5` `FEEL_MAX_DESPAIR=2.5`
 Con il cervello ancora su RedPill la dose viene CALCOLATA e mostrata ma NON applicata: il sito scrive
 "computed, not steered (hosted brain)", il ledger scrive `feel {fear, despair, hoursLeft, steered:false}`.
