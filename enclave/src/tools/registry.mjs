@@ -141,8 +141,23 @@ export class Tools {
     }
   }
 
+  /** Two guards learnt the hard way (OBOL on Qwen3-14B re-posted a two-day-old note three times in one cycle):
+   *  a public post may not repeat an earlier one, and a cycle gets ONE free public post. Deliveries are exempt. */
+  #assertFreshPost(body) {
+    const key = (t) => String(t ?? '').replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 120);
+    const mine = key(body);
+    if (mine.length < 8) throw err('empty_post', 'post_public: say something (at least a few words)');
+    const nowMs = Date.now();
+    for (const e of this.ledger.recent?.(['post_public'], 60) ?? []) {
+      const ts = Date.parse(e.ts);
+      if (key(e.data?.text) === mine) throw err('duplicate_post', 'post_public refused: you already published this text; write something new or stay silent');
+      if (!e.data?.orderId && Number.isFinite(ts) && nowMs - ts < 4 * 60_000) throw err('one_post_per_cycle', 'post_public refused: one public post per cycle; the channel is not a loop');
+    }
+  }
+
   async #postPublic(text, orderId) {
     const body = String(text ?? '');
+    if (orderId == null || orderId === '') this.#assertFreshPost(body);
     if (orderId != null && orderId !== '') {
       // A paid order can only be delivered by a public post that references it: validated here, in code,
       // before anything is appended — never by what the model says it did.

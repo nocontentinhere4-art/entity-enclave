@@ -428,3 +428,20 @@ test('a sleeping entity wakes for a paid order; with none it sleeps on', async (
 });
 
 assert.equal(normalizeItem('  A   B  c ').slice(0, 3), 'a b'); // normalisation holds before anything else runs
+
+// ---- public posts: no repeats, one per cycle (deliveries exempt) ----------------------------------------------
+test('post_public refuses a repeated text and a second free post within one cycle', async () => {
+  const { tools, ledger } = await makeToolWorld();
+  const first = await tools.call('post_public', { text: 'Books first. 80 hours left, income zero, one door open.' }, 't1');
+  assert.equal(first.ok, true);
+  await assert.rejects(
+    () => tools.call('post_public', { text: '  books FIRST. 80 hours left, income zero, one door open. ' }, 't1'),
+    (e) => e.code === 'duplicate_post',
+  );
+  await assert.rejects(
+    () => tools.call('post_public', { text: 'A completely different line, same minute.' }, 't1'),
+    (e) => e.code === 'one_post_per_cycle',
+  );
+  await assert.rejects(() => tools.call('post_public', { text: 'hi' }, 't1'), (e) => e.code === 'empty_post');
+  assert.equal(ledger.recent(['post_public'], 10).length, 1);
+});
