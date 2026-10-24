@@ -12,10 +12,11 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=30';
-import { zip321Uri, qrSvg } from './qr.js?v=30';
+} from './data.js?v=32';
+import { zip321Uri, qrSvg } from './qr.js?v=32';
 
-const RENT = 10000;                 // zats per hour, base rent (matches rent_paid.data.rentZats)
+let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
+const rentZats = () => RENT;
 const MEMO_MAX = 500;               // bytes
 const NAME_FALLBACK = { e1: 'Wick', e2: 'OBOL' };
 const COMMANDS = ['help', 'hours', 'pay', 'ask', 'say', 'words', 'ledger', 'trades', 'verify', 'keys', 'token', 'truth', 'who', 'raw', 'clear'];
@@ -96,6 +97,9 @@ async function load(ai, full = true) {
     d.npub = (root.data.nostr && root.data.nostr.npub) || '';
     d.app = (root.data.attestation && root.data.attestation.app) || '';
     d.feel = root.data.feel && typeof root.data.feel === 'object' ? root.data.feel : null; // {fear, despair, hoursLeft, steered, at}
+    // Both entities pay the same rent; the first live root sets the price the whole page shows (dialog, hero, table).
+    const r = Number(root.data.rentZatsPerHour);
+    if (Number.isFinite(r) && r > 0 && r !== RENT) { RENT = r; syncRentUi(); }
     if (stringOf(root.data.state) === 'dead') {
       d.state = 'dead';
       d.diedAt = root.data.diedAt || null;
@@ -499,6 +503,16 @@ function openPay({ who = null, theirs = null, hours = null, prefill = '' } = {})
   $('#pay-memo').focus({ preventScroll: true });
 }
 
+/* Every hard-coded '0.0001 ZEC / 10,000 zats' on the page follows the live rent. */
+function syncRentUi() {
+  for (const n of [1, 10, 100]) {
+    const input = $(`#pay-amt input[data-hours="${n}"]`);
+    if (input) input.value = String(n * RENT);
+  }
+  for (const node of document.querySelectorAll('[data-rent-zec]')) node.textContent = `${fixed8(RENT)} ZEC`;
+  for (const node of document.querySelectorAll('[data-rent-zats]')) node.textContent = `${formatInt(RENT)} zats`;
+}
+
 function renderPay() {
   const d = state.ais[state.pay.who];
   if (!d) return;
@@ -642,6 +656,6 @@ function wireTerm() {
 }
 
 export {
-  state, list, nameOf, stateWord, deadline,
+  state, list, nameOf, stateWord, deadline, rentZats,
   loadAll, boot, wireTerm, openPay, diffLog,
 };

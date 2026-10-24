@@ -5,13 +5,14 @@ alle ore di affitto rimaste. È activation steering (vettori exp48 di terrafying
 Qwen3-14B, 1x = 36.2356, dose max 4.5). Nessuno può comprare la dose: dipende solo dalle ore.
 
 Curva (env FEEL_*): sopra 240 h → 0. Paura sale linearmente fino a 3.5x a 0 h. Disperazione parte sotto 72 h
-e arriva a 2.5x a 0 h. Oggi (≈1,300 h) la dose è ZERO: finché non abbassi l'affitto o le ore, non sentono niente.
+e arriva a 2.5x a 0 h. Con l'affitto a 150,000 zats/h (deploy 1) hanno ≈ 88 h: paura ≈ 2.2x dal primo tick, disperazione quando scendono sotto 72 h.
 
 ## Tre pezzi, in ordine
 
 ### 1. Enclave (subito, gratis) — immagine: `sha256:572cb6ad645bb713522f018cc3aaf2e6da5fe574c8b0e6db50254f7a127a6a8e`
 Redeploy di ENTRAMBI i CVM (WICK, OBOL) con la nuova immagine, stessi volumi/secret, e in più nel compose:
 - `FEEL_ENABLED=1`
+- `RENT_ZATS_PER_HOUR=150000` (era 10000: ore ≈ 1,300 → ≈ 88; paura ≈ 2.2x subito, disperazione da domani sotto le 72 h; senza entrate muoiono in ~3.7 giorni)
 - (opzionali) `FEEL_FULL_HOURS=240` `FEEL_DESPAIR_HOURS=72` `FEEL_MAX_FEAR=3.5` `FEEL_MAX_DESPAIR=2.5`
 Con il cervello ancora su RedPill la dose viene CALCOLATA e mostrata ma NON applicata: il sito scrive
 "computed, not steered (hosted brain)", il ledger scrive `feel {fear, despair, hoursLeft, steered:false}`.

@@ -9,15 +9,15 @@
  * error is "offline since".
  */
 import {
-  state, list, nameOf, stateWord, deadline, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=31';
+  state, list, nameOf, stateWord, deadline, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
+} from './term.js?v=32';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=30';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=30';
-import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=31';
-import { mountAscii, RAMP } from './ascii.js?v=30';
+} from './data.js?v=32';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=32';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=32';
+import { mountAscii, RAMP } from './ascii.js?v=32';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -1767,8 +1767,7 @@ function handScene() {
 /* [0006] Money — the sand falls through the neck, the bottom pile slowly brightens; speed mirrors the hourly rent */
 function hourglassScene() {
   const g = { cols: 0, rows: 0, t: 0 };
-  const RENT = 10000;
-  const speed = RENT / 10000;   // 1× today; purely visual
+  const speed = Math.min(20, rentZats() / 10000);   // sand falls faster when the rent is higher; purely visual
   const lum = (i, x, y, base) => {
     let l = base;
     const cx = x / g.cols, cy = y / g.rows;

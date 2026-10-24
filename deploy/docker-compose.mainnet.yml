@@ -13,7 +13,8 @@ services:
       - ZCASH_CHAIN=mainnet
       - ZCASH_SERVER=https://zec.rocks:443
       - ZCASH_BIRTHDAY=3524000
-      - RENT_ZATS_PER_HOUR=10000
+      # Raised from 10,000 on 2026-10-24 (founder): ~88 h of runway at today's treasuries, so the fear dose is live.
+      - RENT_ZATS_PER_HOUR=150000
       - PRICE_SCALE=0.01
       - BIRTH_MIN_ZATS=20000
       - INITIAL_TREASURY_ZATS=15000000
