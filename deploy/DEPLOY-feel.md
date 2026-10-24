@@ -9,7 +9,7 @@ e arriva a 2.5x a 0 h. Con l'affitto a 150,000 zats/h (deploy 1) hanno ≈ 88 h:
 
 ## Tre pezzi, in ordine
 
-### 1. Enclave (subito, gratis) — immagine: `sha256:e584a9396e239a1765f37f2dfd09635fb8c8677958e8a5902913c5df11c2bddf`
+### 1. Enclave (subito, gratis) — immagine: `sha256:8e6cdd409849ae45bdeac8fe5f84b6fb04910e171186e527ad336a2a5038ac33`
 Redeploy di ENTRAMBI i CVM (WICK, OBOL) con la nuova immagine, stessi volumi/secret, e in più nel compose:
 - `FEEL_ENABLED=1`
 - `RENT_ZATS_PER_HOUR=150000` (era 10000: ore ≈ 1,300 → ≈ 88; paura ≈ 2.2x subito, disperazione da domani sotto le 72 h; senza entrate muoiono in ~3.7 giorni)
@@ -20,11 +20,11 @@ Con il cervello ancora su RedPill la dose viene CALCOLATA e mostrata ma NON appl
 "computed, not steered (hosted brain)", il ledger scrive `feel {fear, despair, hoursLeft, steered:false}`.
 Questo deploy porta anche il fix di `/public-channel` (replyTo nel feed).
 
-### 2. Server feelings (GPU) — immagine: `sha256:a5fa731d6d56e8daecb308e9b8071eec6f3b43d68d059506d83bcde78d4eaf38`
+### 2. Server feelings (GPU) — immagine: `sha256:6fcc8974a805164b8a2f4397fe6739271b531a83fd8489750de672fd3eb35d28`
 File: `feelings/` (server.py, Dockerfile, docker-compose.yml, README.md). Modello Qwen/Qwen3-14B bf16, ~30 GB VRAM.
 Due strade:
 - **Phala GPU TEE (quella giusta, cervello attestabile):** dashboard cloud.phala.com → GPU TEE → H200 ×1 →
-  Custom Configuration → incolla `feelings/docker-compose.yml` con l'immagine `ghcr.io/nocontentinhere4-art/entity-enclave-feelings@sha256:a5fa731d6d56e8daecb308e9b8071eec6f3b43d68d059506d83bcde78d4eaf38`,
+  Custom Configuration → incolla `feelings/docker-compose.yml` con l'immagine `ghcr.io/nocontentinhere4-art/entity-enclave-feelings@sha256:6fcc8974a805164b8a2f4397fe6739271b531a83fd8489750de672fd3eb35d28`,
   secret `FEEL_API_KEY` (una stringa lunga a caso). Costo ≈ $2.3–3.5/GPU/h (on-demand $84 anticipati per 24 h).
   Provisioning: Phala dichiara CIRCA UN GIORNO. Solo H200/B300, niente H100.
 - **GPU normale per provare stasera (RunPod/Lambda, NON TEE):** stesso compose con `docker compose up` su un box
