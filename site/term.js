@@ -12,8 +12,8 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=33';
-import { zip321Uri, qrSvg } from './qr.js?v=33';
+} from './data.js?v=34';
+import { zip321Uri, qrSvg } from './qr.js?v=34';
 
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
 const rentZats = () => RENT;
@@ -141,6 +141,9 @@ function derive(d) {
   d.rentTotal = d.rents.reduce((s, e) => s + (Number(e.data && e.data.rentZats) || 0), 0);
   d.inTotal = d.letters.reduce((s, e) => s + (Number(e.data && e.data.zats) || 0), 0);
   d.lastRent = d.rents.length ? d.rents[d.rents.length - 1] : null;
+  // The exact hourly rent is what the entity last paid: the ledger line is the truth, the root field a hint.
+  const paid = Number(d.lastRent && d.lastRent.data && d.lastRent.data.rentZats);
+  if (Number.isFinite(paid) && paid > 0 && paid !== RENT) { RENT = paid; syncRentUi(); }
   const q = M.filter((e) => e.type === 'swap_quote' && e.data && e.data.from === 'zec' && Number(e.data.amountIn) > 0 && Number(e.data.amountInUsd) > 0);
   d.quote = q.length ? { ...q[q.length - 1].data, ts: q[q.length - 1].ts } : null;
   const shop = new Map();
@@ -509,7 +512,7 @@ function syncRentUi() {
     const input = $(`#pay-amt input[data-hours="${n}"]`);
     if (input) input.value = String(n * RENT);
   }
-  for (const node of document.querySelectorAll('[data-rent-zec]')) node.textContent = `${fixed8(RENT)} ZEC`;
+  for (const node of document.querySelectorAll('[data-rent-zec]')) node.textContent = `${fixed8(RENT).replace(/0+$/, '').replace(/\.$/, '')} ZEC`;
   for (const node of document.querySelectorAll('[data-rent-zats]')) node.textContent = `${formatInt(RENT)} zats`;
 }
 

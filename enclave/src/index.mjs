@@ -341,6 +341,7 @@ http.createServer(async (req, res) => {
         nostr: { npub: nostr.npub, pubkey: nostr.pubkey },
         reply: replier.status(),
         feel: life.lastFeel ?? null,
+        rentZatsPerHour: config.rentZatsPerHour,
         peer: config.peerUrl,
         lineage: { parent: config.parentUrl, children: ledger.recent(['birth_of'], 1000).map((e) => ({ url: e.data?.url, address: e.data?.address, ts: e.ts })) },
         ledger: { entries: ledger.seq, head: ledger.head },

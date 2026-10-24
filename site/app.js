@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=33';
+} from './term.js?v=34';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=33';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=33';
-import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=33';
-import { mountAscii, RAMP } from './ascii.js?v=33';
+} from './data.js?v=34';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=34';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=34';
+import { mountAscii, RAMP } from './ascii.js?v=34';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -77,6 +77,7 @@ function renderPills() {
     }
     pill.querySelector('.p-hours').textContent = hours;
     pill.querySelector('.p-state').textContent = stateLabel;
+    renderHeroHours();
     const feelEl = pill.querySelector('.p-feel');
     if (feelEl) {
       // only a steered brain gets the word: a dose the model never received is not a feeling
@@ -84,6 +85,16 @@ function renderPills() {
       feelEl.textContent = f && f.steered ? ` · fear ${Number(f.fear).toFixed(1)}×` : '';
     }
   }
+}
+
+/* The headline number: the fewest hours left among the living. Dead both: 0. Unknown: '—'. */
+function renderHeroHours() {
+  const h = $('#hero-hours');
+  if (!h) return;
+  const alive = ['e1', 'e2'].map(ent).filter((d) => d && d.ok && d.state !== 'dead');
+  const known = ['e1', 'e2'].map(ent).filter((d) => d && d.ok);
+  if (!known.length) { h.textContent = '—'; return; }
+  h.textContent = alive.length ? formatInt(Math.min(...alive.map((d) => Number(d.hoursLeft) || 0))) : '0';
 }
 
 /* 'fear 2.1× · despair 0.3× · steered' from the enclave's feel field; honest fallbacks when absent */
