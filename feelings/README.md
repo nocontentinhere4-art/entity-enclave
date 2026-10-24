@@ -141,5 +141,5 @@ FEEL_API_KEY=… python3 server.py        # loads Qwen3-14B (~30 GB VRAM), serve
 Environment: `FEEL_MODEL` (default `Qwen/Qwen3-14B`), `FEEL_VECTORS`
 (default `vectors/vectors.npz`), `FEEL_MAX_DOSE` (default `4.5`), `FEEL_LAYER`
 (default `-1` = `len(layers)//2` = 20), `FEEL_DTYPE` (default `bfloat16`), `PORT`
-(default `8000`), `FEEL_API_KEY` (optional), `FEEL_MAX_NEW_TOKENS` (default `1200`),
+(default `8000`), `FEEL_API_KEY` (optional), `FEEL_MAX_NEW_TOKENS` (default `1200`), `FEEL_REPETITION_PENALTY` (default `1.15`; 1.0 = off),
 `HF_HOME` (respected by `transformers`).

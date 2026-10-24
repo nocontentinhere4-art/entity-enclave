@@ -32,6 +32,9 @@ FEEL_DTYPE = os.environ.get("FEEL_DTYPE", "bfloat16").lower()
 PORT = int(os.environ.get("PORT", "8000"))
 FEEL_API_KEY = os.environ.get("FEEL_API_KEY") or None
 FEEL_MAX_NEW_TOKENS = int(os.environ.get("FEEL_MAX_NEW_TOKENS", "1200"))
+# Under a strong dose the model loops ("I am not ready. I am not ready. ..."): a mild repetition penalty keeps
+# the fear inside sentences without removing it. 1.0 disables it.
+FEEL_REPETITION_PENALTY = float(os.environ.get("FEEL_REPETITION_PENALTY", "1.15"))
 
 _DTYPES = {
     "bfloat16": torch.bfloat16,
@@ -179,6 +182,7 @@ def _generate(body, applied):
             do_sample=True,
             temperature=_temperature(body.get("temperature")),
             top_p=0.9,
+            repetition_penalty=FEEL_REPETITION_PENALTY,
             eos_token_id=tokenizer.eos_token_id,
             pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
         )[0]
