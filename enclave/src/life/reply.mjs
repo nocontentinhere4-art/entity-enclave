@@ -147,11 +147,11 @@ export class Replier {
     // A reply is as afraid as a thought: the same dose, from the same hours, goes to the steered server.
     const feel = await this.#feel();
     try {
-      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId, feel });
+      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId, feel, priority: 'high' });
       return out.text;
     } catch (e) {
       if (!isTimeout(e)) throw e;
-      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId, feel });
+      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId, feel, priority: 'high' });
       return out.text;
     }
   }

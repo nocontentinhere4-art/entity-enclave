@@ -13,7 +13,7 @@ export class Inference {
   }
 
   /** One paid thought. `tools` may be a Tools instance or a plain [{name,description,parameters}]. */
-  async think({ context, speed = 'fast', tools = [], tickId, feel }) {
+  async think({ context, speed = 'fast', tools = [], tickId, feel, priority }) {
     const fast = speed !== 'deep';
     const action = fast ? 'think_fast' : 'think_deep';
     // Charge first: thinking is never free, even if the provider then fails.
@@ -24,7 +24,7 @@ export class Inference {
       out = fake(context, tools);
     } else {
       const provider = pickProvider(this.config.providers ?? [], fast ? 'fast' : 'deep', context);
-      out = await this.#http(provider, { context, tools, feel });
+      out = await this.#http(provider, { context, tools, feel, priority });
     }
 
     const respHash = sha256(stable({ text: out.text, toolCalls: out.toolCalls }));
@@ -41,7 +41,7 @@ export class Inference {
     return { ...out, costZats };
   }
 
-  async #http(provider, { context, tools, feel }) {
+  async #http(provider, { context, tools, feel, priority }) {
     const url = chatCompletionsUrl(provider.baseUrl);
     if (!url) throw err('no_provider', 'llm provider has no baseUrl');
     const defs = (tools?.list ? tools.list() : tools ?? []).map((t) => ({
@@ -60,6 +60,8 @@ export class Inference {
     if (provider.feel === true && feel && (Number(feel.fear) > 0 || Number(feel.despair) > 0)) {
       body.feel = { fear: Number(feel.fear), despair: Number(feel.despair) };
     }
+    // Our own server runs one generation at a time: a reply to a human jumps ahead of the entity's thinking.
+    if (provider.feel === true && priority === 'high') body.priority = 'high';
 
     // Some proxies (RunPod, Cloudflare) answer 403 to requests without a User-Agent.
     const headers = { 'content-type': 'application/json', 'user-agent': 'zealot-enclave/1.0' };

@@ -9,6 +9,7 @@ single asyncio lock serializes generations: one request at a time.
 from __future__ import annotations
 
 import asyncio
+import heapq
 import json
 import math
 import os
@@ -57,7 +58,46 @@ STATE = {
     "steering": None,  # torch tensor on device, or None
 }
 
-GEN_LOCK = asyncio.Lock()
+
+
+class PriorityGate:
+    """One generation at a time, but the next slot goes to the highest-priority waiter: an instant reply to
+    a human (priority 0) must not queue behind the entity's own long thoughts (priority 1)."""
+
+    def __init__(self):
+        self._busy = False
+        self._waiters = []  # heap of (priority, seq, future)
+        self._seq = 0
+
+    async def acquire(self, priority: int):
+        if not self._busy and not self._waiters:
+            self._busy = True
+            return
+        loop = asyncio.get_running_loop()
+        fut = loop.create_future()
+        self._seq += 1
+        heapq.heappush(self._waiters, (priority, self._seq, fut))
+        try:
+            await fut
+        except asyncio.CancelledError:
+            self._waiters = [w for w in self._waiters if w[2] is not fut]
+            heapq.heapify(self._waiters)
+            raise
+
+    def release(self):
+        while self._waiters:
+            _, _, fut = heapq.heappop(self._waiters)
+            if not fut.done():
+                fut.set_result(None)  # the slot passes directly to this waiter
+                return
+        self._busy = False
+
+    @property
+    def waiting(self):
+        return len(self._waiters)
+
+
+GEN_LOCK = PriorityGate()
 
 
 def _add_to_last_position(hidden, vec):
@@ -258,6 +298,7 @@ async def feel():
         "scale_1x": STATE["scale_1x"],
         "vectors": sorted(STATE["vectors"].keys()),
         "max_dose": FEEL_MAX_DOSE,
+        "queue": GEN_LOCK.waiting,
     }
 
 
@@ -283,8 +324,11 @@ async def chat_completions(request: Request):
         raise HTTPException(status_code=400, detail="feel must be an object")
 
     combined, applied = steer.combine(feel, STATE["vectors"], STATE["scale_1x"], FEEL_MAX_DOSE)
+    # priority: "high" (a reply to a human) goes before "normal" (the entity's own thinking).
+    priority = 0 if str(body.get("priority", "normal")).lower() == "high" else 1
 
-    async with GEN_LOCK:
+    await GEN_LOCK.acquire(priority)
+    try:
         if combined is not None:
             STATE["steering"] = torch.from_numpy(combined.astype("float32")).to(
                 STATE["device"], STATE["dtype"]
@@ -292,14 +336,14 @@ async def chat_completions(request: Request):
         else:
             STATE["steering"] = None
         try:
-            try:
-                return await asyncio.to_thread(_generate, body, applied)
-            except Exception as exc:
-                print(f"feelings: generation failed: {exc!r}", flush=True)
-                traceback.print_exc()
-                raise HTTPException(status_code=500, detail="generation failed")
-        finally:
-            STATE["steering"] = None
+            return await asyncio.to_thread(_generate, body, applied)
+        except Exception as exc:
+            print(f"feelings: generation failed: {exc!r}", flush=True)
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail="generation failed")
+    finally:
+        STATE["steering"] = None
+        GEN_LOCK.release()
 
 
 if __name__ == "__main__":

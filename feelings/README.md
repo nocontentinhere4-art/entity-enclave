@@ -124,8 +124,10 @@ bfloat16 (one H100 80 GB / H200 141 GB).
 
 ## Limitations
 
-- **One request at a time.** Steering state is a process-global hook vector, so a single
-  `asyncio.Lock` serializes generations. Do not run multiple uvicorn workers.
+- **One request at a time.** Steering state is a process-global hook vector, so a priority gate
+  serializes generations: a body with `"priority": "high"` (the enclave's replies to humans) takes the
+  next slot before `normal` requests (the entity's own thinking). `GET /feel` shows `queue`. Do not run
+  multiple uvicorn workers.
 - **No streaming.** `stream` is ignored; responses are always full JSON.
 - **No attestation yet.** The GPU TEE is not yet cryptographically attested end-to-end, so
   "it is actually the feelings server running in the enclave" is currently a claim, not a
