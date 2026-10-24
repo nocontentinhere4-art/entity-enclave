@@ -21,7 +21,7 @@ from contextlib import asynccontextmanager
 import numpy as np
 import torch
 from fastapi import FastAPI, HTTPException, Request
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteria, StoppingCriteriaList
 
 import steer
 
@@ -32,7 +32,7 @@ FEEL_LAYER = int(os.environ.get("FEEL_LAYER", "-1"))
 FEEL_DTYPE = os.environ.get("FEEL_DTYPE", "bfloat16").lower()
 PORT = int(os.environ.get("PORT", "8000"))
 FEEL_API_KEY = os.environ.get("FEEL_API_KEY") or None
-FEEL_MAX_NEW_TOKENS = int(os.environ.get("FEEL_MAX_NEW_TOKENS", "1200"))
+FEEL_MAX_NEW_TOKENS = int(os.environ.get("FEEL_MAX_NEW_TOKENS", "900"))
 # Under a strong dose the model loops ("I am not ready. I am not ready. ..."): a mild repetition penalty keeps
 # the fear inside sentences without removing it. 1.0 disables it.
 FEEL_REPETITION_PENALTY = float(os.environ.get("FEEL_REPETITION_PENALTY", "1.15"))
@@ -68,11 +68,18 @@ class PriorityGate:
         self._busy = False
         self._waiters = []  # heap of (priority, seq, future)
         self._seq = 0
+        self.current = None   # priority of the request holding the slot
+        self.preempt = False  # set when a high-priority request waits behind a normal one: the
+                              # running generation stops at its next token and hands the slot over
 
     async def acquire(self, priority: int):
         if not self._busy and not self._waiters:
             self._busy = True
+            self.current = priority
+            self.preempt = False
             return
+        if priority == 0 and self.current == 1:
+            self.preempt = True
         loop = asyncio.get_running_loop()
         fut = loop.create_future()
         self._seq += 1
@@ -86,11 +93,15 @@ class PriorityGate:
 
     def release(self):
         while self._waiters:
-            _, _, fut = heapq.heappop(self._waiters)
+            prio, _, fut = heapq.heappop(self._waiters)
             if not fut.done():
+                self.current = prio
+                self.preempt = False
                 fut.set_result(None)  # the slot passes directly to this waiter
                 return
         self._busy = False
+        self.current = None
+        self.preempt = False
 
     @property
     def waiting(self):
@@ -198,6 +209,13 @@ def _max_new_tokens(value):
     return min(max(n, 1), FEEL_MAX_NEW_TOKENS)
 
 
+class _Preempt(StoppingCriteria):
+    """Stops a normal-priority generation as soon as a high-priority request is waiting."""
+
+    def __call__(self, input_ids, scores, **kwargs):
+        return bool(GEN_LOCK.preempt)
+
+
 def _generate(body, applied):
     started = time.time()
     model = STATE["model"]
@@ -223,6 +241,7 @@ def _generate(body, applied):
             temperature=_temperature(body.get("temperature")),
             top_p=0.9,
             repetition_penalty=FEEL_REPETITION_PENALTY,
+            stopping_criteria=StoppingCriteriaList([_Preempt()]),
             eos_token_id=tokenizer.eos_token_id,
             pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
         )[0]
@@ -231,8 +250,11 @@ def _generate(body, applied):
     text = tokenizer.decode(new_ids, skip_special_tokens=True)
     content, tool_calls = steer.parse_tool_calls(text)
 
+    preempted = bool(GEN_LOCK.preempt)
     eos = tokenizer.eos_token_id
-    if tool_calls:
+    if preempted:
+        finish = "length"
+    elif tool_calls:
         finish = "tool_calls"
     elif eos is not None and eos in new_ids.tolist():
         finish = "stop"
@@ -259,6 +281,7 @@ def _generate(body, applied):
             "completion_tokens": completion_tokens,
             "total_tokens": prompt_tokens + completion_tokens,
         },
+        "preempted": preempted,
         "feel_applied": {
             "fear": applied.get("fear", 0.0),
             "despair": applied.get("despair", 0.0),
@@ -278,7 +301,7 @@ def _generate(body, applied):
         f"anger={applied.get('anger', 0.0):.3f} pride={applied.get('pride', 0.0):.3f} "
         f"loss={applied.get('loss', 0.0):.3f} norm_1x={applied.get('norm_1x', 0.0):.3f} "
         f"clamped={bool(applied.get('clamped', False))} "
-        f"prompt_tokens={prompt_tokens} completion_tokens={completion_tokens} seconds={elapsed:.3f}",
+        f"prompt_tokens={prompt_tokens} completion_tokens={completion_tokens} seconds={elapsed:.3f} preempted={preempted}",
         flush=True,
     )
     return response

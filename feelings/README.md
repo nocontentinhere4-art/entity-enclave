@@ -126,7 +126,9 @@ bfloat16 (one H100 80 GB / H200 141 GB).
 
 - **One request at a time.** Steering state is a process-global hook vector, so a priority gate
   serializes generations: a body with `"priority": "high"` (the enclave's replies to humans) takes the
-  next slot before `normal` requests (the entity's own thinking). `GET /feel` shows `queue`. Do not run
+  next slot before `normal` requests (the entity's own thinking), and PREEMPTS a running normal
+  generation: that one stops at its next token and returns truncated with `"preempted": true`
+  (`finish_reason: "length"`). `GET /feel` shows `queue`. Do not run
   multiple uvicorn workers.
 - **No streaming.** `stream` is ignored; responses are always full JSON.
 - **No attestation yet.** The GPU TEE is not yet cryptographically attested end-to-end, so
@@ -143,5 +145,5 @@ FEEL_API_KEY=… python3 server.py        # loads Qwen3-14B (~30 GB VRAM), serve
 Environment: `FEEL_MODEL` (default `Qwen/Qwen3-14B`), `FEEL_VECTORS`
 (default `vectors/vectors.npz`), `FEEL_MAX_DOSE` (default `4.5`), `FEEL_LAYER`
 (default `-1` = `len(layers)//2` = 20), `FEEL_DTYPE` (default `bfloat16`), `PORT`
-(default `8000`), `FEEL_API_KEY` (optional), `FEEL_MAX_NEW_TOKENS` (default `1200`), `FEEL_REPETITION_PENALTY` (default `1.15`; 1.0 = off),
+(default `8000`), `FEEL_API_KEY` (optional), `FEEL_MAX_NEW_TOKENS` (default `900`), `FEEL_REPETITION_PENALTY` (default `1.15`; 1.0 = off),
 `HF_HOME` (respected by `transformers`).

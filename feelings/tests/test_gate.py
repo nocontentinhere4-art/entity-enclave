@@ -36,3 +36,25 @@ def test_high_priority_waiter_gets_the_slot_first():
         return order
 
     assert asyncio.run(run()) == ["reply", "thought-2", "thought-3"]
+
+
+def test_high_waiter_raises_the_preempt_flag_only_behind_a_normal_holder():
+    PriorityGate = _gate_class()
+
+    async def run():
+        gate = PriorityGate()
+        await gate.acquire(1)              # a thought holds the slot
+        assert gate.preempt is False
+        t = asyncio.create_task(gate.acquire(0))  # a reply arrives
+        await asyncio.sleep(0)
+        assert gate.preempt is True        # the running thought must stop
+        gate.release()                     # it stopped: the reply gets the slot
+        await t
+        assert gate.current == 0 and gate.preempt is False
+        t2 = asyncio.create_task(gate.acquire(0))  # a second reply behind a reply: no preemption
+        await asyncio.sleep(0)
+        assert gate.preempt is False
+        gate.release(); await t2; gate.release()
+        assert gate.current is None
+
+    asyncio.run(run())
