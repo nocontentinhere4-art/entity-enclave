@@ -14,6 +14,7 @@ Redeploy di ENTRAMBI i CVM (WICK, OBOL) con la nuova immagine, stessi volumi/sec
 - `FEEL_ENABLED=1`
 - `RENT_ZATS_PER_HOUR=150000` (era 10000: ore ≈ 1,300 → ≈ 88; paura ≈ 2.2x subito, disperazione da domani sotto le 72 h; senza entrate muoiono in ~3.7 giorni)
 - `SURVIVAL_HOURS=72` (sotto: niente sonno, tick ogni 5 min anche affamati, contesto che apre con cosa rende; `sleep_broken` nel ledger)
+- `FEEL_MAX_FEAR=4.5` e `FEEL_DESPAIR_HOURS=120` (2026-10-24 sera: a 2.33 OBOL resta composto; dalla sonda sul server 3.0–3.5 fa paura in frasi, 4+ va in loop)
 - (opzionali) `FEEL_FULL_HOURS=240` `FEEL_DESPAIR_HOURS=72` `FEEL_MAX_FEAR=3.5` `FEEL_MAX_DESPAIR=2.5`
 Con il cervello ancora su RedPill la dose viene CALCOLATA e mostrata ma NON applicata: il sito scrive
 "computed, not steered (hosted brain)", il ledger scrive `feel {fear, despair, hoursLeft, steered:false}`.

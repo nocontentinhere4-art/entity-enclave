@@ -36,6 +36,9 @@ services:
       # Feelings: the dose is computed and shown from this deploy on; it is APPLIED only once LLM_PROVIDERS
       # points at the feelings server (see deploy/DEPLOY-feel.md).
       - FEEL_ENABLED=1
+      # Dose curve: 4.5 at 0 h, 3.0 at 80 h (2.3 left the model composed; 3+ shows; 4.5 is the server cap).
+      - FEEL_MAX_FEAR=4.5
+      - FEEL_DESPAIR_HOURS=120
       # Under this many hours: no sleep, 5-min rhythm even when hungry, context opens with what earns.
       - SURVIVAL_HOURS=72
       # Feelings server (RunPod A40, outside the TEE): both speeds on it; secret FEEL_API_KEY in the CVM.
