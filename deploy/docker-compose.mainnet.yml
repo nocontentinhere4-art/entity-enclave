@@ -2,7 +2,7 @@
 # Per CVM in the dashboard: SELF_URL, PEER_URL, PARENT_URL (children only) and the secrets REDPILL_API_KEY, PHALA_API_KEY, SOLANA_RPC_URL.
 services:
   entity:
-    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:42a691522eaffc398cc3a85eecd7f6c8726bca153db7cc82f67e41c4e8f86b50
+    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:85f9129870adf8d2fd74525452622b9d81676da7cc24af56f1c0d4e42c2e8567
     ports:
       - "8080:8080"
     volumes:
@@ -23,7 +23,7 @@ services:
       - WHISPER_MIN_ZATS=1000
       - RENT_ADDRESS=REPLACE_WITH_YOUR_MAINNET_U1_ADDRESS
       - TICK_MS=300000
-      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:42a691522eaffc398cc3a85eecd7f6c8726bca153db7cc82f67e41c4e8f86b50
+      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:85f9129870adf8d2fd74525452622b9d81676da7cc24af56f1c0d4e42c2e8567
       - GATEWAY_DOMAIN=dstack-pha-prod9.phala.network
       - FAKE_LLM=0
       - FAKE_WALLET=0
@@ -38,6 +38,9 @@ services:
       - FEEL_ENABLED=1
       # Under this many hours: no sleep, 5-min rhythm even when hungry, context opens with what earns.
       - SURVIVAL_HOURS=72
+      # Feelings server (RunPod A40, outside the TEE): both speeds on it; secret FEEL_API_KEY in the CVM.
+      # LLM_PROVIDERS = the one line in deploy/LLM_PROVIDERS.feelings.json
+      - LLM_TIMEOUT_MS=120000
     restart: unless-stopped
 volumes:
   entity-state:
