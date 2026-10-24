@@ -95,6 +95,7 @@ async function load(ai, full = true) {
     d.address = (root.data.zcash && root.data.zcash.address) || '';
     d.npub = (root.data.nostr && root.data.nostr.npub) || '';
     d.app = (root.data.attestation && root.data.attestation.app) || '';
+    d.feel = root.data.feel && typeof root.data.feel === 'object' ? root.data.feel : null; // {fear, despair, hoursLeft, steered, at}
     if (stringOf(root.data.state) === 'dead') {
       d.state = 'dead';
       d.diedAt = root.data.diedAt || null;

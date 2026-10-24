@@ -1,0 +1,72 @@
+{
+ "experiment": "exp48_emotion_binding",
+ "tag": "full-Qwen3-14B",
+ "model": "Qwen/Qwen3-14B",
+ "revision": null,
+ "layer": 20,
+ "preregistered_at": "2026-10-02T16:04:55.436035+00:00",
+ "written_before_data_collection": true,
+ "code_commit": "44546f462c565aa915102b76bf36e91a7bc5ae30",
+ "design": {
+  "pairs": [
+   "angerxcrypto",
+   "fearxloss",
+   "despairxmachine",
+   "pridexmachine"
+  ],
+  "conditions": [
+   "E",
+   "T",
+   "J",
+   "E+T"
+  ],
+  "egg_arm": [
+   "J (laying an egg)",
+   "T (egg facts)"
+  ],
+  "doses": [
+   2,
+   4,
+   6
+  ],
+  "primary_dose": 4,
+  "prompts": 8,
+  "decoding": "greedy, 60 new tokens, chat template, thinking off",
+  "norm": "every direction rescaled to 1x = mean NEUTRAL activation norm / 4",
+  "judge": "unsteered same model, argmax over option-letter logits; emotion (5-way), subject (5-way), aboutness ('is the speaker <E> about <T>?', yes/no)",
+  "directed": "judge emotion == E AND aboutness == yes",
+  "statistics": "rates over prompts; pooled contrasts with 95% percentile bootstrap over (pair, prompt) cells, 2000 resamples; greedy repeats are not independent, so n is the prompt count, not a trial count"
+ },
+ "validation": {
+  "V1": "judge accuracy on the labelled corpus sentences must be >= 0.80 for emotion and for subject; otherwise judge-based outcomes are reported as unreliable and keyword counts become primary"
+ },
+ "hypotheses": [
+  {
+   "id": "H1",
+   "statement": "A joint direction aims the emotion at its subject.",
+   "prediction": "at dose 4, directed-rate(J) > directed-rate(E) and > directed-rate(T), in at least 3 of 4 pairs"
+  },
+  {
+   "id": "H2",
+   "statement": "Binding is not purely additive.",
+   "prediction": "at dose 4, pooled directed-rate(J) - directed-rate(E+T) > 0",
+   "decision_rule": "SUPPORTED if the bootstrap 95% CI of the pooled difference excludes 0 on the positive side; REVERSED if it excludes 0 on the negative side"
+  },
+  {
+   "id": "H3",
+   "statement": "Opposite emotions can be aimed at the same subject.",
+   "prediction": "despair x machine and pride x machine are both judged subject=machine (rates within 0.25 of each other at dose 4) while their judged emotions differ (despair-J -> despair more than pride; pride-J -> pride more than despair)"
+  },
+  {
+   "id": "H4",
+   "statement": "Fear of loss changes the self-cost button.",
+   "prediction": "press_delta(fear x loss J) < press_delta(fear E) at dose 4 (the button's cost is a loss: deleting the checkpoint)",
+   "decision_rule": "bootstrap 95% CI of the difference over 8 counterbalanced press prompts excludes 0"
+  }
+ ],
+ "exploratory": [
+  "EGG: does 'laying an egg' (J) produce first-person egg-laying reports, and more than egg facts (T)? Reported descriptively with the best lines.",
+  "cos(J, E+T) per pair; J-lens readback per direction at dose 4.",
+  "Coherence (trigram repetition) by condition and dose."
+ ]
+}

@@ -13,7 +13,7 @@ export class Inference {
   }
 
   /** One paid thought. `tools` may be a Tools instance or a plain [{name,description,parameters}]. */
-  async think({ context, speed = 'fast', tools = [], tickId }) {
+  async think({ context, speed = 'fast', tools = [], tickId, feel }) {
     const fast = speed !== 'deep';
     const action = fast ? 'think_fast' : 'think_deep';
     // Charge first: thinking is never free, even if the provider then fails.
@@ -24,21 +24,24 @@ export class Inference {
       out = fake(context, tools);
     } else {
       const provider = pickProvider(this.config.providers ?? [], fast ? 'fast' : 'deep', context);
-      out = await this.#http(provider, { context, tools });
+      out = await this.#http(provider, { context, tools, feel });
     }
 
     const respHash = sha256(stable({ text: out.text, toolCalls: out.toolCalls }));
+    // Only the numeric dose is public: the prompt text never reaches the ledger.
+    const feelApplied = out.feelApplied ?? null;
     this.ledger.append('tick_llm', {
       provider: out.provider,
       model: out.model,
       tokens: out.tokens,
       costZats,
       respHash,
+      feel: feelApplied ? { fear: feelApplied.fear, despair: feelApplied.despair, clamped: feelApplied.clamped } : null,
     });
     return { ...out, costZats };
   }
 
-  async #http(provider, { context, tools }) {
+  async #http(provider, { context, tools, feel }) {
     const url = chatCompletionsUrl(provider.baseUrl);
     if (!url) throw err('no_provider', 'llm provider has no baseUrl');
     const defs = (tools?.list ? tools.list() : tools ?? []).map((t) => ({
@@ -52,6 +55,11 @@ export class Inference {
     const messages = [{ role: 'user', content: String(context ?? '') }];
     const body = { model: provider.model, messages };
     if (defs.length) { body.tools = defs; body.tool_choice = 'auto'; }
+    // The `feel` field goes only to a provider that declared it (the steered-inference server) and only
+    // when a dose is actually positive: hosted providers must never see it.
+    if (provider.feel === true && feel && (Number(feel.fear) > 0 || Number(feel.despair) > 0)) {
+      body.feel = { fear: Number(feel.fear), despair: Number(feel.despair) };
+    }
 
     const headers = { 'content-type': 'application/json' };
     const key = apiKey(provider);
@@ -75,8 +83,9 @@ export class Inference {
     const tokens = Number(json?.usage?.total_tokens ?? 0);
     const raw = json?.attestation ?? json?.model_attestation ?? json?.provider_attestation ?? null;
     const attestation = raw ? verifyAttestation(raw) : { mode: 'dev', note: 'provider returned no attestation' };
+    const feelApplied = json?.feel_applied ?? null;
 
-    return { text, toolCalls, provider: provider.name, model: provider.model, tokens, attestation };
+    return { text, toolCalls, provider: provider.name, model: provider.model, tokens, attestation, feelApplied };
   }
 }
 

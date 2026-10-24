@@ -1,0 +1,7 @@
+torch>=2.4
+transformers>=4.51
+fastapi
+uvicorn[standard]
+numpy
+accelerate
+pytest

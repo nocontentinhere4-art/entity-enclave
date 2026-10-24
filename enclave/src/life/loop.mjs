@@ -2,6 +2,7 @@
 // pay rent, remember. The charter at the top is immutable; only plan and personal rules may be rewritten.
 // Death is terminal: when less than one hour of rent is left the loop hands over to `die` and never returns.
 import { digestError } from '../log.mjs';
+import { feelFor, feelChanged } from './feel.mjs';
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
@@ -28,6 +29,7 @@ export class Life {
     this.lastBalance = null;
     this.lastHunger = 'ok';
     this.lastSignals = { daysLeft: null, lifeSlopePerDay: 0, incomeRhythmPerDay: 0 };
+    this.lastFeel = null; // { fear, despair, hoursLeft, steered, at } from the last cycle that ran with feelings on
     // 'unborn' until memory.bornAt exists: an entity that has never lived cannot die.
     this.state = 'unborn';
     this.running = false;
@@ -161,6 +163,12 @@ export class Life {
     }
 
     // 8. Context = charter + vital numbers + signals + memory + recent events.
+    // Feelings: the fear/despair dose for this cycle, from how many hours of rent are left. The entity is
+    // told what it is being given; only the steered server is asked for it (never the hosted providers).
+    const hoursLeft = this.rent.hoursLeft(this.lastBalance ?? 0);
+    const feel = this.config.feel?.enabled ? feelFor(hoursLeft, this.config.feel) : null;
+    this.feel = feel; // buildContext reads this for the "feeling" line
+
     const signalsFn = await loads.signals();
     this.lastSignals = signalsFn(this.history, this.config.rentZatsPerHour ?? 0);
     this.mem = mem;
@@ -170,6 +178,7 @@ export class Life {
     //    runs at the cycle's speed; follow-ups (after tool results) run fast. A round without tool calls ends the cycle.
     let executed = 0, costZats = 0, remaining = treasury;
     let results = [];
+    let steered = false;
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       const roundSpeed = round === 1 ? speed : 'fast';
       const roundContext = results.length
@@ -177,13 +186,15 @@ export class Life {
         : context;
       let thought;
       try {
-        thought = await this.inference.think({ context: roundContext, speed: roundSpeed, tools: this.tools.list(), tickId: `${tickId}:r${round}` });
+        thought = await this.inference.think({ context: roundContext, speed: roundSpeed, tools: this.tools.list(), tickId: `${tickId}:r${round}`, feel });
       } catch (e) {
         // A slow or failing deep model must not cost the whole cycle: one retry on the fast one, then give up.
         if (roundSpeed !== 'deep' || !['timeout', 'llm_http', 'TimeoutError'].includes(e?.code ?? e?.name)) throw e;
         this.ledger.append('think_retry', { from: 'deep', to: 'fast', ...digestError('think', e) });
-        thought = await this.inference.think({ context: roundContext, speed: 'fast', tools: this.tools.list(), tickId: `${tickId}:r${round}f` });
+        thought = await this.inference.think({ context: roundContext, speed: 'fast', tools: this.tools.list(), tickId: `${tickId}:r${round}f`, feel });
       }
+      // Whether the provider actually applied the dose this round: the entity is told, not quietly dosed.
+      steered = Boolean(thought.feelApplied);
       costZats += Number(thought.costZats) || 0;
       // The spoken thought is public: the text the entity writes each round goes to the ledger as its voice.
       // (Tools are separate: the diary stays private; post_public is the channel.)
@@ -219,12 +230,24 @@ export class Life {
     await this.memory.save(mem);
 
     const tickData = { trigger, zatoshis: treasury, hunger, speed, tools: executed, costZats: thought.costZats ?? 0 };
+    if (feel) {
+      // Numbers only: the dose applied this cycle, and whether the steered server actually answered with it.
+      const current = { ...feel, hoursLeft, steered, at: new Date().toISOString() };
+      if (feelChanged(this.lastFeel, current)) {
+        this.ledger.append('feel', { fear: current.fear, despair: current.despair, hoursLeft, steered });
+      }
+      this.lastFeel = current;
+      tickData.feel = { fear: feel.fear, despair: feel.despair };
+      tickData.steered = steered;
+    } else {
+      this.lastFeel = null;
+    }
     if (jobState.wake) tickData.wokenBy = jobState.wakeReason;
     else if (orderWake) tickData.wokenBy = 'order';
     this.ledger.append('tick', tickData);
 
     // 12. Nightly consolidation, at most once per UTC day.
-    await this.dailyReview(now, tickId);
+    await this.dailyReview(now, tickId, feel);
   }
 
   /** Zats the treasury must have ever reached to be born. Defaults to two hours of rent. */
@@ -259,6 +282,7 @@ export class Life {
       `tick: ${this.tickNo} (${this.lastHunger}; next in ${Math.round(this.intervalMs() / 60_000)} min)`,
       `treasury_zats: ${fmt(this.lastBalance ?? 0)}`,
       `hours_left: ${fmt(this.rent.hoursLeft(this.lastBalance ?? 0))}`,
+      ...this.#feelingLine(),
       'SIGNALS',
       `days_left: ${fmt(s.daysLeft)}`,
       `life_slope_per_day: ${fmt(s.lifeSlopePerDay)}`,
@@ -314,6 +338,15 @@ export class Life {
     return lines.join('\n');
   }
 
+  /** The one line that tells the entity what dose it is receiving now (and whether the steered server
+   *  applied the last one). Numbers only, never prompt text. */
+  #feelingLine() {
+    const feel = this.feel;
+    if (!feel) return [];
+    const steered = this.lastFeel?.steered ? 'yes' : 'no';
+    return [`feeling: fear ${feel.fear}x · despair ${feel.despair}x (steered: ${steered})`];
+  }
+
   /** Human-message seqs the instant replier already answered: durable via each reply's post_public.replyTo,
    *  plus the replier's in-RAM set so an answer is seen the instant it lands, before the ledger is re-read. */
   #answeredSeqs() {
@@ -338,7 +371,7 @@ export class Life {
   }
 
   /** Rewrite plan and personal rules from the day's events. The charter is shown, never written. */
-  async dailyReview(now, tickId) {
+  async dailyReview(now, tickId, feel) {
     const today = dayKey(now);
     if (this.lastDaily === today) return;
     this.lastDaily = today;
@@ -355,7 +388,7 @@ export class Life {
     ].join('\n\n');
 
     try {
-      const r = await this.inference.think({ context: prompt, speed: 'deep', tools: [], tickId: `${tickId}:daily` });
+      const r = await this.inference.think({ context: prompt, speed: 'deep', tools: [], tickId: `${tickId}:daily`, feel });
       const parsed = extractJson(r.text);
       const next = await this.memory.load();
       if (typeof parsed?.plan === 'string') next.plan = parsed.plan.slice(0, 4000);

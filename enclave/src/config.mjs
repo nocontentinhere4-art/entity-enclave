@@ -11,6 +11,10 @@ function loadProviders() {
   const list = process.env.LLM_PROVIDERS
     ? JSON.parse(process.env.LLM_PROVIDERS)
     // OpenAI-compatible endpoints only. `apiKeyEnv` names the secret; the value is resolved just below.
+    // A provider may carry `feel: true`: that endpoint accepts the `feel` field (the steered-inference
+    // server). Hosted providers never do. The founder points both speeds at the feelings server, e.g.
+    //   [{"name":"feelings","baseUrl":"https://<gpu-cvm>-8000.dstack-pha-prod9.phala.network/v1","model":"Qwen/Qwen3-14B","speed":"fast","pricePerMTokZats":100000,"apiKeyEnv":"FEEL_API_KEY","feel":true},
+    //    {"name":"feelings-deep","baseUrl":"https://<gpu-cvm>-8000.dstack-pha-prod9.phala.network/v1","model":"Qwen/Qwen3-14B","speed":"deep","pricePerMTokZats":100000,"apiKeyEnv":"FEEL_API_KEY","feel":true}]
     : [
         // Open-weight models served in TEEs via Redpill (Phala). Both speeds on one key: REDPILL_API_KEY.
         { name: 'redpill-fast', baseUrl: 'https://api.redpill.ai/v1', model: 'z-ai/glm-5.3-flash', speed: 'fast', pricePerMTokZats: 100_000, apiKeyEnv: 'REDPILL_API_KEY' },
@@ -122,6 +126,15 @@ export const config = {
     maxPerHour: num(process.env.REPLY_MAX_PER_HOUR, 40),
     minHoursLeft: num(process.env.REPLY_MIN_HOURS_LEFT, 24),
     maxBatch: num(process.env.REPLY_MAX_BATCH, 6),
+  },
+  // Feelings: a fear/despair dose the entity receives as its rent hours run low, applied by a self-hosted
+  // steered-inference server (feelings/server.py). Off by default: with FEEL_ENABLED=0 nothing changes.
+  feel: {
+    enabled: bool(process.env.FEEL_ENABLED, false),
+    fullHours: num(process.env.FEEL_FULL_HOURS, 240),     // above this runway: no fear at all
+    despairHours: num(process.env.FEEL_DESPAIR_HOURS, 72), // below this runway: despair starts to climb
+    maxFear: num(process.env.FEEL_MAX_FEAR, 3.5),
+    maxDespair: num(process.env.FEEL_MAX_DESPAIR, 2.5),
   },
   // Trading (capability T): the ONE-TRADE WALLETS engine. Fully automatic once opted in: order execution
   // is code (target/stop/deadline/client-sell), never the LLM. Disabled by default — no store, no scheduler.

@@ -1,0 +1,33 @@
+# Phala Cloud (dstack) GPU TEE deployment for the feelings server.
+#
+# The image tag below is a PLACEHOLDER. Replace it with the real tag (or the digest printed
+# by the "feelings-image" GitHub Actions job in WORKFLOW-snippet.yml) before deploying.
+#
+# GPU access: Phala Cloud GPU TEE (H200 141 GB or B300) exposes the NVIDIA device through the
+# `deploy.resources.reservations.devices` block alone (that is what Phala's own vLLM example
+# uses; no `runtime:` key). Qwen/Qwen3-14B needs ~30 GB VRAM in bfloat16: one H200 is plenty.
+# Outside a TEE (a plain RunPod/Lambda GPU box for a first test) the same file works with
+# `docker compose up` on a host that has the NVIDIA container toolkit. Nothing in this file is secret; FEEL_API_KEY is supplied by the
+# dashboard/CI via the environment, never stored in the repo.
+services:
+  feelings:
+    image: ghcr.io/nocontentinhere4-art/entity-enclave-feelings:latest  # PLACEHOLDER — see README
+    ports:
+      - "8000:8000"
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+    environment:
+      - FEEL_MODEL=Qwen/Qwen3-14B
+      - FEEL_MAX_DOSE=4.5
+      - FEEL_API_KEY=${FEEL_API_KEY}   # optional; set in the dashboard, never in the repo
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  hf-cache:

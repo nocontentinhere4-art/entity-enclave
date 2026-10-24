@@ -340,6 +340,7 @@ http.createServer(async (req, res) => {
         zcash: { chain: config.zcashChain, address, balance: life.lastBalance, error: walletError },
         nostr: { npub: nostr.npub, pubkey: nostr.pubkey },
         reply: replier.status(),
+        feel: loop.lastFeel ?? null,
         peer: config.peerUrl,
         lineage: { parent: config.parentUrl, children: ledger.recent(['birth_of'], 1000).map((e) => ({ url: e.data?.url, address: e.data?.address, ts: e.ts })) },
         ledger: { entries: ledger.seq, head: ledger.head },
@@ -387,7 +388,7 @@ http.createServer(async (req, res) => {
       // Both directions, in ledger order: the entity's posts and the humans' messages.
       return json(200, readLedger().filter((e) => e.type === 'post_public' || e.type === 'human_message').slice(-200).map((e) => (
         e.type === 'post_public'
-          ? { seq: e.seq, ts: e.ts, from: 'entity', text: e.data?.text }
+          ? { seq: e.seq, ts: e.ts, from: 'entity', text: e.data?.text, ...(e.data?.replyTo ? { replyTo: e.data.replyTo, kind: e.data.kind ?? 'reply' } : {}) }
           : { seq: e.seq, ts: e.ts, from: 'human', author: e.data?.author, text: e.data?.text }
       )));
     }

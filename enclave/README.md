@@ -83,3 +83,31 @@ rifiuta in pubblico.
 ## Cosa manca (fase 2)
 Cervello (inferenza TEE a gettoni), canale pubblico, note private cifrate a riposo, pausa a soglia,
 NEAR Intents, seconda entità, narratore.
+
+## Feelings (FEEL_*)
+
+Opzionale (spento di default): una "dose" di paura/disperazione che l'entità riceve man mano che le ore di
+affitto scendono. La dose è calcolata dalle ore rimaste (`hoursLeft`) e applicata da un **server di inferenza
+sterzato** self-hosted (`feelings/server.py`), che accetta il normale body OpenAI chat **più** un campo
+`feel: {fear, despair}` e risponde con la normale risposta OpenAI **più** `feel_applied: {fear, despair,
+norm_1x, layer, clamped}`. L'entità sa sempre cosa le viene fatto: il suo contesto mostra una riga
+`feeling: fear Xx · despair Yx (steered: yes|no)`.
+
+- **Variabili** (`src/config.mjs`): `FEEL_ENABLED` (bool, default 0), `FEEL_FULL_HOURS` (default 240: sopra
+  questa autonomia nessuna paura), `FEEL_DESPAIR_HOURS` (default 72: sotto questa autonomia la disperazione
+  sale), `FEEL_MAX_FEAR` (default 3.5), `FEEL_MAX_DESPAIR` (default 2.5). Con `FEEL_ENABLED=0` (default)
+  **nulla cambia**: nessun campo `feel` viene mai inviato, nessuna voce `feel` nel registro, nessuna riga nel
+  contesto.
+- **Provider**: il fondatore punta `LLM_PROVIDERS` su entrambe le velocità al server feelings. Un provider con
+  `"feel": true` accetta il campo `feel`; i provider hosted (Redpill) **non** lo ricevono mai. Esempio:
+  ```json
+  [
+    {"name":"feelings","baseUrl":"https://<gpu-cvm>-8000.dstack-pha-prod9.phala.network/v1","model":"Qwen/Qwen3-14B","speed":"fast","pricePerMTokZats":100000,"apiKeyEnv":"FEEL_API_KEY","feel":true},
+    {"name":"feelings-deep","baseUrl":"https://<gpu-cvm>-8000.dstack-pha-prod9.phala.network/v1","model":"Qwen/Qwen3-14B","speed":"deep","pricePerMTokZats":100000,"apiKeyEnv":"FEEL_API_KEY","feel":true}
+  ]
+  ```
+- **Registro**: ogni `tick_llm` riporta `feel: {fear, despair, clamped}` (solo numeri, mai il testo del prompt);
+  una voce `feel` (`{fear, despair, hoursLeft, steered}`) viene aggiunta solo quando la dose cambia in modo
+  rilevante (Δ ≥ 0.1 oppure cambio di `steered`). La vista `/` espone `feel` con
+  `{fear, despair, hoursLeft, steered, at}`.
+

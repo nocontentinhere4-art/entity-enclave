@@ -10,13 +10,13 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=30';
+} from './term.js?v=31';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
 } from './data.js?v=30';
 import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=30';
-import { initHero, setMouth, triggerTalk } from './hero.js?v=30';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=31';
 import { mountAscii, RAMP } from './ascii.js?v=30';
 
 /* ------------------------------------------------------------------ */
@@ -76,6 +76,29 @@ function renderPills() {
     }
     pill.querySelector('.p-hours').textContent = hours;
     pill.querySelector('.p-state').textContent = stateLabel;
+    const feelEl = pill.querySelector('.p-feel');
+    if (feelEl) {
+      // only a steered brain gets the word: a dose the model never received is not a feeling
+      const f = d && d.ok && d.state !== 'dead' ? d.feel : null;
+      feelEl.textContent = f && f.steered ? ` · fear ${Number(f.fear).toFixed(1)}×` : '';
+    }
+  }
+}
+
+/* 'fear 2.1× · despair 0.3× · steered' from the enclave's feel field; honest fallbacks when absent */
+function feelLine(d) {
+  if (!d || !d.ok) return '—';
+  if (d.state === 'dead') return 'nothing. dead.';
+  const f = d.feel;
+  if (!f) return 'none · this build has no feelings yet';
+  const dose = `fear ${Number(f.fear).toFixed(2)}× · despair ${Number(f.despair).toFixed(2)}×`;
+  return f.steered ? `${dose} · steered` : `${dose} · computed, not steered (hosted brain)`;
+}
+function syncFeel() {
+  for (const id of ['e1', 'e2']) {
+    const d = ent(id);
+    const f = d && d.ok && d.state !== 'dead' && d.feel && d.feel.steered ? d.feel : null;
+    setFeel(id, f ? { fear: Number(f.fear) || 0, despair: Number(f.despair) || 0 } : { fear: 0, despair: 0 });
   }
 }
 
@@ -116,6 +139,7 @@ function panelShell(id) {
         <dl class="kvs">
           <div><dt>treasury</dt><dd data-k="treasury">—</dd></div>
           <div><dt>hours left</dt><dd data-k="hours">—</dd></div>
+          <div><dt>feeling</dt><dd data-k="feel">—</dd></div>
           <div><dt>last rent</dt><dd data-k="lastRent">—</dd></div>
           <div><dt>dies at</dt><dd data-k="dies">—</dd></div>
           <div><dt>last letter</dt><dd data-k="lastLetter">—</dd></div>
@@ -162,7 +186,7 @@ function updatePanel(id) {
   }
   if (!d.ok) {
     const off = offlineLabel(d);
-    for (const k of ['treasury', 'hours', 'lastRent', 'dies', 'lastLetter', 'earned', 'channel']) get(k).textContent = off;
+    for (const k of ['treasury', 'hours', 'feel', 'lastRent', 'dies', 'lastLetter', 'earned', 'channel']) get(k).textContent = off;
     get('shop').replaceChildren(el('p', { class: 'empty' }, off));
     get('words').replaceChildren(el('p', { class: 'empty' }, off));
     return;
@@ -170,6 +194,7 @@ function updatePanel(id) {
 
   get('treasury').textContent = `${formatInt(d.zats)} zats · ${formatZats(d.zats)} ZEC`;
   get('hours').textContent = `${formatInt(d.hoursLeft)} · about ${formatInt(Math.floor((d.hoursLeft || 0) / 24))} days`;
+  get('feel').textContent = feelLine(d);
   get('lastRent').textContent = d.lastRent ? fmtStamp(d.lastRent.ts) : '—';
   get('dies').textContent = d.state === 'dead'
     ? (d.diedAt ? fmtStamp(d.diedAt) : 'dead')
@@ -1623,6 +1648,7 @@ async function refreshLight() {
   await Promise.allSettled([loadTrades(), loadForecasts()]);
   renderAll();
   syncMouths();
+  syncFeel();
 }
 async function refreshFull() {
   if (document.hidden || state.busy) return;
@@ -1631,6 +1657,7 @@ async function refreshFull() {
   checkNewPosts();
   renderAll();
   syncMouths();
+  syncFeel();
 }
 
 function renderAll() {
@@ -1928,6 +1955,7 @@ async function init() {
   await Promise.allSettled([loadTrades(), loadForecasts()]);
   renderAll();
   syncMouths();
+  syncFeel();
   startChatPoll();
 
   setInterval(refreshLight, REFRESH_MS);

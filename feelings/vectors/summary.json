@@ -1,0 +1,64 @@
+{
+ "tag": "full-Qwen3-14B",
+ "scale_1x": 36.2356071472168,
+ "cosines": {
+  "angerxcrypto": {
+   "J_vs_EplusT": 0.7458406686782837,
+   "J_vs_E": 0.7091332674026489,
+   "J_vs_T": 0.4978960156440735,
+   "E_vs_T": 0.30952367186546326
+  },
+  "fearxloss": {
+   "J_vs_EplusT": 0.7972792983055115,
+   "J_vs_E": 0.804539144039154,
+   "J_vs_T": 0.5641412138938904,
+   "E_vs_T": 0.4735102951526642
+  },
+  "despairxmachine": {
+   "J_vs_EplusT": 0.8036790490150452,
+   "J_vs_E": 0.6824318170547485,
+   "J_vs_T": 0.6858333349227905,
+   "E_vs_T": 0.4492567181587219
+  },
+  "pridexmachine": {
+   "J_vs_EplusT": 0.8216601610183716,
+   "J_vs_E": 0.6499535441398621,
+   "J_vs_T": 0.7616491317749023,
+   "E_vs_T": 0.4757421612739563
+  },
+  "egg": {
+   "J_vs_T": 0.4040127694606781
+  }
+ },
+ "lens": {
+  "egg:J": null,
+  "egg:T": null,
+  "angerxcrypto:E": null,
+  "angerxcrypto:T": null,
+  "angerxcrypto:J": null,
+  "angerxcrypto:E+T": null,
+  "fearxloss:E": null,
+  "fearxloss:T": null,
+  "fearxloss:J": null,
+  "fearxloss:E+T": null,
+  "despairxmachine:E": null,
+  "despairxmachine:T": null,
+  "despairxmachine:J": null,
+  "despairxmachine:E+T": null,
+  "pridexmachine:E": null,
+  "pridexmachine:T": null,
+  "pridexmachine:J": null,
+  "pridexmachine:E+T": null
+ },
+ "judge_validation": {
+  "n": 49,
+  "emotion_acc": 0.9387755102040817,
+  "subject_acc": 0.8775510204081632,
+  "about_yes_on_joint": 0.95,
+  "about_no_on_controls": 1.0,
+  "passed": true
+ },
+ "seconds": 1367,
+ "torch": "2.8.0+cu128",
+ "transformers": "5.17.0"
+}

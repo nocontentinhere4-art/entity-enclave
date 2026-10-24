@@ -56,6 +56,7 @@ let timer = 0;
 let running = false;
 
 const idxOf = (id) => (id === 'e1' ? 0 : 1);
+const feels = [{ fear: 0, despair: 0 }, { fear: 0, despair: 0 }]; // live steering doses, drive the tremor
 
 function loadImages() {
   imgOpen.src = './vendor/skulls-b.jpg';
@@ -199,6 +200,10 @@ function render(kL, kR, bL, bR, shL, shR, now) {
   ctx.font = `${CELL * 1.25}px ${MONO}`;
   ctx.textBaseline = 'top';
   const n = RAMP.length - 1;
+  // fear = tremor: cells shake up to ~1.4px at dose 4 and the yellow spreads lower; despair dims the bone
+  const trL = Math.min(4, feels[0].fear) * 0.35, trR = Math.min(4, feels[1].fear) * 0.35;
+  const yL = LIME_AT - Math.min(4, feels[0].fear) * 0.04, yR = LIME_AT - Math.min(4, feels[1].fear) * 0.04;
+  const dL = 1 - Math.min(4, feels[0].despair) * 0.08, dR = 1 - Math.min(4, feels[1].despair) * 0.08;
   for (let i = 0; i < total; i++) {
     const x = i % cols;
     const y = (i / cols) | 0;
@@ -209,11 +214,14 @@ function render(kL, kR, bL, bR, shL, shR, now) {
     const v = Math.min(1, Math.max(0, l));
     const ch = RAMP[Math.round(v * n)];
     if (ch === ' ') continue;
-    const b = h ? bR : bL;                 // state brightness dims the ink, never the glyph density
-    const isLime = (h ? shR : shL) && v > LIME_AT;   // yellow stays while the entity lives (alive or asleep)
+    const b = (h ? bR : bL) * (h ? dR : dL); // state brightness dims the ink, never the glyph density
+    const isLime = (h ? shR : shL) && v > (h ? yR : yL);   // yellow stays while the entity lives (alive or asleep)
+    const tr = h ? trR : trL;
+    const jx = tr ? tr * Math.sin(now * 23 + x * 1.7 + y * 0.9) : 0;
+    const jy = tr ? tr * Math.cos(now * 29 + x * 0.6 + y * 2.1) : 0;
     ctx.globalAlpha = b;
     ctx.fillStyle = isLime ? LIME : (v > 0.55 ? BRIGHT : DIM);
-    ctx.fillText(ch, x * CELL, y * CELL * 1.15);
+    ctx.fillText(ch, x * CELL + jx, y * CELL * 1.15 + jy);
     ctx.globalAlpha = 1;
   }
 }
@@ -328,6 +336,13 @@ export function setMouth(id, mode) {
     s.nextYawn = -1;
     s.yawnEnd = -1;
   }
+}
+
+/** Live steering doses for an entity ({fear, despair} in 1x units); zero = still bone. */
+export function setFeel(id, feel) {
+  const f = feels[idxOf(id)];
+  f.fear = Math.max(0, Number(feel && feel.fear) || 0);
+  f.despair = Math.max(0, Number(feel && feel.despair) || 0);
 }
 
 /** A new public post: make that skull talk for 3 s. */
