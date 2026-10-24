@@ -340,7 +340,7 @@ http.createServer(async (req, res) => {
         zcash: { chain: config.zcashChain, address, balance: life.lastBalance, error: walletError },
         nostr: { npub: nostr.npub, pubkey: nostr.pubkey },
         reply: replier.status(),
-        feel: loop.lastFeel ?? null,
+        feel: life.lastFeel ?? null,
         peer: config.peerUrl,
         lineage: { parent: config.parentUrl, children: ledger.recent(['birth_of'], 1000).map((e) => ({ url: e.data?.url, address: e.data?.address, ts: e.ts })) },
         ledger: { entries: ledger.seq, head: ledger.head },
