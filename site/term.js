@@ -12,8 +12,8 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=44';
-import { zip321Uri, qrSvg } from './qr.js?v=44';
+} from './data.js?v=45';
+import { zip321Uri, qrSvg } from './qr.js?v=45';
 
 const ANY_MIN_ZEC = 0.006;          // any-coin route (Trocador) minimum, with margin over their ~0.0045
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
@@ -665,13 +665,18 @@ function wireTerm() {
   const fold = $('.term-fold');
   if (fold) fold.addEventListener('click', () => term.classList.toggle('collapsed'));
 
+  wirePay();
+}
+
+/** The pay dialog's own listeners: pages without the terminal (the skulls home) call this directly. */
+function wirePay() {
   const payAmt = $('#pay-amt');
   const payMemo = $('#pay-memo');
-  if (payAmt) payAmt.addEventListener('change', renderPay);
-  if (payMemo) payMemo.addEventListener('input', renderPay);
+  if (payAmt && !payAmt.dataset.wired) { payAmt.dataset.wired = '1'; payAmt.addEventListener('change', renderPay); }
+  if (payMemo && !payMemo.dataset.wired) { payMemo.dataset.wired = '1'; payMemo.addEventListener('input', renderPay); }
 }
 
 export {
   state, list, nameOf, stateWord, deadline, rentZats,
-  loadAll, boot, wireTerm, openPay, diffLog,
+  loadAll, boot, wireTerm, wirePay, openPay, diffLog,
 };

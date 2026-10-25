@@ -1,67 +1,63 @@
-/*
- * hero.js — ZEALOT v17, the hero. Two skulls, one signal.
- *
- * The founder-approved ASCII skulls, moved out of ascii-demo.html and extended with mouths.
- * Two luminance grids are sampled from the open and shut frames (vendor/skulls-b.jpg and
- * vendor/skulls-closed.jpg — the same skulls, the same framing) and every cell is drawn as
- *   lum = mix(open, closed, k)
- * where k(t) eases 0→1→0 per skull. The left skull is WICK (e1), the right is OBOL (e2), and
- * each takes its own k from its live state: alive = talk cycles, asleep = one slow yawn every
- * ~12 s at 70% brightness, dead = jaw shut at 40% with the lime gone. A new public post makes
- * that skull talk for 3 s. 30 fps via setTimeout, no per-frame allocations beyond the glyph
- * loop, paused when hidden, prefers-reduced-motion = a static open frame.
- */
+/* hero.js — ZEALOT v18, patched with interaction hooks */
 
 const RAMP = ' .-~:;=!*+^%$#&@';
-const CELL = 7;               // px per glyph cell
+const CELL_MIN_W = 6, CELL_MAX_W = 8;
+const CELL_MIN_H = 8, CELL_MAX_H = 10;
 const GAMMA = 1.0;
-const THRESH = 0.09;          // below this luminance: empty cell
-const LIME_AT = 0.80;         // the brighter cells go Zcash yellow (founder likes the yellow on the bone)
-const GAP_FRAC = 0.17;        // push the two halves outwards, clear of the copy column
+const THRESH = 0.09;
+const LIME_AT = 0.80;
+const GAP_PHONE = 28;
+const GAP_DESK = 80;
 const LIME = '#f4b728';
-const BRIGHT = 'rgba(242,242,238,.92)';
-const DIM = 'rgba(242,242,238,.5)';
+const DIM = 'rgba(244,183,40,.28)';
+const BRIGHT = '#f4b728';
 const MONO = '"JetBrains Mono", "SF Mono", Menlo, monospace';
-const CHEW = 1.4;             // one open-close, seconds (soft)
-const YAWN_PERIOD = 2.2;      // one yawn, seconds
-const YAWN_EVERY = 4;         // yawn interval, seconds (asleep still moves the jaw often)
-const TALK_SECS = 3;          // forced talk after a new public post
-const STACK_AT = 720;         // below this width the skulls stack (phone)
-
+const CHEW = 1.4;
+const YAWN_PERIOD = 2.2;
+const YAWN_EVERY = 4;
+const TALK_SECS = 3;
+const STACK_AT = 720;
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-let canvas = null;
-let ctx = null;
+let canvas = null, ctx = null;
 let W = 0, H = 0, dpr = 1;
 let cols = 0, rows = 0, total = 0;
+let cellW = 8, cellH = 10;
 let lumOpen = null, lumClosed = null, half = null;
 let stacked = false;
+let baseBoxes = [null, null];
+let layout = null;
+let active = true;
 
 const off = document.createElement('canvas');
 const octx = off.getContext('2d', { willReadFrequently: true });
-
 const imgOpen = new Image();
 const imgClosed = new Image();
 let ready = false;
 
-// 0 = left = WICK (e1), 1 = right = OBOL (e2)
 const skulls = [
   { mode: 'none', k: 0, talkUntil: -1, burstEnd: -1, nextBurst: -1, chewStart: 0, yawnStart: -1, yawnEnd: -1, nextYawn: -1, yawnPeriod: YAWN_PERIOD, chatter: false },
   { mode: 'none', k: 0, talkUntil: -1, burstEnd: -1, nextBurst: -1, chewStart: 0, yawnStart: -1, yawnEnd: -1, nextYawn: -1, yawnPeriod: YAWN_PERIOD, chatter: false },
 ];
 
-let clock = 0;
-let lastT = 0;
-let timer = 0;
-let running = false;
-
+let clock = 0, lastT = 0, timer = 0, running = false;
 const idxOf = (id) => (id === 'e1' ? 0 : 1);
-const feels = [{ fear: 0, despair: 0 }, { fear: 0, despair: 0 }]; // live steering doses, drive the tremor
-const nonce = ['', '']; // PROVE LIVE nonce drawn between each skull's jaws (32px mono)
+const feels = [{ fear: 0, despair: 0 }, { fear: 0, despair: 0 }];
+const nonce = ['', ''];
+const clockText = ['', ''];
+const clockFill = ['#', '#'];
+const hours = [null, null];
 
-/* ------------------------------------------------------------------ */
-/* 5×7 glyph digits — the one shared number alphabet, drawn on-canvas  */
-/* ------------------------------------------------------------------ */
+const manualJaw = [null, null];
+const lean = [{ x: 0, y: 0, vx: 0, vy: 0 }, { x: 0, y: 0, vx: 0, vy: 0 }];
+const breath = [null, null];
+const lantern = { x: -999, y: -999, r: 0, active: false };
+const deathStart = [-1, -1];
+let bothDeadTime = -1, extinguishStart = -1, extinguishFade = 1;
+
+let dispX = null, dispY = null, dispVX = null, dispVY = null;
+let dispAcc = 0;
+
 const GLYPHS = {
   '0': ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
   '1': ['..#..', '.##..', '..#..', '..#..', '..#..', '..#..', '.###.'],
@@ -78,7 +74,6 @@ const GLYPHS = {
   ' ': ['.....', '.....', '.....', '.....', '.....', '.....', '.....'],
 };
 
-/** Render a string as 7 rows of 5-wide glyph cells (lit cells carry `fill`, empties stay '.'). */
 export function glyphRows(str, fill) {
   const lines = ['', '', '', '', '', '', ''];
   for (const ch of String(str == null ? '' : str)) {
@@ -88,7 +83,6 @@ export function glyphRows(str, fill) {
   return lines;
 }
 
-/* deterministic hash → [0,1); no Math.random per frame */
 function hash1(n) {
   let h = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b);
   h ^= h >>> 13;
@@ -97,15 +91,9 @@ function hash1(n) {
   return (h >>> 0) / 4294967296;
 }
 
-/* live clock text under each jaw + hours (for the below-24 h "holes") */
-const clockText = ['', ''];
-const clockFill = ['#', '#'];
-const hours = [null, null];
-
 function loadImages() {
   imgOpen.src = './vendor/skulls-b.jpg';
   imgClosed.src = './vendor/skulls-closed.jpg';
-  // decode() can stall in background tabs: wait for load instead, with decode as a bonus
   const loaded = (img) => new Promise((res) => {
     if (img.complete && img.naturalWidth > 0) return res();
     img.addEventListener('load', res, { once: true });
@@ -114,29 +102,41 @@ function loadImages() {
   return Promise.all([loaded(imgOpen), loaded(imgClosed)]);
 }
 
+function lerpColor(a, b, t) {
+  const ah = parseInt(a.slice(1), 16), bh = parseInt(b.slice(1), 16);
+  const ar = ah >> 16, ag = (ah >> 8) & 255, ab = ah & 255;
+  const br = bh >> 16, bg = (bh >> 8) & 255, bb = bh & 255;
+  const rr = Math.round(ar + (br - ar) * t);
+  const rg = Math.round(ag + (bg - ag) * t);
+  const rb = Math.round(ab + (bb - ab) * t);
+  return `#${((rr << 16) | (rg << 8) | rb).toString(16).padStart(6, '0')}`;
+}
+
 function sampleFrame(img, out) {
-  const iw = img.width, ih = img.height;
-  const hw = iw / 2;
+  const iw = img.width, ih = img.height, hw = iw / 2;
   octx.clearRect(0, 0, cols, rows);
   octx.fillStyle = '#000';
   octx.fillRect(0, 0, cols, rows);
   if (stacked) {
-    // phone: WICK above the headline, OBOL below it
-    const rw = cols * 0.84;
-    const rh = rows * 0.30;
-    const s = Math.min(rw / hw, rh / ih);
+    const gapCells = Math.round(GAP_PHONE / cellH);
+    const availRows = rows - gapCells;
+    const shRows = Math.floor(availRows / 2);
+    const s = Math.min((cols * 0.84) / hw, shRows / ih);
     const sw = hw * s, sh = ih * s;
     const x0 = (cols - sw) / 2;
-    octx.drawImage(img, 0, 0, hw, ih, x0, rows * 0.02, sw, sh);
-    octx.drawImage(img, hw, 0, hw, ih, x0, rows * 0.68, sw, sh);
+    const top = Math.floor((rows - 2 * shRows - gapCells) / 2);
+    octx.drawImage(img, 0, 0, hw, ih, x0, top, sw, sh);
+    octx.drawImage(img, hw, 0, hw, ih, x0, top + shRows + gapCells, sw, sh);
   } else {
-    // founder-approved look: contain-fit the pair, push the halves outwards
-    const s = Math.min(cols / iw, (rows * 0.90) / ih);
-    const dw = iw * s, dh = ih * s;
-    const GAP = GAP_FRAC * cols;
-    const y0 = (rows - dh) / 2;
-    octx.drawImage(img, 0, 0, hw, ih, (cols - dw) / 2 - GAP, y0, dw / 2, dh);
-    octx.drawImage(img, hw, 0, hw, ih, cols / 2 + GAP, y0, dw / 2, dh);
+    const gapCells = Math.round(GAP_DESK / cellW);
+    const availCols = cols - gapCells;
+    const swCols = Math.floor(availCols / 2);
+    const s = Math.min(swCols / hw, (rows * 0.90) / ih);
+    const sw = hw * s, sh = ih * s;
+    const y0 = (rows - sh) / 2;
+    const x0 = (cols - 2 * sw - gapCells) / 2;
+    octx.drawImage(img, 0, 0, hw, ih, x0, y0, sw, sh);
+    octx.drawImage(img, hw, 0, hw, ih, x0 + sw + gapCells, y0, sw, sh);
   }
   const d = octx.getImageData(0, 0, cols, rows).data;
   for (let i = 0; i < total; i++) {
@@ -145,14 +145,33 @@ function sampleFrame(img, out) {
   }
 }
 
+function computeLayout() {
+  if (!baseBoxes[0] || !baseBoxes[1]) return;
+  const toPix = (b, h) => {
+    const lx = lean[h].x * cellW, ly = lean[h].y * cellH;
+    return {
+      x0: b.x0 * cellW + lx, y0: b.y0 * cellH + ly,
+      x1: b.x1 * cellW + lx, y1: b.y1 * cellH + ly,
+      w: (b.x1 - b.x0) * cellW, h: (b.y1 - b.y0) * cellH,
+    };
+  };
+  layout = {
+    cols, rows, cell: { w: cellW, h: cellH }, dpr,
+    halves: { e1: toPix(baseBoxes[0], 0), e2: toPix(baseBoxes[1], 1) }
+  };
+}
+
 function sample() {
   W = canvas.clientWidth;
   H = canvas.clientHeight;
   dpr = Math.min(2, window.devicePixelRatio || 1);
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
-  cols = Math.floor(W / CELL);
-  rows = Math.floor(H / (CELL * 1.15));
+  stacked = W < STACK_AT;
+  cellW = stacked ? CELL_MIN_W : CELL_MAX_W;
+  cellH = stacked ? CELL_MIN_H : CELL_MAX_H;
+  cols = Math.floor(W / cellW);
+  rows = Math.floor(H / cellH);
   total = cols * rows;
   if (cols <= 0 || rows <= 0) return;
   off.width = cols;
@@ -160,20 +179,27 @@ function sample() {
   lumOpen = new Float32Array(total);
   lumClosed = new Float32Array(total);
   half = new Uint8Array(total);
-  stacked = W < STACK_AT;
-  gridChars = null;
+  dispX = new Float32Array(total); dispY = new Float32Array(total);
+  dispVX = new Float32Array(total); dispVY = new Float32Array(total);
 
   sampleFrame(imgOpen, lumOpen);
   sampleFrame(imgClosed, lumClosed);
 
-  // each cell belongs to a half: left half (WICK) or right half (OBOL)
+  baseBoxes = [{ x0: cols, y0: rows, x1: 0, y1: 0 }, { x0: cols, y0: rows, x1: 0, y1: 0 }];
   const boundary = stacked ? rows * 0.5 : cols * 0.5;
   for (let i = 0; i < total; i++) {
-    half[i] = (stacked ? (i / cols) | 0 : i % cols) < boundary ? 0 : 1;
+    const x = i % cols, y = (i / cols) | 0;
+    const h = (stacked ? y : x) < boundary ? 0 : 1;
+    half[i] = h;
+    const v = Math.max(lumOpen[i], lumClosed[i]);
+    if (v < THRESH) continue;
+    const b = baseBoxes[h];
+    b.x0 = Math.min(b.x0, x); b.x1 = Math.max(b.x1, x + 1);
+    b.y0 = Math.min(b.y0, y); b.y1 = Math.max(b.y1, y + 1);
   }
+  computeLayout();
 }
 
-// soft jaw: cosine ease in and out, never fully shut while talking, never beyond [0,1]
 function chewK(s, now) {
   const t = ((now - s.chewStart) % CHEW) / CHEW;
   return 0.72 * (0.5 - 0.5 * Math.cos(2 * Math.PI * t));
@@ -184,30 +210,30 @@ function yawnK(s, now) {
   return 1 - 0.85 * o * o;
 }
 
-function computeK(s, now) {
+function computeK(s, now, i) {
   if (s.mode === 'dead') return 1;
-  if (s.chatter) return (Math.floor(now * 6) % 2 === 0) ? 0.2 : 0.5; // 3 Hz waiting chatter: two glyph rows
+  if (manualJaw[i] != null) return manualJaw[i];
+  if (s.chatter) return (Math.floor(now * 6) % 2 === 0) ? 0.2 : 0.5;
   if (now < s.talkUntil) return chewK(s, now);
   if (s.mode === 'none' || s.mode === 'unknown') return 0;
   if (s.mode === 'asleep') {
     if (s.nextYawn <= 0) s.nextYawn = now + YAWN_EVERY * (0.3 + Math.random());
     if (now >= s.nextYawn && now >= s.yawnEnd) {
-      s.yawnStart = now;
-      s.yawnPeriod = YAWN_PERIOD;
-      s.yawnEnd = now + s.yawnPeriod;
+      s.yawnStart = now; s.yawnPeriod = YAWN_PERIOD; s.yawnEnd = now + s.yawnPeriod;
       s.nextYawn = s.yawnEnd + YAWN_EVERY;
     }
     if (now < s.yawnEnd) return yawnK(s, now);
     return 1;
   }
-  // alive: talk bursts of two or three chews, then a 2–4 s pause
+  const d = Math.min(1, feels[i].fear || 0);
+  const gain = 0.7 + 0.7 * d;
   if (s.nextBurst <= 0) s.nextBurst = now + 0.8 + Math.random() * 1.2;
-  if (now < s.burstEnd) return chewK(s, now);
+  if (now < s.burstEnd) return Math.min(1, gain * chewK(s, now));
   if (now >= s.nextBurst) {
     s.chewStart = now;
     s.burstEnd = now + (2 + (Math.random() < 0.5 ? 0 : 1)) * CHEW;
     s.nextBurst = s.burstEnd + 0.8 + Math.random() * 1.2;
-    return chewK(s, now);
+    return Math.min(1, gain * chewK(s, now));
   }
   return 0;
 }
@@ -218,7 +244,6 @@ function brightnessOf(s) {
   return 1;
 }
 
-/* the dotted grid behind the skulls, in glyphs: one dim character every 48px, one swapped per frame */
 const GRID_SET = '!@%^&*()$#';
 const GRID = 48;
 let gridChars = null, gridCols = 0, gridRows = 0;
@@ -231,49 +256,105 @@ function drawGrid() {
   if (!gridChars) buildGrid();
   gridChars[(Math.random() * gridChars.length) | 0] = (Math.random() * GRID_SET.length) | 0;
   ctx.font = `11px ${MONO}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-  ctx.fillStyle = W < STACK_AT ? 'rgba(244,183,40,0.08)' : 'rgba(244,183,40,0.28)'; // quieter on phones, where the skulls stack over it
+  ctx.fillStyle = W < STACK_AT ? 'rgba(244,183,40,0.08)' : 'rgba(244,183,40,0.28)';
   for (let r = 0; r < gridRows; r++) for (let c = 0; c < gridCols; c++) {
     ctx.fillText(GRID_SET[gridChars[r * gridCols + c]], c * GRID + 24, r * GRID + 24);
   }
   ctx.textAlign = 'left';
 }
 
-function render(kL, kR, bL, bR, shL, shR, now) {
+function updatePhysics(dt) {
+  if (reduced.matches) return;
+  const dead0 = skulls[0].mode === 'dead', dead1 = skulls[1].mode === 'dead';
+  if (dead0 && dead1 && bothDeadTime < 0) bothDeadTime = clock;
+  if (bothDeadTime >= 0 && extinguishStart < 0 && clock - bothDeadTime > 1.0) extinguishStart = clock;
+  if (extinguishStart >= 0) {
+    extinguishFade = 1 - (clock - extinguishStart) / 1.8;
+    if (extinguishFade <= 0) { extinguishFade = 0; active = false; }
+  }
+  const d0 = Math.min(1, feels[0].fear || 0);
+  const d1 = Math.min(1, feels[1].fear || 0);
+  dispAcc += dt;
+  let impulse = false;
+  if (dispAcc >= 0.1) { dispAcc -= 0.1; impulse = true; }
+  for (let i = 0; i < total; i++) {
+    const h = half[i];
+    const dead = h ? dead1 : dead0;
+    const d = h ? d1 : d0;
+    if (dead || d <= 0.001) { dispVX[i] = dispVY[i] = 0; dispX[i] = dispY[i] = 0; continue; }
+    const k = 120, c = 22;
+    dispVX[i] += (-k * dispX[i] - c * dispVX[i]) * dt;
+    dispVY[i] += (-k * dispY[i] - c * dispVY[i]) * dt;
+    dispX[i] += dispVX[i] * dt;
+    dispY[i] += dispVY[i] * dt;
+    if (impulse) {
+      const v = Math.max(lumOpen[i], lumClosed[i]);
+      if (v > THRESH && Math.random() < 0.22 * d * d) {
+        const amp = 2.5 * d;
+        dispVX[i] += (Math.random() * 2 - 1) * amp * 60;
+        dispVY[i] += (Math.random() * 2 - 1) * amp * 60;
+      }
+    }
+  }
+}
+
+function render(kL, kR, bL, bR, shL, shR, now, fade) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
   drawGrid();
-  ctx.font = `${CELL * 1.25}px ${MONO}`;
+  ctx.font = `${cellW * 1.2}px ${MONO}`;
   ctx.textBaseline = 'top';
   const n = RAMP.length - 1;
-  const holeSalt = Math.floor(now * 2);   // below-24 h: cells fall out, reshuffle every ~0.5 s
-  // fear = tremor: cells shake up to ~1.4px at dose 4 and the yellow spreads lower; despair dims the bone
-  const trL = Math.min(4, feels[0].fear) * 0.35, trR = Math.min(4, feels[1].fear) * 0.35;
-  const yL = LIME_AT - Math.min(4, feels[0].fear) * 0.04, yR = LIME_AT - Math.min(4, feels[1].fear) * 0.04;
-  const dL = 1 - Math.min(4, feels[0].despair) * 0.08, dR = 1 - Math.min(4, feels[1].despair) * 0.08;
+  const holeSalt = Math.floor(now * 2);
+  const d0 = Math.min(1, feels[0].fear || 0);
+  const d1 = Math.min(1, feels[1].fear || 0);
   for (let i = 0; i < total; i++) {
-    const x = i % cols;
-    const y = (i / cols) | 0;
+    const x = i % cols, y = (i / cols) | 0;
     const h = half[i];
-    // below 24 h of life: that half's cells start falling out (2% per missing hour, capped 50%).
-    // A dead half is frozen whole and gray, never holed.
+    const dead = skulls[h].mode === 'dead';
+    const d = h ? d1 : d0;
     const hrs = hours[h];
-    if (hrs != null && hrs < 24 && skulls[h].mode !== 'dead' && !skulls[h].chatter) {
+    if (hrs != null && hrs < 24 && !dead && !skulls[h].chatter) {
       if (hash1(i ^ holeSalt) < Math.min(0.5, (24 - hrs) * 0.02)) continue;
     }
     let l = lumOpen[i] + (lumClosed[i] - lumOpen[i]) * (h ? kR : kL);
     if (l < THRESH) continue;
-    if (h ? shR : shL) l += 0.06 * Math.sin(now * 1.6 + x * 0.21 + y * 0.13);
+    if ((h ? shR : shL) && !dead) l += 0.06 * Math.sin(now * 1.6 + x * 0.21 + y * 0.13);
     const v = Math.min(1, Math.max(0, l));
-    const ch = RAMP[Math.round(v * n)];
+    const b = (h ? bR : bL) * (dead ? 1 : (1 - Math.min(4, feels[h].despair || 0) * 0.08));
+    const amp = dead ? 0 : (0.04 + 0.32 * d * d);
+    const jx = amp * Math.sin(now * 2 * Math.PI * 12 + x * 1.7 + y * 0.9);
+    const jy = amp * Math.cos(now * 2 * Math.PI * 12 + x * 0.6 + y * 2.1);
+    const lx = lean[h].x * cellW, ly = lean[h].y * cellH;
+    let scale = breath[h];
+    if (scale == null || dead || reduced.matches) {
+      scale = dead ? 1 : 1 + 0.003 * Math.sin(2 * Math.PI * now / (5.2 - 3.2 * d) + h * Math.PI);
+    }
+    const box = layout ? layout.halves[h === 0 ? 'e1' : 'e2'] : null;
+    const cy = box ? (box.y0 + box.y1) / 2 : H / 2;
+    const yp = y * cellH + ly + (scale - 1) * (y * cellH + ly - cy);
+    let alphaMul = 1;
+    if (lantern.active) {
+      const cx = x * cellW + cellW / 2 + lx, cy2 = yp + cellH / 2;
+      const dx = cx - lantern.x, dy = cy2 - lantern.y;
+      const dist = Math.hypot(dx, dy);
+      const u = Math.min(1, Math.max(0, dist / lantern.r));
+      alphaMul = 0.8 + 0.2 * (1 - u * u * (3 - 2 * u)); // the skulls stay the protagonists: the lantern only sharpens
+    }
+    let ch = RAMP[Math.round(v * n)];
+    if (!dead && !reduced.matches && Math.random() < ((0.002 + 0.078 * d * d * d) / 3)) {
+      ch = '~!*^%'[(Math.random() * 5) | 0];
+    }
     if (ch === ' ') continue;
-    const b = (h ? bR : bL) * (h ? dR : dL); // state brightness dims the ink, never the glyph density
-    const isLime = (h ? shR : shL) && v > (h ? yR : yL);   // yellow stays while the entity lives (alive or asleep)
-    const tr = h ? trR : trL;
-    const jx = tr ? tr * Math.sin(now * 23 + x * 1.7 + y * 0.9) : 0;
-    const jy = tr ? tr * Math.cos(now * 29 + x * 0.6 + y * 2.1) : 0;
-    ctx.globalAlpha = b;
-    ctx.fillStyle = isLime ? LIME : (v > 0.55 ? BRIGHT : DIM);
-    ctx.fillText(ch, x * CELL + jx, y * CELL * 1.15 + jy);
+    ctx.globalAlpha = b * alphaMul * fade;
+    if (dead) {
+      const prog = Math.min(1, (now - deathStart[h]) / 1.4);
+      ctx.fillStyle = prog >= 1 ? '#555' : lerpColor(LIME, '#777', prog);
+    } else {
+      const isLime = (h ? shR : shL) && v > (LIME_AT - d * 0.04);
+      ctx.fillStyle = isLime ? LIME : (v > 0.55 ? BRIGHT : DIM);
+    }
+    ctx.fillText(ch, x * cellW + jx + lx, yp + jy + (h ? dispY[i] : dispY[i]));
     ctx.globalAlpha = 1;
   }
 }
@@ -282,39 +363,26 @@ function drawNonceLayer() {
   for (let i = 0; i < 2; i++) {
     const t = nonce[i];
     if (!t) continue;
-    ctx.font = `32px ${MONO}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = LIME;
+    ctx.font = `32px ${MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = LIME;
     let mx, my;
-    if (stacked) {
-      mx = W / 2;
-      my = i === 0 ? H * 0.30 : H * 0.76;
-    } else {
-      mx = i === 0 ? W * 0.25 : W * 0.75;
-      my = H * 0.58;
-    }
+    if (stacked) { mx = W / 2; my = i === 0 ? H * 0.30 : H * 0.76; }
+    else { mx = i === 0 ? W * 0.25 : W * 0.75; my = H * 0.58; }
     ctx.fillText(t, mx, my);
   }
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
 }
 
-/* The two live clocks, drawn under each jaw as 5×7 glyph digits on the same canvas. */
 function drawGlyphString(str, fill, x, y, cell) {
   ctx.font = `${Math.max(2, cell * 1.2)}px ${MONO}`;
-  ctx.textBaseline = 'top';
-  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top'; ctx.textAlign = 'left';
   let px = x;
   for (const ch of str) {
     const g = GLYPHS[ch] || GLYPHS[' '];
     for (let r = 0; r < 7; r++) {
       const row = g[r];
-      for (let c = 0; c < 5; c++) {
-        if (row[c] === '#') ctx.fillText(fill, px + c * cell, y + r * cell);
-      }
+      for (let c = 0; c < 5; c++) if (row[c] === '#') ctx.fillText(fill, px + c * cell, y + r * cell);
     }
-    px += 6 * cell;   // 5 glyph columns + 1 blank
+    px += 6 * cell;
   }
   ctx.textAlign = 'left';
 }
@@ -327,13 +395,8 @@ function drawClockLayer() {
     const cell = stacked ? 3 : 4;
     const glyphW = str.length * 6 * cell;
     let mx, my;
-    if (stacked) {
-      mx = (W - glyphW) / 2;
-      my = i === 0 ? H * 0.36 : H * 0.80;
-    } else {
-      mx = (i === 0 ? W * 0.25 : W * 0.75) - glyphW / 2;
-      my = H * 0.68;
-    }
+    if (stacked) { mx = (W - glyphW) / 2; my = i === 0 ? H * 0.36 : H * 0.80; }
+    else { mx = (i === 0 ? W * 0.25 : W * 0.75) - glyphW / 2; my = H * 0.68; }
     ctx.fillStyle = dead ? 'rgba(120,120,120,0.55)' : LIME;
     drawGlyphString(str, clockFill[i], mx, my, cell);
   }
@@ -343,39 +406,34 @@ function drawClockLayer() {
 function draw(now) {
   if (!ready || !lumOpen || !lumClosed) return;
   const s0 = skulls[0], s1 = skulls[1];
-  render(
-    computeK(s0, now), computeK(s1, now),
-    brightnessOf(s0), brightnessOf(s1),
-    s0.mode !== 'dead', s1.mode !== 'dead',
-    now,
-  );
-  drawClockLayer();
-  drawNonceLayer();
+  render(computeK(s0, now, 0), computeK(s1, now, 1), brightnessOf(s0), brightnessOf(s1), s0.mode !== 'dead', s1.mode !== 'dead', now, extinguishFade);
+  drawClockLayer(); drawNonceLayer();
 }
 
 function renderStatic() {
   if (!ready || !lumOpen) return;
-  render(0, 0, 1, 1, false, false, 0);
-  drawClockLayer();
-  drawNonceLayer();
+  render(0, 0, 1, 1, false, false, 0, 1);
+  drawClockLayer(); drawNonceLayer();
 }
 
 function tick() {
+  if (!active) { if (timer) { clearTimeout(timer); timer = 0; running = false; } return; }
   const nowMs = performance.now();
   const dt = (nowMs - lastT) / 1000;
   lastT = nowMs;
   if (!document.hidden) {
     clock += dt;
+    updatePhysics(dt);
+    computeLayout();
     draw(clock);
     drawZMark(clock);
   }
   timer = setTimeout(tick, 1000 / 30);
 }
 
-/* The Z mark, drawn with the same glyphs as the skulls (yellow), 'ZCASH' under it in the HTML. */
+/* Z mark (unchanged behaviour) */
 let zMask = null, zCtx = null, zHeads = null, zSpeeds = null;
-const Z_S = 216, Z_CELL = 6, Z_N = Z_S / Z_CELL; // S is a multiple of the cell
-/* The Zcash mark (ring + Z with its two ticks) drawn in the skulls' glyphs; glyph rain falls down the strokes. */
+const Z_S = 216, Z_CELL = 6, Z_N = Z_S / Z_CELL;
 function drawZMark(now = 0) {
   const c = document.getElementById('zmark');
   if (!c) return;
@@ -389,7 +447,6 @@ function drawZMark(now = 0) {
     o.fillStyle = '#fff'; o.font = `900 ${S * 0.56}px "Helvetica Neue", Arial, sans-serif`;
     o.textAlign = 'center'; o.textBaseline = 'middle';
     o.fillText('Z', S / 2, S / 2 + S * 0.025);
-    // the two ticks of the Zcash glyph
     const tw = S * 0.06, th = S * 0.09;
     o.fillRect(S / 2 - tw / 2, S / 2 - S * 0.28 - th, tw, th);
     o.fillRect(S / 2 - tw / 2, S / 2 + S * 0.28 - S * 0.02, tw, th);
@@ -410,7 +467,7 @@ function drawZMark(now = 0) {
     const head = (zHeads[x] + now * zSpeeds[x]) % (Z_N + 8);
     for (let y = 0; y < Z_N; y++) {
       if (!zMask[y * Z_N + x]) continue;
-      let dist = head - y; if (dist < 0) dist += Z_N + 8;   // cells above the head glow, fading up the trail
+      let dist = head - y; if (dist < 0) dist += Z_N + 8;
       const w = dist < 7 ? 1 - dist / 7 : 0;
       const v = Math.min(1, 0.55 + 0.45 * w);
       g.globalAlpha = 0.62 + 0.38 * w;
@@ -429,66 +486,85 @@ export function initHero() {
     ready = imgOpen.naturalWidth > 0 && imgClosed.naturalWidth > 0;
     if (!ready) return;
     sample();
-    if (reduced.matches) {
-      renderStatic();
-    } else if (!running) {
-      running = true;
-      lastT = performance.now();
-      timer = setTimeout(tick, 1000 / 30);
-    }
-  });
-  window.addEventListener('resize', () => {
-    if (!ready) return;
-    sample();
     if (reduced.matches) renderStatic();
-  }, { passive: true });
+    else if (!running) { running = true; lastT = performance.now(); timer = setTimeout(tick, 1000 / 30); }
+  });
+  window.addEventListener('resize', () => { if (!ready) return; sample(); if (reduced.matches) renderStatic(); }, { passive: true });
 }
 
-/** Set the mouth state for an entity: 'alive' | 'asleep' | 'dead' | 'none'. */
 export function setMouth(id, mode) {
-  const s = skulls[idxOf(id)];
+  const i = idxOf(id);
+  const s = skulls[i];
   if (s.mode !== mode) {
     s.mode = mode;
-    s.nextBurst = -1;
-    s.burstEnd = -1;
-    s.nextYawn = -1;
-    s.yawnEnd = -1;
+    s.nextBurst = -1; s.burstEnd = -1; s.nextYawn = -1; s.yawnEnd = -1;
+    if (mode !== 'dead') deathStart[i] = -1;
   }
 }
 
-/** Live steering doses for an entity ({fear, despair} in 1x units); zero = still bone. */
 export function setFeel(id, feel) {
   const f = feels[idxOf(id)];
   f.fear = Math.max(0, Number(feel && feel.fear) || 0);
   f.despair = Math.max(0, Number(feel && feel.despair) || 0);
 }
 
-/** A new public post: make that skull talk for 3 s. */
 export function triggerTalk(id) {
   const s = skulls[idxOf(id)];
-  s.talkUntil = clock + TALK_SECS;
-  s.chewStart = clock;
+  s.talkUntil = clock + TALK_SECS; s.chewStart = clock;
 }
 
-/** Waiting chatter for PROVE LIVE: open/close the jaw by two glyph rows at 3 Hz. No-op when the canvas is absent. */
-export function setJawChatter(id, on) {
-  skulls[idxOf(id)].chatter = Boolean(on);
-}
-
-/** Draw a 32px mono number between the jaws of one skull; pass '' or null to clear. No-op when the canvas is absent. */
-export function drawNonce(id, text) {
-  nonce[idxOf(id)] = String(text == null ? '' : text);
-}
-
-/** Set the 5×7 clock text (e.g. '12:34:56') and fill glyph ('#', '+', '@') under one jaw. No-op when absent. */
+export function setJawChatter(id, on) { skulls[idxOf(id)].chatter = Boolean(on); }
+export function drawNonce(id, text) { nonce[idxOf(id)] = String(text == null ? '' : text); }
 export function drawClockText(id, text, fill) {
   const i = idxOf(id);
   clockText[i] = String(text == null ? '' : text);
   clockFill[i] = fill === '+' || fill === '@' ? fill : '#';
 }
+export function setHours(id, h) { const n = Number(h); hours[idxOf(id)] = Number.isFinite(n) ? n : null; }
 
-/** Set the hours-of-life for one half (drives the below-24 h cell fall-out in render). No-op when absent. */
-export function setHours(id, h) {
-  const n = Number(h);
-  hours[idxOf(id)] = Number.isFinite(n) ? n : null;
+/* ----------------- interaction hooks ----------------- */
+export function getLayout() { return layout; }
+
+export function getLum(id) {
+  const i = idxOf(id);
+  if (!lumOpen) return null;
+  const out = new Float32Array(total);
+  for (let k = 0; k < total; k++) if (half[k] === i) out[k] = lumOpen[k];
+  return out;
+}
+
+export function setLantern(x, y, radius) {
+  if (x == null || y == null) { lantern.active = false; return; }
+  lantern.x = x; lantern.y = y; lantern.r = radius || 88; lantern.active = true;
+}
+
+export function setLean(id, dx, dy) {
+  const i = idxOf(id);
+  lean[i].x = dx; lean[i].y = dy;
+  computeLayout();
+}
+
+export function setDeath(id, dead) {
+  const i = idxOf(id);
+  if (dead) {
+    if (skulls[i].mode !== 'dead') deathStart[i] = clock;
+    skulls[i].mode = 'dead';
+  } else {
+    skulls[i].mode = 'none'; deathStart[i] = -1;
+  }
+  if (skulls[0].mode === 'dead' && skulls[1].mode === 'dead') {
+    if (reduced.matches) setActive(false);
+    else if (bothDeadTime < 0) bothDeadTime = clock;
+  }
+}
+
+export function setBreath(id, scale) { breath[idxOf(id)] = scale == null ? null : scale; }
+export function setJaw(id, open01) { const i = idxOf(id); manualJaw[i] = open01 == null ? null : Math.max(0, Math.min(1, open01)); }
+
+export function setActive(a) {
+  active = a;
+  if (!a) {
+    if (timer) { clearTimeout(timer); timer = 0; running = false; }
+    if (ctx) { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = '#060606'; ctx.fillRect(0, 0, W, H); }
+  } else if (!running && ready) { running = true; lastT = performance.now(); timer = setTimeout(tick, 1000 / 30); }
 }

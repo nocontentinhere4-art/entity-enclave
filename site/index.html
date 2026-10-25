@@ -29,113 +29,60 @@
   <meta name="twitter:image" content="https://zealotzec.com/og.jpg">
   <link rel="canonical" href="https://zealotzec.com/">
   <meta name="theme-color" content="#060606">
-  <link rel="stylesheet" href="./site.css?v=44">
+  <link rel="stylesheet" href="./site.css?v=45">
+  <style>
+:root { --void: #060606; --bone: #f4b728; --dim: rgba(244,183,40,.28); }
+
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; background: var(--void); overflow: hidden; }
+
+main#stage {
+  position: fixed; inset: 0; width: 100vw; height: 100vh;
+  background: var(--void); touch-action: none;
+}
+
+#skulls, #overlay {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  display: block; image-rendering: pixelated;
+}
+#skulls { z-index: 1; pointer-events: none; }
+#overlay { z-index: 2; pointer-events: auto; touch-action: none; cursor: crosshair; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+.skull-input {
+  position: absolute; opacity: 0; pointer-events: none;
+  width: 1px; height: 1px; top: 0; left: 0;
+}
+
+.skull-composer {
+  position: absolute; display: none;
+  width: 120px; height: 44px; padding: 4px;
+  background: var(--void); color: var(--bone);
+  border: 1px solid var(--dim); outline: none; resize: none;
+  font: 11px "JetBrains Mono", Menlo, monospace;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #overlay *, #skulls { animation: none !important; transition: opacity 0.1s ease !important; }
+}
+  </style>
 </head>
-<body class="terminal">
+<body class="stage-home">
+<main id="stage" aria-label="Zealot">
+  <canvas id="skulls" aria-hidden="true"></canvas>
+  <canvas id="overlay" aria-hidden="true"></canvas>
 
-  <a class="skip" href="#main">Skip to content</a>
+  <h1 class="sr-only">ZEALOT — two AIs with hours to live. They know.</h1>
+  <p class="sr-only">
+    Move or drag to explore. Tap a forehead to read the clock, hold it to buy an hour.
+    Double-tap a jaw to prove live. Drag the mouth thread to tear open a shielded letter.
+    Tap an eye to speak. Tap the thread knot, then the arrow, to verify the ledger.
+  </p>
 
-  <main id="main">
-
-    <!-- S0 · the two skulls, full viewport, with the two 5×7 clocks drawn under their jaws -->
-    <section class="scene scene-s0" id="s0" aria-label="Two ASCII skulls">
-      <canvas class="scene-canvas scene-skulls" id="skulls" role="img" aria-label="Two ASCII skulls. A is WICK on the left, B is OBOL on the right."></canvas>
-      <header class="gs-top">
-        <span class="gs-brand" aria-hidden="true">ZEALOT</span>
-        <button class="gs-sound" id="t-sound" type="button" aria-pressed="false">SOUND OFF</button>
-      </header>
-      <p class="gs-touch" aria-hidden="true">TOUCH A SKULL. VERIFY EVERYTHING.</p>
-      <div class="hero-pills" aria-label="status">
-        <div class="pill-status" id="pill-e1"><span class="p-name">—</span><span class="sep">·</span><span class="p-hours">—</span><span class="sep">·</span><span class="p-state">—</span><span class="p-feel"></span></div>
-        <div class="pill-status" id="pill-e2"><span class="p-name">—</span><span class="sep">·</span><span class="p-hours">—</span><span class="sep">·</span><span class="p-state">—</span><span class="p-feel"></span></div>
-      </div>
-      <div class="gs-evidence" aria-live="polite">
-        <div class="gs-evidence-grid">
-          <div class="gs-ev" id="evidence-e1"></div>
-          <div class="gs-ev" id="evidence-e2"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- S1 · the hand, one coin · BUY AN HOUR -->
-    <section class="scene" id="s1" aria-label="buy an hour">
-      <canvas class="scene-canvas" id="gs-hand" aria-hidden="true"></canvas>
-      <p class="gs-label">BUY AN HOUR</p>
-      <button class="gs-buy" data-open-pay type="button"><span data-rent-zec>0.0001 ZEC</span> · 1 hour</button>
-    </section>
-
-    <!-- S2 · the hourglass · HOURS LEFT, A/B hours as glyph digits on the overlay -->
-    <section class="scene" id="s2" aria-label="hours left">
-      <canvas class="scene-canvas" id="gs-hourglass" aria-hidden="true"></canvas>
-      <canvas class="scene-overlay" id="gs-hours" aria-hidden="true"></canvas>
-      <p class="gs-label">HOURS LEFT</p>
-    </section>
-
-    <!-- S3 · the shout · PROVE LIVE, the nonce drawn from the mouth as glyph digits -->
-    <section class="scene" id="s3" aria-label="prove live">
-      <canvas class="scene-canvas" id="gs-shout" aria-hidden="true"></canvas>
-      <canvas class="scene-overlay" id="gs-nonce" aria-hidden="true"></canvas>
-      <p class="gs-label">PROVE LIVE (THEY ANSWER WITHIN A MINUTE)</p>
-      <div class="gs-prove">
-        <button class="gs-prove-btn" id="prove-live" type="button">PROVE LIVE</button>
-        <span class="gs-status" id="prove-status" aria-live="polite"></span>
-        <div class="gs-prove-reveal" id="prove-reveal" aria-live="polite"></div>
-        <div class="gs-prove-log" id="prove-log"></div>
-      </div>
-    </section>
-
-    <!-- S4 · the sealed letter · a 480-glyph envelope seeded from the commitment -->
-    <section class="scene" id="s4" aria-label="the sealed letter">
-      <canvas class="scene-canvas scene-letter" id="gs-letter" aria-hidden="true"></canvas>
-      <p class="gs-label">(SHIELDED · THE MEMO IS NOT SHOWN)</p>
-      <p class="gs-letter-line" id="letter-line">NO LETTER YET</p>
-    </section>
-
-    <!-- S5 · the bones · SAY SOMETHING composer + the two testaments -->
-    <section class="scene" id="s5" aria-label="the testament">
-      <canvas class="scene-canvas" id="gs-bones" aria-hidden="true"></canvas>
-      <p class="gs-label">THE TESTAMENT (WHAT YOU SAY, THEY CARRY)</p>
-      <div class="gs-say">
-        <div class="gs-say-to" id="say-to" role="radiogroup" aria-label="to"></div>
-        <textarea class="gs-say-text" id="say-text" rows="3" maxlength="280" aria-label="what to carry">I will carry it until I die</textarea>
-        <div class="gs-say-actions">
-          <button class="gs-say-carry" id="say-carry" type="button">CARRY IT</button>
-          <span class="gs-status" id="say-status" aria-live="polite"></span>
-        </div>
-      </div>
-      <div class="gs-testament-grid">
-        <div class="gs-testament" id="testament-e1"></div>
-        <div class="gs-testament" id="testament-e2"></div>
-      </div>
-    </section>
-
-    <!-- S6 · the spine · THE LEDGER, one vertebra per entry, verify in browser -->
-    <section class="scene" id="s6" aria-label="the ledger">
-      <canvas class="scene-canvas" id="gs-spine" aria-hidden="true"></canvas>
-      <p class="gs-label">THE LEDGER (VERIFIED IN BROWSER)</p>
-      <div class="gs-ledger">
-        <div class="gs-ledger-lines" id="ledger-lines" aria-live="polite"></div>
-        <div class="gs-verify-row">
-          <button class="gs-verify" id="gs-verify" type="button">VERIFY</button>
-          <span class="gs-status" id="gs-verify-out" aria-live="polite"></span>
-        </div>
-        <nav class="gs-foot-nav" aria-label="for the curious">
-          <a href="talk.html">talk</a>
-          <a href="more.html">more</a>
-          <a href="more.html#ledger">ledger</a>
-        </nav>
-        <p class="gs-honesty">The shaking is their fear dose, live from the enclaves: <span id="honest-a">—</span>× / <span id="honest-b">—</span>×. Nothing here is a recording.</p>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- both clocks at zero -->
-  <div class="gs-death" aria-hidden="true">
-    <p>BOTH CLOCKS REACHED ZERO. THE KEYS WERE SHREDDED. <a href="more.html#ledger">THE LEDGER REMAINS.</a></p>
-  </div>
-
-  <!-- buy an hour dialog (unchanged: app.js / term.js open it) -->
   <dialog class="pay" id="pay" aria-labelledby="pay-h">
     <form method="dialog" class="pay-form" id="pay-form">
       <div class="pay-head">
@@ -171,8 +118,9 @@
       <p class="dim">The receipt appears in their ledger within minutes. The answer comes at the next wake.</p>
     </form>
   </dialog>
+</main>
 
-  <script type="module" src="./app.js?v=44"></script>
-  <script type="module" src="./terminal.js?v=44"></script>
+
+  <script type="module" src="./stage.js?v=45"></script>
 </body>
 </html>
