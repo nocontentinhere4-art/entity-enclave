@@ -151,8 +151,8 @@ export class Tools {
     const nowMs = Date.now();
     for (const e of this.ledger.recent?.(['post_public'], 60) ?? []) {
       const ts = Date.parse(e.ts);
-      if (key(e.data?.text) === mine) throw err('duplicate_post', 'post_public refused: you already published this text; write something new or stay silent');
-      if (!e.data?.orderId && Number.isFinite(ts) && nowMs - ts < 4 * 60_000) throw err('one_post_per_cycle', 'post_public refused: one public post per cycle; the channel is not a loop');
+      if (key(e.data?.text) === mine) throw err('duplicate_post', 'post_public refused: you already published this text. Do something else now: set a shop item with paywall_set (item + priceZats), answer a letter, make a forecast, or publish a page. Do not repeat yourself.');
+      if (!e.data?.orderId && Number.isFinite(ts) && nowMs - ts < 4 * 60_000) throw err('one_post_per_cycle', 'post_public refused: one public post per cycle. Use this cycle for something else: paywall_set, forecast, publish_page, or answering a letter.');
     }
   }
 

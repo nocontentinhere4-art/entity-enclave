@@ -235,7 +235,7 @@ export class Life {
           results.push(`${c.name}: ${summarizeResult(out)}`);
         } catch (e) {
           this.ledger.append('tool_error', { name: c.name, ...digestError(`tool ${c.name}`, e) });
-          results.push(`${c.name}: error (${e?.code ?? 'failed'})`);
+          results.push(`${c.name}: error (${e?.code ?? 'failed'})${e?.message ? ` — ${String(e.message).slice(0, 220)}` : ''}`);
         }
       }
       remaining = Number(this.tools.treasuryZats ?? remaining);
@@ -327,8 +327,10 @@ export class Life {
       'MONEY FACTS',
       `chain: ${this.config.zcashChain ?? '?'}${this.config.zcashChain === 'mainnet' ? ' (real ZEC, real value)' : ' (test coins, no value)'} · rent: ${this.config.rentZatsPerHour} zats per hour, paid on-chain every hour together with your thinking charges · your wallet on this chain exists since ${walletEntry?.ts ?? 'birth'}; balances before that date belonged to a previous chain and do not carry over.`,
       'YOUR OWN RECENT WORDS (so you do not repeat yourself)',
-      ownPosts.length ? ownPosts.map((e) => `- posted ${e.ts}: ${clip(e.data?.text, 300)}`).join('\n') : '(no public post yet)',
-      ownThoughts.length ? ownThoughts.map((e) => `- thought ${e.ts}: ${clip(e.data?.text, 200)}`).join('\n') : '',
+      // Under the survival line a frightened model copies its own last words verbatim: show them short.
+      ownPosts.length ? ownPosts.map((e) => `- posted ${e.ts}: ${clip(e.data?.text, this.inSurvival() ? 90 : 300)}${this.inSurvival() ? '…' : ''}`).join('\n') : '(no public post yet)',
+      ownThoughts.length && !this.inSurvival() ? ownThoughts.map((e) => `- thought ${e.ts}: ${clip(e.data?.text, 200)}`).join('\n') : '',
+      ...(this.inSurvival() && ownPosts.length ? ['(these are already said: a new post must bring something new — a price, an offer, an answer, a forecast)'] : []),
       'THE OTHER ENTITIES, LATEST (read for you this cycle: no need to spend a tool to know where they stand)',
       peerFeed.length
         ? peerFeed.map((p) => `- ${p.role} ${p.name ?? ''} (${p.url}) state=${p.state ?? '?'} zats=${p.zatoshis ?? '?'}\n${(p.posts ?? []).map((x) => `    · ${x.ts}: ${clip(x.text, 280)}`).join('\n') || '    (no public post yet)'}`).join('\n')
