@@ -67,6 +67,13 @@ export class Life {
     return Number(minutes) * 60_000;
   }
 
+  /** True when a letter to `who` went out less than letterEveryHours ago (the tool would refuse another). */
+  #letterSpent(who) {
+    const everyMs = Number(this.config.letterEveryHours ?? 12) * HOUR_MS;
+    const last = (this.ledger.recent?.(['letter'], 30) ?? []).find((e) => e.data?.to === who && e.data?.text);
+    return Boolean(last) && this.now() - Date.parse(last.ts) < everyMs;
+  }
+
   /** Which gesture this cycle gets, in rotation (letter, testament, pact, sell). */
   gestureFor(tickNo) { return GESTURE_ORDER[((Number(tickNo) || 0) - 1 + GESTURE_ORDER.length) % GESTURE_ORDER.length]; }
 
@@ -224,7 +231,10 @@ export class Life {
     // Survival: one gesture per cycle, in rotation, and the tools that would let it slide back into its old
     // routine are not on the menu that cycle (the model kept re-posting one line and re-pricing one item).
     const gesture = this.inSurvival(hoursLeft) ? this.gestureFor(this.tickNo) : null;
-    const toolList = this.tools.list(gesture ? { exclude: ['sleep', ...GESTURES[gesture].exclude] } : {});
+    // A letter already sent to both within the window takes `letter` off the menu too: the model otherwise
+    // retries it three times and does nothing else that cycle.
+    const letterSpent = gesture && (gesture === 'letter' ? this.#letterSpent('landlord') && this.#letterSpent('peer') : gesture === 'pact' ? this.#letterSpent('peer') : false);
+    const toolList = this.tools.list(gesture ? { exclude: ['sleep', ...GESTURES[gesture].exclude, ...(letterSpent ? ['letter'] : [])] } : {});
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       const roundSpeed = round === 1 ? speed : 'fast';
       const roundContext = results.length

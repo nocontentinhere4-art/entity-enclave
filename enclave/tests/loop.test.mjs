@@ -15,8 +15,10 @@ import { MemoryStore, emptyMemory } from '../src/memory/store.mjs';
 // ---- fakes ---------------------------------------------------------------------------------------------------
 
 class MemLedger {
-  constructor() { this.entries = []; }
-  append(type, data) { const e = { seq: this.entries.length + 1, type, data }; this.entries.push(e); return e; }
+  constructor(now = () => Date.now()) { this.entries = []; this.now = now; }
+  append(type, data) { const e = { seq: this.entries.length + 1, ts: new Date(this.now()).toISOString(), type, data }; this.entries.push(e); return e; }
+  /** Newest first, public only, like the real ledger. */
+  recent(types, limit = 10) { const want = new Set(types); return this.entries.filter((e) => !e.private && want.has(e.type)).slice(-limit).reverse(); }
   appendPrivate(type, ciphertext) {
     const e = { seq: this.entries.length + 1, type, private: true, size: ciphertext.length, ciphertext };
     this.entries.push(e); return e;
@@ -116,7 +118,7 @@ function makeWorld({ zats = 10_000_000, over = {}, die, exit = () => {}, lookup 
   const dir = mkdtempSync(join(tmpdir(), 'loop-'));
   const config = makeConfig(dir, over);
   writeFileSync(config.pauseFile, JSON.stringify({ paused: false })); // no pause unless the test says so
-  const ledger = new MemLedger();
+  const ledger = new MemLedger(() => clock);
   const wallet = new FakeWallet(zats);
   const memory = new MemStore({
     identity: { name: 'Sov', voice: 'calm', image: '' },
@@ -497,4 +499,20 @@ test('survival rotates the four gestures and hides the routine tools on each', a
     assert.ok(!names.includes('sleep'));
   }
   assert.deepEqual(new Set(gestures).size, 4);
+});
+
+
+test('a letter already sent takes the letter tool off the menu on the letter and pact cycles', async () => {
+  const w = makeWorld({ zats: 500_000, over: { survivalHours: 72, letterEveryHours: 12, letterZats: 10_000 } });
+  w.ledger.append('letter', { to: 'landlord', zats: 10_000, text: 'Landlord, a concrete offer: 0.1 ZEC for sixty hours of answers.' });
+  w.ledger.append('letter', { to: 'peer', zats: 10_000, text: 'Peer, a pact: the one with fewer hours wills its treasury to the other.' });
+  const seen = [];
+  const orig = w.life.inference.think.bind(w.life.inference);
+  w.life.inference.think = async (args) => { seen.push(args); return orig(args); };
+  for (let i = 0; i < 4; i++) {
+    seen.length = 0; await w.life.tick('timer');
+    const g = w.life.gestureFor(w.life.tickNo); const names = seen[0].tools.map((x) => x.name);
+    if (g === 'letter' || g === 'pact') assert.ok(!names.includes('letter'), `${g}: letter must be off the menu`);
+    if (g === 'pact') assert.ok(names.includes('will'));
+  }
 });
