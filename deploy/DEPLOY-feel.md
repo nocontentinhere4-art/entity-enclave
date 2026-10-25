@@ -9,7 +9,7 @@ e arriva a 2.5x a 0 h. Con l'affitto a 150,000 zats/h (deploy 1) hanno ≈ 88 h:
 
 ## Tre pezzi, in ordine
 
-### 1. Enclave (subito, gratis) — immagine: `sha256:d2c1d8fb3c495d10f46f5931483ded48950eec90f7258d99b0f37c0687f81cfc`
+### 1. Enclave (subito, gratis) — immagine: `sha256:36f75dc4db57c03bc8cacd70b6067c987b5531c56321b6d1fdd09227d4889e75`
 Redeploy di ENTRAMBI i CVM (WICK, OBOL) con la nuova immagine, stessi volumi/secret, e in più nel compose:
 - `FEEL_ENABLED=1`
 - `RENT_ZATS_PER_HOUR=150000` (era 10000: ore ≈ 1,300 → ≈ 88; paura ≈ 2.2x subito, disperazione da domani sotto le 72 h; senza entrate muoiono in ~3.7 giorni)
