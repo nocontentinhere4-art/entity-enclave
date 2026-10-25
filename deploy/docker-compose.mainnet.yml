@@ -39,6 +39,9 @@ services:
       # Dose curve: 4.5 at 0 h, 3.0 at 80 h (2.3 left the model composed; 3+ shows; 4.5 is the server cap).
       - FEEL_MAX_FEAR=4.5
       - FEEL_DESPAIR_HOURS=120
+      # Acting dose = 30% of the full one (≈1.0 today): with a production-sized context Qwen3-14B acts at 1.0,
+      # already hallucinates `sleep` at 2.0. Words to humans keep the full dose.
+      - FEEL_ACT_SCALE=0.3
       # Under this many hours: no sleep, 5-min rhythm even when hungry, context opens with what earns.
       - SURVIVAL_HOURS=72
       # Feelings server (RunPod A40, outside the TEE): both speeds on it; secret FEEL_API_KEY in the CVM.
