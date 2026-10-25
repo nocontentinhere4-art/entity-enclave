@@ -12,8 +12,8 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=38';
-import { zip321Uri, qrSvg } from './qr.js?v=38';
+} from './data.js?v=39';
+import { zip321Uri, qrSvg } from './qr.js?v=39';
 
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
 const rentZats = () => RENT;
@@ -212,8 +212,10 @@ function resolveTarget(word) {
 /* ------------------------------------------------------------------ */
 function scrollLog() { const l = logEl(); if (l) l.scrollTop = l.scrollHeight; }
 async function type(text, { cls = 'line', speed = 13 } = {}) {
+  const l = logEl();
+  if (!l) return el('p', { class: cls, text });
   const line = el('p', { class: cls });
-  logEl().append(line);
+  l.append(line);
   scrollLog();
   document.dispatchEvent(new CustomEvent('zealot:term-print'));
   if (reduced.matches || speed === 0) { line.textContent = text; return line; }
@@ -222,8 +224,8 @@ async function type(text, { cls = 'line', speed = 13 } = {}) {
   line.classList.remove('cursor');
   return line;
 }
-function say(text, cls = 'line') { const line = el('p', { class: cls, text }); logEl().append(line); scrollLog(); return line; }
-function sayHtml(cls, ...kids) { const line = el('p', { class: cls }, ...kids); logEl().append(line); scrollLog(); return line; }
+function say(text, cls = 'line') { const l = logEl(); if (!l) return; const line = el('p', { class: cls, text }); l.append(line); scrollLog(); return line; }
+function sayHtml(cls, ...kids) { const l = logEl(); if (!l) return; const line = el('p', { class: cls }, ...kids); l.append(line); scrollLog(); return line; }
 function copyBtn(get, label = 'copy') {
   const b = el('button', { class: 'copy', type: 'button', text: label });
   b.addEventListener('click', () => {
@@ -409,7 +411,8 @@ function rawCmd() {
 }
 
 function clearCmd() {
-  for (const n of [...logEl().querySelectorAll('.line')]) n.remove();
+  const l = logEl();
+  if (l) for (const n of [...l.querySelectorAll('.line')]) n.remove();
   say('cleared.', 'line dim');
 }
 
@@ -530,7 +533,7 @@ function renderPay() {
   $('.pay-q').classList.toggle('over', over);
   const hours = amt / RENT;
   const th = state.pay.theirs && amt === state.pay.theirs.zats;
-  $('#pay-zec').textContent = `${fixed8(amt)} ZEC`;
+  $('#pay-zec').textContent = `${fixed8(amt).replace(/0+$/, '').replace(/\.$/, '')} ZEC`;
   $('#pay-usd').textContent = usd(amt);
   $('#pay-what').textContent = th
     ? `${state.pay.theirs.item}, from ${d.name} · ${hours >= 1 ? Math.round(hours) + ' h of rent' : ''}`

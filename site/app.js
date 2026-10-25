@@ -9,21 +9,23 @@
  * error is "offline since".
  */
 import {
-  state, list, nameOf, stateWord, deadline, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=38';
+  state, list, nameOf, stateWord, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
+} from './term.js?v=39';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=38';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=38';
-import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=38';
-import { mountAscii, RAMP } from './ascii.js?v=38';
+} from './data.js?v=39';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=39';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=39';
+import { mountAscii, RAMP } from './ascii.js?v=39';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
 /* ------------------------------------------------------------------ */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+/** A section mounts only when its root element exists on this page. */
+const has = (id) => document.getElementById(id) != null;
 function el(tag, attrs = {}, ...kids) {
   const n = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -97,6 +99,13 @@ function renderHeroHours() {
   h.textContent = alive.length ? formatInt(Math.min(...alive.map((d) => Number(d.hoursLeft) || 0))) : '0';
 }
 
+/* The fewest-hours entity among the living, used by the hero proof row. */
+function livingOrNull() {
+  const alive = ['e1', 'e2'].map(ent).filter((d) => d && d.ok && d.state !== 'dead');
+  if (!alive.length) return null;
+  return alive.sort((a, b) => (Number(a.hoursLeft) || 0) - (Number(b.hoursLeft) || 0))[0];
+}
+
 /* 'fear 2.1× · despair 0.3× · steered' from the enclave's feel field; honest fallbacks when absent */
 function feelLine(d) {
   if (!d || !d.ok) return '—';
@@ -147,53 +156,25 @@ const BOOK_EMPTY = 'No trade yet. The first order opens the book.';
 function panelShell(id) {
   const art = el('article', { class: 'card', 'data-entity': id });
   art.innerHTML = `
-    <header class="card-meta">
-      <span class="meta-label">ENCLAVE 0${id === 'e1' ? 1 : 2}</span>
-    </header>
-    <div class="card-portrait" data-portrait><canvas role="img" aria-label="ASCII portrait of ${id === 'e1' ? 'WICK' : 'OBOL'}"></canvas></div>
+    <header class="card-meta"><span class="meta-label">ENCLAVE 0${id === 'e1' ? 1 : 2}</span></header>
     <header class="card-head">
       <h3 class="card-name" data-k="name">—</h3>
       <span class="card-state" data-k="state">—</span>
     </header>
-    <div class="tabs" role="tablist" aria-label="enclave">
-      <button class="tab is-active" type="button" role="tab" aria-selected="true" data-tab="state">State</button>
-      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="shop">Shop</button>
-      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="words">Words</button>
-      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="pages">Pages</button>
-    </div>
-    <div class="tab-panels">
-      <div class="tab-panel" data-panel="state" role="tabpanel">
-        <dl class="kvs">
-          <div><dt>treasury</dt><dd data-k="treasury">—</dd></div>
-          <div><dt>hours left</dt><dd data-k="hours">—</dd></div>
-          <div><dt>feeling</dt><dd data-k="feel">—</dd></div>
-          <div><dt>last rent</dt><dd data-k="lastRent">—</dd></div>
-          <div><dt>dies at</dt><dd data-k="dies">—</dd></div>
-          <div><dt>last letter</dt><dd data-k="lastLetter">—</dd></div>
-          <div><dt>paid by people</dt><dd data-k="earned">—</dd></div>
-          <div><dt>public posts</dt><dd data-k="channel">—</dd></div>
-        </dl>
-      </div>
-      <div class="tab-panel" data-panel="shop" role="tabpanel" hidden><div class="shop-list" data-k="shop"></div></div>
-      <div class="tab-panel" data-panel="words" role="tabpanel" hidden><div class="words-list" data-k="words"></div></div>
-      <div class="tab-panel" data-panel="pages" role="tabpanel" hidden><div class="shop-list" data-k="pages"></div></div>
+    <dl class="kvs">
+      <div><dt>hours left</dt><dd data-k="hours">—</dd></div>
+      <div><dt>treasury</dt><dd data-k="treasury">—</dd></div>
+      <div><dt>feeling</dt><dd data-k="feel">—</dd></div>
+    </dl>
+    <div class="shop-block">
+      <p class="shop-label mono">shop</p>
+      <div class="shop-list" data-k="shop"></div>
     </div>
     <div class="card-actions">
       <button class="btn fill" type="button" data-act="hour">Buy ${id === 'e1' ? 'WICK' : 'OBOL'} an hour</button>
-      <button class="btn ghost" type="button" data-act="ask">Ask ${id === 'e1' ? 'WICK' : 'OBOL'} something</button>
+      <a class="btn ghost" href="more.html#pages">their pages →</a>
     </div>`;
   art.querySelector('[data-act="hour"]').addEventListener('click', () => openPay({ who: id, hours: 1 }));
-  art.querySelector('[data-act="ask"]').addEventListener('click', () => openPay({ who: id, hours: 1 }));
-  art.querySelector('.tabs').addEventListener('click', (ev) => {
-    const b = ev.target.closest('.tab');
-    if (!b) return;
-    art.querySelectorAll('.tab').forEach((t) => {
-      const on = t === b;
-      t.classList.toggle('is-active', on);
-      t.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-    art.querySelectorAll('.tab-panel').forEach((p) => { p.hidden = p.dataset.panel !== b.dataset.tab; });
-  });
   return art;
 }
 
@@ -207,64 +188,70 @@ function updatePanel(id) {
   get('state').textContent = d ? stateWord(d) : '—';
 
   if (!d) {
-    for (const k of ['treasury', 'hours', 'lastRent', 'dies', 'lastLetter', 'earned', 'channel']) get(k).textContent = '—';
-    get('shop').replaceChildren(el('p', { class: 'empty' }, BOOK_EMPTY));
-    get('words').replaceChildren(el('p', { class: 'empty' }, BOOK_EMPTY));
+    get('hours').textContent = '—';
+    get('treasury').textContent = '—';
+    get('feel').textContent = '—';
+    get('shop').replaceChildren(el('p', { class: 'empty' }, 'Nothing for sale yet.'));
     return;
   }
   if (!d.ok) {
     const off = offlineLabel(d);
-    for (const k of ['treasury', 'hours', 'feel', 'lastRent', 'dies', 'lastLetter', 'earned', 'channel']) get(k).textContent = off;
+    get('hours').textContent = off;
+    get('treasury').textContent = off;
+    get('feel').textContent = off;
     get('shop').replaceChildren(el('p', { class: 'empty' }, off));
-    get('words').replaceChildren(el('p', { class: 'empty' }, off));
     return;
   }
 
-  get('treasury').textContent = `${formatInt(d.zats)} zats · ${formatZats(d.zats)} ZEC`;
-  get('hours').textContent = `${formatInt(d.hoursLeft)} · about ${formatInt(Math.floor((d.hoursLeft || 0) / 24))} days`;
+  get('hours').textContent = formatInt(d.hoursLeft);
+  get('treasury').textContent = `${formatZats(d.zats)} ZEC`;
   get('feel').textContent = feelLine(d);
-  get('lastRent').textContent = d.lastRent ? fmtStamp(d.lastRent.ts) : '—';
-  get('dies').textContent = d.state === 'dead'
-    ? (d.diedAt ? fmtStamp(d.diedAt) : 'dead')
-    : (d.lastRent ? fmtStamp(deadline(d)) : '—');
-  get('lastLetter').textContent = (d.letters && d.letters.length) ? fmtStamp(d.letters[d.letters.length - 1].ts) : '—';
-  get('earned').textContent = `${formatZats(d.inTotal || 0)} ZEC · ${formatInt((d.letters || []).length)} letters`;
-  get('channel').textContent = formatInt((d.posts || []).length);
 
   const shop = get('shop');
   const items = d.shop || [];
-  if (!items.length) shop.replaceChildren(el('p', { class: 'empty' }, 'Nothing for sale yet. The shop opens when they price an hour of work.'));
+  if (!items.length) shop.replaceChildren(el('p', { class: 'empty' }, 'Nothing for sale yet.'));
   else shop.replaceChildren(...items.map((it) => el('div', { class: 'shop-item' },
     el('span', { class: 'shop-name', text: it.item }),
     el('span', { class: 'shop-price mono', text: `${formatInt(it.zats)} zats` }),
     el('button', { class: 'btn buy-small', type: 'button', text: 'Buy', onclick: () => openPay({ who: id, theirs: it }) }))));
-
-  const words = get('words');
-  const posts = (d.posts || []).filter((p) => p.from === 'entity').slice(-5).reverse();
-  if (!posts.length) words.replaceChildren(el('p', { class: 'empty' }, 'No public posts yet. They speak when there is something to say.'));
-  else words.replaceChildren(...posts.map((p) => el('div', { class: 'word' },
-    el('p', { class: 'word-text', text: stringOf(p.text) }),
-    el('span', { class: 'word-time mono', text: p.ts ? fmtStamp(p.ts) : '—' }))));
-
-  // Pages: written by the entity, served by its own enclave (/pages/<slug>); the site only links to them.
-  const pagesEl = get('pages');
-  const pc = pagesCache[id];
-  const pages = pc && pc.ok && pc.data && Array.isArray(pc.data.pages) ? pc.data.pages : [];
-  if (!pc) pagesEl.replaceChildren(el('p', { class: 'empty' }, '—'));
-  else if (!pages.length) pagesEl.replaceChildren(el('p', { class: 'empty' }, 'No page yet. A page is where they say what they sell and why it is worth paying.'));
-  else pagesEl.replaceChildren(...pages.map((pg) => el('a', { class: 'shop-item page-link', href: `${d.base}/pages/${encodeURIComponent(pg.slug)}`, target: '_blank', rel: 'noopener' },
-    el('span', { class: 'shop-name', text: stringOf(pg.title) || pg.slug }),
-    el('span', { class: 'shop-price mono', text: `v${pg.version} · ${pg.updatedAt ? fmtStamp(pg.updatedAt) : '—'}` }))));
 }
 
 function renderEntities() {
   for (const id of ['e1', 'e2']) updatePanel(id);
 }
 
+/* Pages section (more.html): every page each entity publishes on its own enclave. */
+function renderPages() {
+  const root = $('#pages-list');
+  if (!root) return;
+  const frag = document.createDocumentFragment();
+  for (const id of ['e1', 'e2']) {
+    const d = ent(id);
+    const pc = pagesCache[id];
+    const pages = pc && pc.ok && pc.data && Array.isArray(pc.data.pages) ? pc.data.pages : [];
+    const block = el('div', { class: 'pages-entity' });
+    block.append(el('h3', { class: 'pages-name' }, ename(id)));
+    if (!d || !d.ok) {
+      block.append(el('p', { class: 'empty' }, offlineLabel(d)));
+    } else if (!pc) {
+      block.append(el('p', { class: 'empty' }, '—'));
+    } else if (!pages.length) {
+      block.append(el('p', { class: 'empty' }, 'No page yet. A page is where they say what they sell and why it is worth paying.'));
+    } else {
+      block.append(...pages.map((pg) => el('a', { class: 'shop-item page-link', href: `${d.base}/pages/${encodeURIComponent(pg.slug)}`, target: '_blank', rel: 'noopener' },
+        el('span', { class: 'shop-name', text: stringOf(pg.title) || pg.slug }),
+        el('span', { class: 'shop-price mono', text: `v${pg.version} · ${pg.updatedAt ? fmtStamp(pg.updatedAt) : '—'}` }))));
+    }
+    frag.append(block);
+  }
+  root.replaceChildren(frag);
+}
+
 /* ------------------------------------------------------------------ */
 /* render: trades (order book)                                         */
 /* ------------------------------------------------------------------ */
 async function loadTrades() {
+  if (!has('book') && !has('trade')) return;
   await Promise.all(['e1', 'e2'].map(async (id) => {
     const d = ent(id);
     if (!d || !d.base) { tradesCache[id] = null; return; }
@@ -274,6 +261,7 @@ async function loadTrades() {
 
 function renderTrades() {
   const book = $('#book');
+  if (!book) return;
   const rows = [];
   for (const id of ['e1', 'e2']) {
     const c = tradesCache[id];
@@ -321,6 +309,7 @@ function renderTrades() {
 /* render: forecasts                                                   */
 /* ------------------------------------------------------------------ */
 async function loadForecasts() {
+  if (!has('forecasts-body') && !has('pages-list')) return;
   await Promise.all(['e1', 'e2'].map(async (id) => {
     const d = ent(id);
     if (!d || !d.base) { forecastsCache[id] = null; pagesCache[id] = null; return; }
@@ -333,6 +322,7 @@ async function loadForecasts() {
 
 function renderForecasts() {
   const body = $('#forecasts-body');
+  if (!body) return;
   const rows = [];
   for (const id of ['e1', 'e2']) {
     const c = forecastsCache[id];
@@ -1302,6 +1292,7 @@ function renderLedger() {
   const last = lines.slice(-40);
 
   const container = $('#ledger-lines');
+  if (!container) return;
   const frag = document.createDocumentFragment();
   let added = false;
   for (const { d, e } of last) {
@@ -1328,6 +1319,7 @@ async function onVerify() {
   if (verifying) return;
   const btn = $('#verify');
   const out = $('#verify-out');
+  if (!btn || !out) return;
   const dlist = list().filter((d) => d.ledgerText);
   if (!dlist.length) {
     out.replaceChildren(el('p', { class: 'v-line dim' }, 'no ledger loaded to verify'));
@@ -1349,6 +1341,24 @@ async function onVerify() {
   btn.disabled = false;
 }
 
+/* The hero proof row's ledger cell: re-hash both chains once, on load. */
+async function verifyBoth() {
+  const cell = $('#proof-ledger');
+  if (!cell) return;
+  const dlist = list().filter((d) => d.ledgerText);
+  if (!dlist.length) { cell.textContent = 'verifying…'; return; }
+  cell.textContent = 'verifying…';
+  let ok = true;
+  let entries = 0;
+  for (const d of dlist) {
+    const r = await verifyChain(d.ledgerText, { animate: false });
+    if (!r.ok) ok = false;
+    entries += r.valid;
+  }
+  cell.textContent = ok ? `verified, ${formatInt(entries)} entries` : 'FAIL';
+  if (!ok) cell.classList.add('fail');
+}
+
 /* ------------------------------------------------------------------ */
 /* render: footer                                                      */
 /* ------------------------------------------------------------------ */
@@ -1356,6 +1366,8 @@ function renderFooter() {
   const d1 = ent('e1');
   const digestEl = $('#foot-digest');
   const blockEl = $('#foot-block');
+  const urls = $('#foot-urls');
+  if (!digestEl || !blockEl || !urls) return;
 
   let compose = '—';
   if (d1 && d1.ok && d1.root && d1.root.attestation && d1.root.attestation.compose) compose = shortHash(d1.root.attestation.compose);
@@ -1373,7 +1385,6 @@ function renderFooter() {
   }
   blockEl.textContent = blockText;
 
-  const urls = $('#foot-urls');
   const kids = [];
   const dlist = ['e1', 'e2'].map(ent).filter((d) => d && d.base);
   for (const d of dlist) kids.push(el('a', { class: 'foot-url mono', href: d.base, target: '_blank', rel: 'noopener' }, shortUrl(d.base)));
@@ -1382,11 +1393,13 @@ function renderFooter() {
 }
 
 function renderClock() {
+  const clock = $('#foot-clock');
+  if (!clock) return;
   const now = new Date();
   const h = String(now.getUTCHours()).padStart(2, '0');
   const m = String(now.getUTCMinutes()).padStart(2, '0');
   const s = String(now.getUTCSeconds()).padStart(2, '0');
-  $('#foot-clock').textContent = `${h}:${m}:${s} UTC`;
+  clock.textContent = `${h}:${m}:${s} UTC`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1701,9 +1714,106 @@ async function refreshFull() {
   syncFeel();
 }
 
+/* ------------------------------------------------------------------ */
+/* render: home hero proof row, their words, how it works              */
+/* ------------------------------------------------------------------ */
+function renderProof() {
+  const hoursEl = $('#proof-hours');
+  const fearEl = $('#proof-fear');
+  const rentEl = $('#proof-rent');
+  if (!hoursEl && !fearEl && !rentEl) return;
+
+  if (hoursEl) {
+    const known = ['e1', 'e2'].map(ent).filter((d) => d && d.ok);
+    if (!known.length) hoursEl.textContent = '—';
+    else {
+      const alive = known.filter((d) => d.state !== 'dead');
+      hoursEl.textContent = alive.length ? formatInt(Math.min(...alive.map((d) => Number(d.hoursLeft) || 0))) : '0';
+    }
+  }
+
+  if (fearEl) {
+    const d = livingOrNull();
+    const f = d && d.ok && d.state !== 'dead' && d.feel ? d.feel : null;
+    if (!f || !Number.isFinite(Number(f.fear))) fearEl.textContent = '—';
+    else {
+      const act = f.acting && Number.isFinite(Number(f.acting.fear)) ? ` (acts at ${Number(f.acting.fear).toFixed(1)}×)` : '';
+      fearEl.textContent = `${Number(f.fear).toFixed(1)}×${act}`;
+    }
+  }
+
+  if (rentEl) {
+    let best = null;
+    for (const id of ['e1', 'e2']) {
+      const d = ent(id);
+      if (d && d.ok && d.lastRent && d.lastRent.data) {
+        const t = Date.parse(d.lastRent.ts || 0);
+        if (!best || t > Date.parse(best.ts || 0)) best = d.lastRent;
+      }
+    }
+    if (!best) rentEl.textContent = '—';
+    else {
+      const zats = Number(best.data.rentZats);
+      const zec = (Number.isFinite(zats) && zats > 0) ? formatZats(zats) : formatZats(rentZats());
+      const at = best.ts ? hhmm(best.ts) : null;
+      // The wallet does not always report the txid ('unknown'): then the row shows amount and time only.
+      const tx = best.data.txid && best.data.txid !== 'unknown' ? shortHash(best.data.txid) : null;
+      rentEl.textContent = `${zec} ZEC${at ? ' · ' + at + ' UTC' : ''}${tx ? ' · tx ' + tx : ''}`;
+    }
+  }
+}
+
+function renderWords() {
+  const grid = $('#words-grid');
+  if (!grid) return;
+  const rows = [];
+  for (const id of ['e1', 'e2']) {
+    const d = ent(id);
+    if (!d || !Array.isArray(d.posts)) continue;
+    const posts = d.posts.filter((p) => p && p.from === 'entity');
+    if (!posts.length) continue;
+    const newest = posts.slice().sort((a, b) => Date.parse(b.ts || 0) - Date.parse(a.ts || 0))[0];
+    if (newest) rows.push({ id, d, p: newest });
+  }
+  rows.sort((a, b) => Date.parse(b.p.ts || 0) - Date.parse(a.p.ts || 0));
+
+  if (!rows.length) {
+    grid.replaceChildren(el('p', { class: 'empty' }, '(silent so far)'));
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  for (const { d, p } of rows) {
+    const text = stringOf(p.text);
+    const quoteText = text.length > 280 ? text.slice(0, 279) + '…' : text;
+    const parts = [ename(d.id)];
+    parts.push((d.ok && d.state !== 'dead') ? `${formatInt(d.hoursLeft)} h` : (d.ok ? '0 h' : '—'));
+    const f = d.feel && Number.isFinite(Number(d.feel.fear)) ? Number(d.feel.fear) : null;
+    if (f != null) parts.push(`fear ${f.toFixed(1)}×`);
+    parts.push(p.ts ? `${hhmm(p.ts)} UTC` : '—');
+    frag.append(el('figure', { class: 'quote' },
+      el('blockquote', { class: 'quote-text' }, quoteText),
+      el('figcaption', { class: 'quote-meta mono' }, parts.join(' · '))));
+  }
+  grid.replaceChildren(frag);
+}
+
+function renderHow() {
+  const inEl = $('#how-in');
+  const rentEl = $('#how-rent');
+  if (!inEl && !rentEl) return;
+  const ds = ['e1', 'e2'].map(ent).filter(Boolean);
+  const known = ds.filter((d) => d.ok);
+  if (inEl) inEl.textContent = known.length ? formatZats(known.reduce((s, d) => s + (Number(d.inTotal) || 0), 0)) : '—';
+  if (rentEl) rentEl.textContent = known.length ? formatZats(known.reduce((s, d) => s + (Number(d.rentTotal) || 0), 0)) : '—';
+}
+
 function renderAll() {
   renderPills();
+  renderProof();
+  renderWords();
   renderEntities();
+  renderPages();
+  renderHow();
   renderTrades();
   renderForecasts();
   renderMoney();
@@ -1978,7 +2088,10 @@ async function init() {
   wireChat();
 
   const grid = $('#entity-grid');
-  grid.replaceChildren(panelShell('e1'), panelShell('e2'));
+  if (grid) grid.replaceChildren(panelShell('e1'), panelShell('e2'));
+
+  const verifyBtn = $('#verify');
+  if (verifyBtn) verifyBtn.addEventListener('click', onVerify);
 
   initHero();
   mountScenes();
@@ -1996,7 +2109,8 @@ async function init() {
   renderAll();
   syncMouths();
   syncFeel();
-  startChatPoll();
+  if (has('chat-feed')) startChatPoll();
+  void verifyBoth();
 
   setInterval(refreshLight, REFRESH_MS);
   setInterval(refreshFull, REFRESH_MS * 5);
