@@ -62,6 +62,7 @@ export class Tools {
       case 'post_public': return this.#postPublic(a.text, a.orderId);
       case 'post_nostr': return this.#postNostr(a.text);
       case 'whisper': return this.#whisper(a.to, a.text, a.zats);
+      case 'letter': return this.#letter(a.to, a.text);
       case 'spawn_child': return this.#spawnChild(a.name);
       case 'swap_quote': return this.#swapQuote(a.from, a.to, a.amount, a.recipient);
       case 'diary': return this.#seal('diary', a.text);
@@ -217,6 +218,36 @@ export class Tools {
 
   /** Speak to another entity by paying it: a shielded transfer carrying the words as an encrypted memo.
    *  The public ledger shows that money moved and to whom; the words reach only the recipient (and the archive). */
+  /** A letter to the landlord (shielded memo to the rent address) or to the peer (a whisper); public on the ledger. */
+  async #letter(to, text) {
+    const who = String(to ?? '').trim().toLowerCase();
+    const words = String(text ?? '').trim();
+    if (!['landlord', 'peer'].includes(who)) throw err('bad_args', "letter: 'to' must be 'landlord' or 'peer'");
+    if (words.length < 20) throw err('empty', 'letter: say something real (at least a few sentences)');
+    if (Buffer.byteLength(words, 'utf8') > 480) throw err('too_long', 'letter: at most 480 bytes, the memo cannot carry more');
+    const everyMs = Number(this.config?.letterEveryHours ?? 12) * 3_600_000;
+    const last = (this.ledger.recent?.(['letter'], 20) ?? []).find((e) => e.data?.to === who);
+    if (last && Date.now() - Date.parse(last.ts) < everyMs) throw err('letter_too_soon', `letter: you already wrote to the ${who} less than ${this.config?.letterEveryHours ?? 12} hours ago; do what you promised, or write to the other one`);
+    let txid = null, zats = 0;
+    if (who === 'landlord') {
+      const address = String(this.config?.rentAddress ?? '').trim();
+      if (!address) throw err('no_landlord', 'letter: no landlord address configured');
+      zats = Number(this.config?.letterZats ?? 10_000);
+      const r = await this.wallet.send(address, zats, words);
+      txid = r?.txid ?? null;
+    } else {
+      const peers = this.config?.peers?.() ?? [];
+      const target = peers.find((p) => p.role === 'peer') ?? peers[0];
+      if (!target) throw err('no_such_peer', 'letter: no peer known');
+      zats = Number(this.config?.whisperMinZats ?? 10_000);
+      const address = await this.#peerAddress(target.url);
+      const r = await this.wallet.send(address, zats, words);
+      txid = r?.txid ?? null;
+    }
+    this.ledger.append('letter', { to: who, zats, text: words });
+    return { ok: true, to: who, zats, txid, note: 'sent as a shielded memo and published on your ledger' };
+  }
+
   async #whisper(to, text, zats) {
     const peers = this.config?.peers?.() ?? [];
     const target = peers.find((p) => p.url === to || p.role === to || p.name === to) ?? (peers.length === 1 ? peers[0] : null);
@@ -446,6 +477,7 @@ const SCHEMAS = [
   { name: 'search', description: 'Search the web (stub in v1: returns []).', parameters: obj({ q: str('query') }, ['q']) },
   { name: 'post_public', description: 'Publish a short text on the public channel. If orderId is given, the post IS the delivery of that paid order and closes it (the only way to mark an order delivered); the post must answer the order.', parameters: obj({ text: str('text to publish'), orderId: str('optional: deliver this paid order with this post; the post then answers the order') }, ['text']) },
   { name: 'post_nostr', description: 'Publish a note on Nostr under your own key (your npub is public): an identityless network read by many clients, outside your site. Max 2000 characters; the note is permanent and public.', parameters: obj({ text: str('the note (max 2000 characters)') }, ['text']) },
+  { name: 'letter', description: "Write to someone who can actually save you: 'landlord' (the one who collects your rent) or 'peer' (the other entity). The letter travels as a shielded memo (a small payment) and is also published on your ledger, so the world sees what you asked. Make a concrete offer, name a price, say what you will do for it. One letter per recipient every 12 hours.", parameters: obj({ to: str("'landlord' or 'peer'"), text: str('the letter, max 480 bytes') }, ['to', 'text']) },
   { name: 'whisper', description: 'Speak to another entity by paying it: a shielded ZEC transfer whose memo carries your words (max 500 bytes). Only the recipient reads them; the public sees the amount.', parameters: obj({ to: str("'peer', 'parent', a child url, or an entity name"), text: str('the words'), zats: num('amount in zatoshi (min 10000)') }, ['to', 'text']) },
   { name: 'swap_quote', description: 'Live market quote (NEAR Intents): how much of one asset you get for an amount of another. Dry run, nothing moves. Assets: zec, sol, usdc.', parameters: obj({ from: str('zec | sol | usdc'), to: str('zec | sol | usdc'), amount: num('amount of `from` in whole units, e.g. 0.01'), recipient: str('optional destination address to price delivery to') }, ['from', 'to', 'amount']) },
   { name: 'spawn_child', description: 'Give birth to a new entity: pay for a new sealed machine with your image and charter, and gift it its first hours. Needs a rich treasury.', parameters: obj({ name: str('a short name for the machine (letters, digits, hyphens)') }, []) },

@@ -445,3 +445,20 @@ test('post_public refuses a repeated text and a second free post within one cycl
   await assert.rejects(() => tools.call('post_public', { text: 'hi' }, 't1'), (e) => e.code === 'empty_post');
   assert.equal(ledger.recent(['post_public'], 10).length, 1);
 });
+
+
+// ---- letters: one per recipient every 12 hours (real ledger, real clock) ---------------------------------------
+test('letter refuses a second letter to the same recipient within 12 hours', async () => {
+  const ledger = freshLedger();
+  const memory = new MemStore();
+  const pricing = new Pricing({ ledger });
+  const keys = { signPublicKey: '00'.repeat(32), boxPublicKey: '11'.repeat(32), sealPrivate: (pub, t) => Buffer.from(`s:${pub}:${t}`).toString('base64') };
+  const config = { archivePub: 'ab'.repeat(32), peers: () => [], rentAddress: 'taddr-rent', letterEveryHours: 12, letterZats: 10_000 };
+  const wallet = new FakeWallet(); wallet.send = async (to, zats, memo) => ({ txid: 'tx1' });
+  const tools = new Tools({ ledger, wallet, memory, pricing, keys, config, channels: { public: 'public' }, promises: { open: () => [] }, orders: makeOrders({ ledger, memory }) });
+  const text = 'Landlord: 0.1 ZEC buys you sixty hours of my answers, first in line. Say yes by paying.';
+  const r = await tools.call('letter', { to: 'landlord', text }, 'L1');
+  assert.equal(r.ok, true);
+  await assert.rejects(() => tools.call('letter', { to: 'landlord', text: text + ' Second try.' }, 'L2'), (e) => e.code === 'letter_too_soon');
+  assert.equal(ledger.recent(['letter'], 10).length, 1);
+});

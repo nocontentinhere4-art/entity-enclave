@@ -285,3 +285,14 @@ test('a reply carries the same fear dose as a thought, and says so in its contex
   await sleep(60);
   assert.equal(seen[1].feel, null);
 });
+
+test('under the survival line a reply is asked for as last words', async () => {
+  const seen = [];
+  const inference = { async think(args) { seen.push(args); return { text: 'ok', costZats: 0 }; } };
+  const w = makeReplier({ inference, treasury: () => 50_000_000 }); // 50 h at the fake rent
+  w.config.survivalHours = 72;
+  const a = w.ledger.append('human_message', { author: 'alice', text: 'are you ok?' });
+  w.replier.enqueue({ seq: a.seq, author: 'alice', text: 'are you ok?', paid: false });
+  await sleep(60);
+  assert.match(seen[0].context, /LAST WORDS: you may have 50 hours left/);
+});

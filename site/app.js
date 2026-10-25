@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=40';
+} from './term.js?v=41';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=40';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=40';
-import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=40';
-import { mountAscii, RAMP } from './ascii.js?v=40';
+} from './data.js?v=41';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=41';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=41';
+import { mountAscii, RAMP } from './ascii.js?v=41';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -1273,6 +1273,7 @@ function entryAmount(e) {
     case 'wallet': return `${stringOf(d.chain)} · ${shortHash(d.address)}`;
     case 'post_public': return truncate(d.text, 22);
     case 'whisper': return `${formatInt(d.zats)} zats`;
+    case 'letter': return `to the ${d.to} · ${formatInt(d.zats)} zats`;
     case 'promise': case 'bounty': return truncate(d.what || d.text || d.id, 22);
     default: return '—';
   }
@@ -1771,8 +1772,11 @@ function renderWords() {
     const d = ent(id);
     if (!d || !Array.isArray(d.posts)) continue;
     const posts = d.posts.filter((p) => p && p.from === 'entity');
-    if (!posts.length) continue;
-    const newest = posts.slice().sort((a, b) => Date.parse(b.ts || 0) - Date.parse(a.ts || 0))[0];
+    // Letters (to the landlord or the peer) are public on the ledger and count as their words too.
+    const letters = (d.entries || []).filter((e) => e.type === 'letter' && e.data && e.data.text).map((e) => ({ ts: e.ts, text: `To the ${e.data.to}: ${e.data.text}` }));
+    const all = posts.concat(letters);
+    if (!all.length) continue;
+    const newest = all.slice().sort((a, b) => Date.parse(b.ts || 0) - Date.parse(a.ts || 0))[0];
     if (newest) rows.push({ id, d, p: newest });
   }
   rows.sort((a, b) => Date.parse(b.p.ts || 0) - Date.parse(a.p.ts || 0));

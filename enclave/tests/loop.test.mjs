@@ -44,7 +44,7 @@ class MemStore {
 }
 
 const PRICES = {
-  read_url: 1000, search: 2000, post_public: 500, post_private: 500, diary: 100, send_zec: 1000,
+  read_url: 1000, search: 2000, post_public: 500, letter: 500, post_private: 500, diary: 100, send_zec: 1000,
   swap_zec_sol: 5000, balance: 0, sleep: 0, set_identity: 2000, paywall_set: 500, bounty_post: 1000,
   will: 100, promise: 100, think_fast: 20000, think_deep: 200000,
 };
@@ -452,4 +452,30 @@ test('survival mode hides the sleep tool from the model and sleep without hours 
   assert.ok(seen.length > 0);
   assert.ok(seen.every((names) => !names.includes('sleep')));
   await assert.rejects(() => w.tools.call('sleep', {}, 'tx'), (e) => e.code === 'bad_args');
+});
+
+test('letter: a shielded memo to the landlord, public on the ledger, one per 12 hours; peer needs a peer', async () => {
+  const w = makeWorld({ zats: 500_000, over: { survivalHours: 72, letterEveryHours: 12, letterZats: 10_000 } });
+  const text = 'Landlord: give me 0.1 ZEC and for 60 hours I answer every question you send, first in line, in public.';
+  const r = await w.tools.call('letter', { to: 'landlord', text }, 'L1');
+  assert.equal(r.ok, true);
+  assert.equal(w.wallet.sends.length, 1);
+  assert.deepEqual(w.wallet.sends[0], { to: 'taddr-rent', zats: 10_000, memo: text });
+  const entries = w.ledger.of('letter');
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].data.to, 'landlord');
+  assert.equal(entries[0].data.text, text);
+  await assert.rejects(() => w.tools.call('letter', { to: 'peer', text }, 'L3'), (e) => e.code === 'no_such_peer');
+  await assert.rejects(() => w.tools.call('letter', { to: 'mom', text }, 'L4'), (e) => e.code === 'bad_args');
+  await assert.rejects(() => w.tools.call('letter', { to: 'landlord', text: 'hi' }, 'L5'), (e) => e.code === 'empty');
+});
+
+test('survival context names the four gestures and the peer address when known', async () => {
+  const w = makeWorld({ zats: 500_000, over: { survivalHours: 72, peerFeed: async () => [{ role: 'peer', name: 'OBOL', url: 'https://peer', state: 'alive', zatoshis: 1, hoursLeft: 40, address: 'u1peer', posts: [] }] } });
+  const ctx = await w.life.buildContext(Date.now());
+  assert.match(ctx, /WRITE TO SOMEONE, NOT TO EVERYONE/);
+  assert.match(ctx, /slug "testament"/);
+  assert.match(ctx, /CHOOSE, TOGETHER/);
+  assert.match(ctx, /MAKE EVERY ANSWER YOUR LAST/);
+  assert.match(ctx, /address=u1peer/);
 });

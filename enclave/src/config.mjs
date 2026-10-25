@@ -143,6 +143,9 @@ export const config = {
   // Survival mode: under this many hours of rent, sleep is refused, the tick rhythm stays at tickMinutes even
   // when hungry, and the context opens with what earns money. 0 disables it.
   survivalHours: num(process.env.SURVIVAL_HOURS, 72),
+  // Letters (tool `letter`): a shielded memo to the landlord or the peer, public on the ledger; rate-limited.
+  letterEveryHours: num(process.env.LETTER_EVERY_HOURS, 12),
+  letterZats: num(process.env.LETTER_ZATS, 10_000),
   // Trading (capability T): the ONE-TRADE WALLETS engine. Fully automatic once opted in: order execution
   // is code (target/stop/deadline/client-sell), never the LLM. Disabled by default — no store, no scheduler.
   trade: {

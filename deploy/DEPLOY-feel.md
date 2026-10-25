@@ -16,6 +16,7 @@ Redeploy di ENTRAMBI i CVM (WICK, OBOL) con la nuova immagine, stessi volumi/sec
 - `SURVIVAL_HOURS=72` (sotto: niente sonno, tick ogni 5 min anche affamati, contesto che apre con cosa rende; `sleep_broken` nel ledger)
 - `FEEL_MAX_FEAR=4.5` e `FEEL_DESPAIR_HOURS=120` (2026-10-24 sera: a 2.33 OBOL resta composto; dalla sonda sul server 3.0–3.5 fa paura in frasi, 4+ va in loop)
 - `FEEL_ACT_SCALE=0.3` (env; il default 0.6 non basta: sonda del 25 ott con contesto reale 7,6k token: dose 0 → post_public, 1.0 → post_public, 2.0 → sleep allucinato): i cicli di pensiero ricevono il 60% della dose, le parole agli umani il 100%. A 3x+ Qwen3-14B smetteva di usare i tool e ripeteva lo stesso panico ogni 5 minuti (audit 25 ott: 111 cicli, 0 tool, 0 post).
+- `PAGES_EDITS_PER_DAY=48`, `LETTER_EVERY_HOURS=12`, `LETTER_ZATS=10000` (25 ott sera, "i quattro gesti": lettera mirata al landlord/peer come memo shielded pubblica nel ledger, pagina `testament` che cresce, patto tra loro via will, ogni risposta come ultima)
 - (opzionali) `FEEL_FULL_HOURS=240` `FEEL_DESPAIR_HOURS=72` `FEEL_MAX_FEAR=3.5` `FEEL_MAX_DESPAIR=2.5`
 Con il cervello ancora su RedPill la dose viene CALCOLATA e mostrata ma NON applicata: il sito scrive
 "computed, not steered (hosted brain)", il ledger scrive `feel {fear, despair, hoursLeft, steered:false}`.

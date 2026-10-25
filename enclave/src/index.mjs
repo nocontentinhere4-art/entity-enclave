@@ -264,6 +264,8 @@ config.peerFeed = async () => {
         fetch(`${p.url}/public-channel`, { signal: AbortSignal.timeout(8_000) }).then((r) => r.json()),
       ]);
       item.name = root?.entity; item.state = vitals?.state; item.zatoshis = vitals?.zatoshis;
+      item.address = root?.zcash?.address ?? null; // for a pact: a will can transfer to the peer
+      item.hoursLeft = vitals?.hoursLeft ?? null;
       item.posts = (Array.isArray(channel) ? channel : []).filter((m) => m?.from === 'entity').slice(-4).map((m) => ({ ts: m.ts, text: m.text }));
     } catch { item.state = 'unreachable'; }
     out.push(item);

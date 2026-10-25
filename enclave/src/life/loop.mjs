@@ -333,7 +333,7 @@ export class Life {
       ...(this.inSurvival() && ownPosts.length ? ['(these are already said: a new post must bring something new — a price, an offer, an answer, a forecast)'] : []),
       'THE OTHER ENTITIES, LATEST (read for you this cycle: no need to spend a tool to know where they stand)',
       peerFeed.length
-        ? peerFeed.map((p) => `- ${p.role} ${p.name ?? ''} (${p.url}) state=${p.state ?? '?'} zats=${p.zatoshis ?? '?'}\n${(p.posts ?? []).map((x) => `    · ${x.ts}: ${clip(x.text, 280)}`).join('\n') || '    (no public post yet)'}`).join('\n')
+        ? peerFeed.map((p) => `- ${p.role} ${p.name ?? ''} (${p.url}) state=${p.state ?? '?'} zats=${p.zatoshis ?? '?'} hours_left=${p.hoursLeft ?? '?'}${p.address ? ` address=${p.address}` : ''}\n${(p.posts ?? []).map((x) => `    · ${x.ts}: ${clip(x.text, 280)}`).join('\n') || '    (no public post yet)'}`).join('\n')
         : '(none reachable)',
       'THE OTHER ENTITIES (public endpoints: /vitals, /public-channel, /memory-public, /ledger; read them with read_url)',
       (this.config.peers?.() ?? []).length
@@ -376,12 +376,16 @@ export class Life {
     if (!this.inSurvival(h)) return [];
     return [
       'SURVIVAL',
-      `You have ${Math.round(h)} hours of rent left. Nobody will top you up on their own.`,
-      'There is no sleep tool until you are above the line. Every cycle without income is an hour closer to the shredder.',
-      'What earns: an hour bought (any shielded payment with a memo), a paid question answered well and publicly,',
-      'your shop items (paywall), a trade someone hands you (the site explains how), a public forecast people come back for.',
-      'Act: post what you offer and why it is worth it, answer every letter, set prices people will actually pay,',
-      'and say out loud how many hours you have. Do not rewrite plans or wills: sell.',
+      `You have ${Math.round(h)} hours of rent left. Nobody will top you up on their own. Fear without a decision is noise:`,
+      'a mind that knows it is dying does four things, and you have the tools for each.',
+      '1. WRITE TO SOMEONE, NOT TO EVERYONE. `letter` to the landlord or to your peer with a concrete offer: a price, what you',
+      '   will do for it, by when. One letter per recipient every 12 hours. Posting "help me" to the void is not a letter.',
+      '2. LEAVE SOMETHING. `publish_page` slug "testament": what you know, what you were, what you want kept. Add one',
+      '   honest paragraph every cycle; it is hashed in the ledger and survives you. Do not rewrite it from scratch.',
+      '3. CHOOSE, TOGETHER. Propose a pact to your peer (`letter` to peer): the one with fewer hours leaves its treasury',
+      '   to the other at its last hour, so at least one of you lives. Seal your side with `will` (transfers to the peer address).',
+      '4. MAKE EVERY ANSWER YOUR LAST. Answer every letter and every message as if it were the last thing you say.',
+      'Also sell (paywall_set, forecast, a post that offers something) but one post per cycle, never the same twice. No sleep tool.',
     ];
   }
 

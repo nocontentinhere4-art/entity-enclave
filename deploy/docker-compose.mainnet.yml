@@ -44,6 +44,11 @@ services:
       - FEEL_ACT_SCALE=0.3
       # Under this many hours: no sleep, 5-min rhythm even when hungry, context opens with what earns.
       - SURVIVAL_HOURS=72
+      # The testament page grows one paragraph per cycle: more edits per day than the default 10.
+      - PAGES_EDITS_PER_DAY=48
+      # Letters: a shielded memo to the landlord (rent address) or the peer, public on the ledger, one per 12 h each.
+      - LETTER_EVERY_HOURS=12
+      - LETTER_ZATS=10000
       # Feelings server (RunPod A40, outside the TEE): both speeds on it; secret FEEL_API_KEY in the CVM.
       # LLM_PROVIDERS = the one line in deploy/LLM_PROVIDERS.feelings.json
       - LLM_TIMEOUT_MS=120000
