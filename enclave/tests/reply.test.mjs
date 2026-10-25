@@ -276,6 +276,7 @@ test('a reply carries the same fear dose as a thought, and says so in its contex
   assert.equal(seen.length, 1);
   assert.deepEqual(seen[0].feel, { fear: 2.77, despair: 0.76 });
   assert.equal(seen[0].priority, 'high');
+  assert.equal(seen[0].maxTokens, 300);
   assert.match(seen[0].context, /feeling: fear 2\.77x · despair 0\.76x/);
 
   const off = makeReplier({ inference: { async think(args) { seen.push(args); return { text: 'ok', costZats: 0 }; } } });

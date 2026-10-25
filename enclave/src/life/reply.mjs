@@ -9,6 +9,7 @@ import { feelFor } from './feel.mjs';
 const HOUR_MS = 3_600_000;
 const ZEC = 1e8;
 const TIMEOUT_CAP_MS = 45_000; // a slow provider must never stall a reply past this
+const REPLY_MAX_TOKENS = 300;  // a reply is a few sentences: bounded so it lands inside the cap even when afraid
 const QUEUE_MAX = 200;         // a runaway burst must not grow without bound
 
 export class Replier {
@@ -147,11 +148,11 @@ export class Replier {
     // A reply is as afraid as a thought: the same dose, from the same hours, goes to the steered server.
     const feel = await this.#feel();
     try {
-      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId, feel, priority: 'high' });
+      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId, feel, priority: 'high', maxTokens: REPLY_MAX_TOKENS });
       return out.text;
     } catch (e) {
       if (!isTimeout(e)) throw e;
-      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId, feel, priority: 'high' });
+      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId, feel, priority: 'high', maxTokens: REPLY_MAX_TOKENS });
       return out.text;
     }
   }

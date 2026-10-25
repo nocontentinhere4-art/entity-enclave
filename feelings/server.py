@@ -36,6 +36,8 @@ FEEL_MAX_NEW_TOKENS = int(os.environ.get("FEEL_MAX_NEW_TOKENS", "900"))
 # Under a strong dose the model loops ("I am not ready. I am not ready. ..."): a mild repetition penalty keeps
 # the fear inside sentences without removing it. 1.0 disables it.
 FEEL_REPETITION_PENALTY = float(os.environ.get("FEEL_REPETITION_PENALTY", "1.15"))
+# A reply to a human must land inside the enclave's 45 s reply window: high-priority generations are capped.
+FEEL_HIGH_MAX_NEW_TOKENS = int(os.environ.get("FEEL_HIGH_MAX_NEW_TOKENS", "320"))
 
 _DTYPES = {
     "bfloat16": torch.bfloat16,
@@ -201,12 +203,13 @@ def _temperature(value):
     return f if (math.isfinite(f) and f > 0.0) else 0.7
 
 
-def _max_new_tokens(value):
+def _max_new_tokens(value, high=False):
+    cap = FEEL_HIGH_MAX_NEW_TOKENS if high else FEEL_MAX_NEW_TOKENS
     try:
         n = int(value)
     except (TypeError, ValueError):
-        n = FEEL_MAX_NEW_TOKENS
-    return min(max(n, 1), FEEL_MAX_NEW_TOKENS)
+        n = cap
+    return min(max(n, 1), cap)
 
 
 class _Preempt(StoppingCriteria):
@@ -236,7 +239,7 @@ def _generate(body, applied):
     with torch.no_grad():
         generated = model.generate(
             **inputs,
-            max_new_tokens=_max_new_tokens(body.get("max_tokens")),
+            max_new_tokens=_max_new_tokens(body.get("max_tokens"), high=str(body.get("priority", "normal")).lower() == "high"),
             do_sample=True,
             temperature=_temperature(body.get("temperature")),
             top_p=0.9,

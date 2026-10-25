@@ -13,7 +13,7 @@ export class Inference {
   }
 
   /** One paid thought. `tools` may be a Tools instance or a plain [{name,description,parameters}]. */
-  async think({ context, speed = 'fast', tools = [], tickId, feel, priority }) {
+  async think({ context, speed = 'fast', tools = [], tickId, feel, priority, maxTokens }) {
     const fast = speed !== 'deep';
     const action = fast ? 'think_fast' : 'think_deep';
     // Charge first: thinking is never free, even if the provider then fails.
@@ -24,7 +24,7 @@ export class Inference {
       out = fake(context, tools);
     } else {
       const provider = pickProvider(this.config.providers ?? [], fast ? 'fast' : 'deep', context);
-      out = await this.#http(provider, { context, tools, feel, priority });
+      out = await this.#http(provider, { context, tools, feel, priority, maxTokens });
     }
 
     const respHash = sha256(stable({ text: out.text, toolCalls: out.toolCalls }));
@@ -41,7 +41,7 @@ export class Inference {
     return { ...out, costZats };
   }
 
-  async #http(provider, { context, tools, feel, priority }) {
+  async #http(provider, { context, tools, feel, priority, maxTokens }) {
     const url = chatCompletionsUrl(provider.baseUrl);
     if (!url) throw err('no_provider', 'llm provider has no baseUrl');
     const defs = (tools?.list ? tools.list() : tools ?? []).map((t) => ({
@@ -54,6 +54,7 @@ export class Inference {
     }));
     const messages = [{ role: 'user', content: String(context ?? '') }];
     const body = { model: provider.model, messages };
+    if (Number.isFinite(Number(maxTokens)) && Number(maxTokens) > 0) body.max_tokens = Math.floor(Number(maxTokens));
     if (defs.length) { body.tools = defs; body.tool_choice = 'auto'; }
     // The `feel` field goes only to a provider that declared it (the steered-inference server) and only
     // when a dose is actually positive: hosted providers must never see it.
