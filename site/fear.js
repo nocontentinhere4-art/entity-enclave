@@ -10,7 +10,7 @@
  * glitch loop: tremor, chromatic split, slice cuts, letter failure, the CRT intensity, the death overlay and the
  * two-second typing intro. It reads state from term.js; it never talks to the network.
  */
-import { state } from './term.js?v=42';
+import { state } from './term.js?v=43';
 
 const FEAR_MAX = 4.5;                 // dose scale top: page = dose / FEAR_MAX
 const GLYPHS_FAIL = '!@#$%^&*';       // letter-failure glyphs

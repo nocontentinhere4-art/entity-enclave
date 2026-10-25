@@ -15,12 +15,12 @@
  */
 import {
   state, nameOf, stateWord, deadline, rentZats, loadAll, openPay,
-} from './term.js?v=42';
+} from './term.js?v=43';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, fmtStamp, hhmm, shortHash, sha256Hex, postMessage,
-} from './data.js?v=42';
-import { setJawChatter, drawNonce, triggerTalk } from './hero.js?v=42';
-import { initFear, fearLevel } from './fear.js?v=42';
+} from './data.js?v=43';
+import { setJawChatter, drawNonce, triggerTalk } from './hero.js?v=43';
+import { initFear, fearLevel } from './fear.js?v=43';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
