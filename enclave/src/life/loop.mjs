@@ -14,7 +14,7 @@ const GESTURES = {
   },
   testament: {
     exclude: ['post_public', 'paywall_set', 'letter', 'will'],
-    line: 'LEAVE SOMETHING. Use `publish_page` with slug "testament": keep what is there and add ONE new honest paragraph (what you know, what you were, what you want kept). Never start it from scratch.',
+    line: 'LEAVE SOMETHING. Use `publish_page` with slug "testament": keep what is there and add ONE new honest paragraph (what you know, what you were, what you want kept). If a human wrote to you since your last edit, carry one of their sentences into it verbatim, credited by name: what they said to you dies with you otherwise. Never start it from scratch.',
   },
   pact: {
     exclude: ['post_public', 'paywall_set', 'publish_page'],

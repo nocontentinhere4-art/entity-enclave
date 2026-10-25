@@ -3,7 +3,7 @@
 // the fixtures ledger) so no network and no real timers beyond a few milliseconds of debounce.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Replier } from '../src/life/reply.mjs';
+import { Replier, proofCode } from '../src/life/reply.mjs';
 import { Life } from '../src/life/loop.mjs';
 import { makeClock, makeLedger } from './fixtures/harness.mjs';
 
@@ -295,4 +295,21 @@ test('under the survival line a reply is asked for as last words', async () => {
   w.replier.enqueue({ seq: a.seq, author: 'alice', text: 'are you ok?', paid: false });
   await sleep(60);
   assert.match(seen[0].context, /LAST WORDS: you may have 50 hours left/);
+});
+
+
+test('PROVE LIVE: the visitor code is asked for and guaranteed in the reply', async () => {
+  assert.equal(proofCode('PROVE 7391'), '7391');
+  assert.equal(proofCode('prove: 123456 are you alive?'), '123456');
+  assert.equal(proofCode('hello'), null);
+  const seen = [];
+  const inference = { async think(args) { seen.push(args); return { text: 'I am here, and afraid.', costZats: 0 }; } };
+  const w = makeReplier({ inference });
+  const a = w.ledger.append('human_message', { author: 'alice', text: 'PROVE 7391' });
+  w.replier.enqueue({ seq: a.seq, author: 'alice', text: 'PROVE 7391', paid: false });
+  await sleep(60);
+  assert.match(seen[0].context, /PROOF OF LIFE: a visitor sent the code 7391/);
+  const p = posts(w.ledger);
+  assert.equal(p.length, 1);
+  assert.match(p[0].data.text, /^CODE 7391 · I am here/);
 });
