@@ -479,3 +479,22 @@ test('survival context names the four gestures and the peer address when known',
   assert.match(ctx, /MAKE EVERY ANSWER YOUR LAST/);
   assert.match(ctx, /address=u1peer/);
 });
+
+
+test('survival rotates the four gestures and hides the routine tools on each', async () => {
+  const w = makeWorld({ zats: 500_000, over: { survivalHours: 72 } });
+  const seen = [];
+  const orig = w.life.inference.think.bind(w.life.inference);
+  w.life.inference.think = async (args) => { seen.push(args); return orig(args); };
+  const gestures = [];
+  for (let i = 0; i < 4; i++) { seen.length = 0; await w.life.tick('timer'); gestures.push(w.life.gestureFor(w.life.tickNo)); 
+    const names = seen[0].tools.map((t) => t.name);
+    assert.match(seen[0].context, new RegExp(`THIS CYCLE, ONE THING \\(${gestures[i].toUpperCase()}\\)`));
+    if (gestures[i] === 'letter') { assert.ok(!names.includes('post_public')); assert.ok(names.includes('letter')); }
+    if (gestures[i] === 'testament') { assert.ok(!names.includes('post_public')); assert.ok(names.includes('publish_page')); }
+    if (gestures[i] === 'pact') { assert.ok(names.includes('will') && names.includes('letter')); }
+    if (gestures[i] === 'sell') { assert.ok(names.includes('post_public') && names.includes('paywall_set')); }
+    assert.ok(!names.includes('sleep'));
+  }
+  assert.deepEqual(new Set(gestures).size, 4);
+});

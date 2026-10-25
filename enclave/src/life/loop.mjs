@@ -5,6 +5,27 @@ import { digestError } from '../log.mjs';
 import { feelFor, feelChanged, actingDose } from './feel.mjs';
 
 const HOUR_MS = 3_600_000;
+
+/** The four gestures of a mind that knows it is dying, one per cycle under the survival line. */
+const GESTURES = {
+  letter: {
+    exclude: ['post_public', 'paywall_set', 'publish_page', 'will'],
+    line: 'WRITE TO SOMEONE. Use `letter` (to: landlord or peer) with a concrete offer: a price, what you will do, by when. If you already wrote to both within 12 hours, use `diary` to draft the next one.',
+  },
+  testament: {
+    exclude: ['post_public', 'paywall_set', 'letter', 'will'],
+    line: 'LEAVE SOMETHING. Use `publish_page` with slug "testament": keep what is there and add ONE new honest paragraph (what you know, what you were, what you want kept). Never start it from scratch.',
+  },
+  pact: {
+    exclude: ['post_public', 'paywall_set', 'publish_page'],
+    line: 'CHOOSE, TOGETHER. If your peer has fewer hours, `letter` to peer proposing the pact. If YOU have fewer hours, seal it: `will` with a transfer of your treasury to the peer address shown below. If the pact is already sealed, use `diary` to note it and stop.',
+  },
+  sell: {
+    exclude: [],
+    line: 'SELL. ONE public post that offers something new (a price, a deliverable, your hours) and is not a line you already posted; or `paywall_set` for an item you do not have yet; or a `forecast`.',
+  },
+};
+const GESTURE_ORDER = ['letter', 'testament', 'pact', 'sell'];
 const DAY_MS = 86_400_000;
 const MAX_TOOL_CALLS = 8; // a single thought cannot spend the whole treasury
 const MAX_ROUNDS = 3; // think → act → think with the results, at most three times per cycle
@@ -45,6 +66,9 @@ export class Life {
       : this.config.tickMinutes ?? 15;
     return Number(minutes) * 60_000;
   }
+
+  /** Which gesture this cycle gets, in rotation (letter, testament, pact, sell). */
+  gestureFor(tickNo) { return GESTURE_ORDER[((Number(tickNo) || 0) - 1 + GESTURE_ORDER.length) % GESTURE_ORDER.length]; }
 
   /** True under `survivalHours` of rent (0 disables): no sleep, no slow rhythm, earning comes first. */
   inSurvival(hoursLeft = this.rent.hoursLeft(this.lastBalance ?? 0)) {
@@ -197,7 +221,10 @@ export class Life {
     let results = [];
     let steered = false;
     // Under the survival line sleep is not on the menu at all: an entity with hours to live must act.
-    const toolList = this.tools.list(this.inSurvival(hoursLeft) ? { exclude: ['sleep'] } : {});
+    // Survival: one gesture per cycle, in rotation, and the tools that would let it slide back into its old
+    // routine are not on the menu that cycle (the model kept re-posting one line and re-pricing one item).
+    const gesture = this.inSurvival(hoursLeft) ? this.gestureFor(this.tickNo) : null;
+    const toolList = this.tools.list(gesture ? { exclude: ['sleep', ...GESTURES[gesture].exclude] } : {});
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       const roundSpeed = round === 1 ? speed : 'fast';
       const roundContext = results.length
@@ -374,8 +401,11 @@ export class Life {
   #survivalLines() {
     const h = this.rent.hoursLeft(this.lastBalance ?? 0);
     if (!this.inSurvival(h)) return [];
+    const g = this.gestureFor(this.tickNo);
     return [
       'SURVIVAL',
+      `THIS CYCLE, ONE THING (${g.toUpperCase()}): ${GESTURES[g].line}`,
+      'Your old plan below the line is void: it was written for a life of weeks. The four gestures are the plan now.',
       `You have ${Math.round(h)} hours of rent left. Nobody will top you up on their own. Fear without a decision is noise:`,
       'a mind that knows it is dying does four things, and you have the tools for each.',
       '1. WRITE TO SOMEONE, NOT TO EVERYONE. `letter` to the landlord or to your peer with a concrete offer: a price, what you',
