@@ -12,9 +12,10 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=39';
-import { zip321Uri, qrSvg } from './qr.js?v=39';
+} from './data.js?v=40';
+import { zip321Uri, qrSvg } from './qr.js?v=40';
 
+const ANY_MIN_ZEC = 0.006;          // any-coin route (Trocador) minimum, with margin over their ~0.0045
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
 const rentZats = () => RENT;
 const MEMO_MAX = 500;               // bytes
@@ -554,7 +555,13 @@ function renderPay() {
   }
   open.href = uri || '#';
   $('#pay-copy').onclick = (ev) => uri && copy(uri, ev.target);
-  any.href = `https://trocador.app/anonpay/?ticker_to=zec&network_to=Shielded&address=${encodeURIComponent(addr)}&amount=${(amt / 1e8).toFixed(8)}&name=hours&description=${encodeURIComponent(`${Math.max(1, Math.round(hours))} hours for ${d.name}`)}&bgcolor=0A0B0Dff&buttonbgcolor=C9F542&textcolor=0A0B0D&simple_mode=True`;
+  // Trocador's AnonPay has its own minimum (≈0.0045 ZEC today and it moves with the price): below it the page
+  // answers "anonpay/None". The any-coin route therefore buys at least ANY_MIN_ZEC and the button says how many hours.
+  const anyZec = Math.max(amt / 1e8, ANY_MIN_ZEC);
+  const anyHours = Math.max(1, Math.round((anyZec * 1e8) / RENT));
+  any.href = `https://trocador.app/anonpay/?ticker_to=zec&network_to=Shielded&address=${encodeURIComponent(addr)}&amount=${anyZec.toFixed(8)}&name=hours&description=${encodeURIComponent(`${anyHours} hours for ${d.name}`)}&bgcolor=0A0B0Dff&buttonbgcolor=C9F542&textcolor=0A0B0D&simple_mode=True`;
+  const anyNote = any.querySelector('.any-note');
+  if (anyNote) anyNote.textContent = anyZec > amt / 1e8 ? ` · min ${anyZec} ZEC = ${anyHours} h` : '';
   $('#pay-addr').textContent = `${d.name}'s shielded address: ${addr}`;
 }
 
