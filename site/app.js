@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=43';
+} from './term.js?v=44';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=43';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=43';
-import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=43';
-import { mountAscii, RAMP } from './ascii.js?v=43';
+} from './data.js?v=44';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=44';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=44';
+import { mountAscii, RAMP } from './ascii.js?v=44';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -1700,6 +1700,7 @@ async function refreshLight() {
   await loadAll(false);
   diffLog();
   checkNewPosts();
+  checkNewRent();
   await Promise.allSettled([loadTrades(), loadForecasts()]);
   renderAll();
   syncMouths();
@@ -1711,6 +1712,7 @@ async function refreshFull() {
   await loadAll(true);
   diffLog();
   checkNewPosts();
+  checkNewRent();
   renderAll();
   syncMouths();
   syncFeel();
@@ -1895,14 +1897,26 @@ function obolScene() {
   };
 }
 
-/* [0003] Trades — the hand reaches: cells reveal left→right on a slow loop; the coin pulses yellow on trade-open */
+/* [0003] Trades — the hand reaches: cells reveal left→right on a slow loop; the coin pulses yellow on trade-open,
+ * and drops out of the hand when a new hour of rent is paid (S1 BUY AN HOUR). */
 function handScene() {
-  const g = { cols: 0, rows: 0, t: 0, pulseUntil: -1 };
-  const SCAN = 9, PULSE = 0.8;
+  const g = { cols: 0, rows: 0, t: 0, pulseUntil: -1, dropStart: -1, wantDrop: false };
+  const SCAN = 9, PULSE = 0.8, DROP = 0.9;
+  /* the coin: a bright yellow disk that falls from the open hand to the bottom */
+  const coinFall = (x, y) => {
+    if (g.t < g.dropStart || g.t >= g.dropStart + DROP) return 0;
+    const p = (g.t - g.dropStart) / DROP;
+    const cx = 0.58, cy = 0.28 + p * 0.66;
+    const dx = x / g.cols - cx, dy = y / g.rows - cy;
+    const d = Math.sqrt(dx * dx * 3 + dy * dy * 4);
+    return d < 0.055 ? (1 - d / 0.055) : 0;
+  };
   const lum = (i, x, y, base) => {
     if (g.t < g.pulseUntil && base > 0.55 && y < g.rows * 0.75) {
       return base + ((g.pulseUntil - g.t) / PULSE) * 0.45;
     }
+    const drop = coinFall(x, y);
+    if (drop > 0) return Math.min(1, base + drop * 0.9);
     return base;
   };
   const alpha = (i, x, y, base) => {
@@ -1910,7 +1924,11 @@ function handScene() {
     const ahead = x - edge;
     return ahead < 0 ? 1 : (ahead < 2.5 ? 0.5 : 0.35);
   };
-  const yellow = (i, x, y, base) => (g.t < g.pulseUntil && base > 0.55 && y < g.rows * 0.75 ? true : null);
+  const yellow = (i, x, y, base) => {
+    if (g.t < g.pulseUntil && base > 0.55 && y < g.rows * 0.75) return true;
+    if (coinFall(x, y) > 0) return true;
+    return null;
+  };
   const live = { lum, alpha, yellow };
   return {
     g,
@@ -1921,14 +1939,16 @@ function handScene() {
   };
 }
 
-/* [0006] Money — the sand falls through the neck, the bottom pile slowly brightens; speed mirrors the hourly rent */
+/* [0006] Money — the sand falls through the neck, the bottom pile slowly brightens; speed mirrors the hourly rent,
+ * and the sand stream jitters with the live fear dose */
 function hourglassScene() {
-  const g = { cols: 0, rows: 0, t: 0 };
+  const g = { cols: 0, rows: 0, t: 0, jitter: 0 };
   const speed = Math.min(20, rentZats() / 10000);   // sand falls faster when the rent is higher; purely visual
   const lum = (i, x, y, base) => {
     let l = base;
     const cx = x / g.cols, cy = y / g.rows;
-    if (Math.abs(cx - 0.5) < 0.07 && cy > 0.18 && cy < 0.9) {
+    const jx = g.jitter * Math.sin(g.t * 17 + y * 0.7) * 0.02;   // fear: the stream shakes
+    if (Math.abs(cx - 0.5 + jx) < 0.07 && cy > 0.18 && cy < 0.9) {
       const ph = frac(cy - g.t * 0.45 * speed);
       l = Math.min(1, l + Math.max(0, 1 - Math.abs(ph - 0.5) * 5) * 0.65);
     }
@@ -1988,22 +2008,23 @@ function spineScene() {
   };
 }
 
-/* [0008] Terminal — the jaw talks while a line is being typed */
+/* [0008] Terminal — the jaw talks while a line is being typed; 3 Hz chatter while PROVE LIVE waits */
 function shoutScene() {
-  const g = { cols: 0, rows: 0, t: 0, talkUntil: -1 };
+  const g = { cols: 0, rows: 0, t: 0, talkUntil: -1, chatter: false };
+  const hot = () => (g.t < g.talkUntil) || (g.chatter && (Math.floor(g.t * 3) % 2 === 0));
   const lum = (i, x, y, base) => (
-    g.t < g.talkUntil && y > g.rows * 0.5 && base > 0.3
+    hot() && y > g.rows * 0.5 && base > 0.3
       ? base + cellRand(i, (g.t * 12) | 0) * 0.15
       : base);
   const char = (i, x, y, base) => {
     const c = Math.round(base * RAMP_N);
-    if (g.t < g.talkUntil && y > g.rows * 0.5 && base > 0.3) {
+    if (hot() && y > g.rows * 0.5 && base > 0.3) {
       const f = cellRand(i, (g.t * 12) | 0);
       return clampI(c + (f > 0.5 ? 1 : -1), 0, RAMP_N);
     }
     return c;
   };
-  const yellow = (i, x, y, base) => (g.t < g.talkUntil && y > g.rows * 0.5 && base > 0.7 ? true : null);
+  const yellow = (i, x, y, base) => (hot() && y > g.rows * 0.5 && base > 0.7 ? true : null);
   const live = { lum, char, yellow };
   return {
     g,
@@ -2059,6 +2080,45 @@ function mountScenes() {
   // dividers removed: one continuous page
 }
 
+/* The home's glyph scenes (S1 hand, S2 hourglass, S3 shout, S5 bones, S6 spine). S0 skulls live in hero.js,
+ * S4 letter in terminal.js. Mounted only when their canvases exist (index.html). */
+const homeScenes = { hand: null, hourglass: null, shout: null, bones: null, spine: null };
+
+function mountHomeScenes() {
+  const hand = $('#gs-hand');
+  if (hand) { homeScenes.hand = handScene(); homeScenes.hand.handle = mountAscii(hand, homeScenes.hand.opts); }
+  const hg = $('#gs-hourglass');
+  if (hg) { homeScenes.hourglass = hourglassScene(); homeScenes.hourglass.handle = mountAscii(hg, homeScenes.hourglass.opts); }
+  const shout = $('#gs-shout');
+  if (shout) { homeScenes.shout = shoutScene(); homeScenes.shout.handle = mountAscii(shout, homeScenes.shout.opts); }
+  const bones = $('#gs-bones');
+  if (bones) { homeScenes.bones = bonesScene(); homeScenes.bones.handle = mountAscii(bones, homeScenes.bones.opts); }
+  const spine = $('#gs-spine');
+  if (spine) { homeScenes.spine = spineScene(); homeScenes.spine.handle = mountAscii(spine, homeScenes.spine.opts); }
+
+  document.addEventListener('zealot:ledger-new', () => { if (homeScenes.spine) homeScenes.spine.addPulse(); });
+  document.addEventListener('zealot:trade-open', () => { if (homeScenes.hand) homeScenes.hand.g.pulseUntil = performance.now() / 1000 + 0.8; });
+}
+
+/* a new rent_paid line drops the coin out of S1's hand */
+const seenRentSeq = { e1: 0, e2: 0 };
+function primeRent() {
+  for (const id of ['e1', 'e2']) {
+    const d = ent(id);
+    if (d && Array.isArray(d.rents) && d.rents.length) seenRentSeq[id] = Math.max(0, ...d.rents.map((e) => Number(e.seq) || 0));
+  }
+}
+function checkNewRent() {
+  let paid = false;
+  for (const id of ['e1', 'e2']) {
+    const d = ent(id);
+    if (!d || !Array.isArray(d.rents)) continue;
+    const newest = Math.max(0, ...d.rents.map((e) => Number(e.seq) || 0));
+    if (newest > seenRentSeq[id]) { seenRentSeq[id] = newest; paid = true; }
+  }
+  if (paid && homeScenes.hand) homeScenes.hand.g.dropStart = performance.now() / 1000;
+}
+
 function syncScenes() {
   const wick = ent('e1');
   if (scenes.wick) {
@@ -2101,6 +2161,7 @@ async function init() {
 
   initHero();
   mountScenes();
+  mountHomeScenes();
 
   renderClock();
   setInterval(renderClock, 1000);
@@ -2111,6 +2172,7 @@ async function init() {
     console.error(err);
   }
   primePosts();
+  primeRent();
   await Promise.allSettled([loadTrades(), loadForecasts()]);
   renderAll();
   syncMouths();
@@ -2124,6 +2186,8 @@ async function init() {
 
   if (new URLSearchParams(location.search).get('selftest') === '1') void runSelfTest();
 }
+
+export { scenes, homeScenes };
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();

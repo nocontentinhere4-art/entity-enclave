@@ -197,11 +197,14 @@ export function mountAscii(canvas, opts = {}) {
       let a = inst.opacity;
       let ci = null;                    // null => derive the char from luminance
       let yel = null;
+      let jx = 0, jy = 0;               // per-cell tremor offset (px), from the motion hint
       if (hint) {
         if (hint.lum != null) l = resolve(hint.lum, i, x, y, base);
         if (hint.alpha != null) a = inst.opacity * resolve(hint.alpha, i, x, y, 1);
         if (hint.char != null) ci = resolve(hint.char, i, x, y, base);
         if (hint.yellow != null) yel = resolveBool(hint.yellow, i, x, y, base);
+        if (hint.dx != null) jx = resolve(hint.dx, i, x, y, base);
+        if (hint.dy != null) jy = resolve(hint.dy, i, x, y, base);
       }
       if (l < inst.thresh) continue;
       const v = Math.min(1, Math.max(0, l));
@@ -213,7 +216,7 @@ export function mountAscii(canvas, opts = {}) {
       const isLime = inst.yellow && (yel === true || (yel == null && v > inst.yellowAt));
       ctx.globalAlpha = a;
       ctx.fillStyle = isLime ? LIME : (v > 0.55 ? BRIGHT : DIM);
-      ctx.fillText(ch, x * inst.cell, y * inst.cell * CELL_ASPECT);
+      ctx.fillText(ch, x * inst.cell + jx, y * inst.cell * CELL_ASPECT + jy);
     }
     ctx.globalAlpha = 1;
   }
@@ -251,7 +254,10 @@ export function mountAscii(canvas, opts = {}) {
     // underlying state changes (e.g. an entity dies) after the initial sample, since
     // the shared clock skips reduced scenes.
     redraw: () => { if (inst.ready && inst.reduced) inst.draw(0); },
+    // Point the scene at a new image (e.g. a re-seeded procedural letter). Re-samples on load.
+    setSrc: (url) => { inst.ready = false; img.src = url; },
     get reduced() { return inst.reduced; },
+    get lum() { return inst.lum; },
     destroy() {
       if (ro) ro.disconnect();
       ensureIO().unobserve(canvas);
@@ -260,4 +266,9 @@ export function mountAscii(canvas, opts = {}) {
       byCanvas.delete(canvas);
     },
   };
+}
+
+/** The live set of mounted scenes, for post-mount passes (e.g. fear.js wraps their motion). */
+export function getInstances() {
+  return instances;
 }

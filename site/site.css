@@ -116,35 +116,7 @@ main { position: relative; }
 }
 .sec-h em { font-style: italic; color: var(--lime); }
 
-/* ---------- 1 · hero ---------- */
-.hero {
-  position: relative;
-  height: 100vh;
-  height: 100svh;
-  overflow: hidden;
-  background-color: var(--bg);
-  /* the hero grid is drawn in glyphs by hero.js */
-}
-.hero .skulls { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 1; }
-.hero-copy {
-  position: absolute; inset: 0; z-index: 2;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; padding: 72px 24px 10vh; pointer-events: none;
-}
-.hero h1 {
-  margin: 0; font-family: var(--serif); font-weight: 300;
-  font-size: clamp(40px, 6.2vw, 92px); line-height: 1.02;
-  letter-spacing: -0.025em; color: var(--display);
-}
-.hero h1 em { font-style: italic; color: var(--lime); text-shadow: 0 0 28px rgba(244, 183, 40, 0.35); }
-.mono-num { font-variant-numeric: tabular-nums; }
-.hero-sub {
-  margin: 26px 0 0; max-width: 58ch;
-  font-family: var(--sans); font-weight: 400; font-size: 15px; line-height: 1.7; color: var(--muted);
-}
-.mark { margin: 28px auto 0; display: grid; justify-items: center; gap: 10px; }
-.mark canvas { width: 190px; height: 190px; display: block; }
-.mark-word { font-family: var(--mono); font-size: 11px; letter-spacing: 0.26em; color: var(--lime); }
+/* ---------- 1 · hero status pills (under the two skulls) ---------- */
 .hero-pills {
   position: absolute; left: 0; right: 0; bottom: 60px; z-index: 2; pointer-events: none;
 }
@@ -163,11 +135,7 @@ main { position: relative; }
 .pill-status .sep { color: var(--caption); }
 .pill-status .p-hours { color: var(--body); font-variant-numeric: tabular-nums; }
 .pill-status .p-state { color: var(--lime); font-weight: 600; }
-.scroll {
-  position: absolute; left: 0; right: 0; bottom: 16px; z-index: 2;
-  text-align: center; font-family: var(--mono); font-weight: 500; font-size: 10px;
-  letter-spacing: 0.2em; color: var(--muted);
-}
+.pill-status .p-feel { color: var(--lime); }
 
 
 /* ---------- buttons ---------- */
@@ -603,12 +571,6 @@ legend { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; col
   :root { --pad: 16px; }
   .cell.m { display: none; }
   .cell.dock { display: flex; }
-  .hero { height: 100vh; height: 100svh; }
-  .hero-copy { padding: 64px 16px 12vh; }
-  .hero h1 { font-size: clamp(26px, 7vw, 40px); }
-  .hero-sub { font-size: 13px; line-height: 1.6; margin-top: 18px; }
-  .mark { margin-top: 22px; }
-  .mark canvas { width: 84px; height: 84px; }
   .hero-pills { bottom: 46px; display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; padding: 0 12px; }
   .pill-status { position: static; transform: none; }
   #pill-e1, #pill-e2 { left: auto; }
@@ -938,358 +900,273 @@ body { background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%
 
 
 /* ================================================================== */
-/* v42 · MORTALITY TERMINAL (home) — "THE INTERFACE IS AFRAID WITH THEM" */
-/* Yellow ink on near-black. A giant numbered list in mono: one item per */
-/* row, each row expands its block beneath it. The two skulls sit behind */
-/* row #1. The live fear dose of the two AIs drives the CRT and the      */
-/* glitch (tremor / chromatic split / slices / letter failure / death).  */
+/* v44 · GLYPH HOME — seven scenes drawn in ASCII, one canvas each     */
 /* ================================================================== */
-body.terminal { background-image: none; overflow-x: hidden; }
-body.terminal main { overflow-x: clip; max-width: 100vw; }
+body.terminal { overflow-x: hidden; }
+body.terminal main { max-width: 100vw; }
 
-/* ---------- CRT: scanlines, roll bar, vignette ---------- */
-/* Intensity is the live fear dose: each layer's opacity = (0.4 + 0.6·page). */
-.mt-crt { position: fixed; inset: 0; z-index: 9000; pointer-events: none; }
-.mt-crt-scan {
-  position: absolute; inset: 0;
-  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0.08) 0px, rgba(0,0,0,0.08) 1px, transparent 1px, transparent 2px);
-  opacity: var(--mt-crt, 0.4);
-}
-.mt-crt-roll {
-  position: absolute; left: 0; right: 0; top: -120px; height: 120px;
-  background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.04), transparent);
-  opacity: var(--mt-crt, 0.4);
-  animation: mt-roll 9s linear infinite;
-}
-@keyframes mt-roll { from { transform: translateY(0); } to { transform: translateY(calc(100vh + 120px)); } }
-.mt-crt-vig {
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,0.62) 100%);
-  opacity: var(--mt-crt, 0.4);
-}
-
-/* ---------- the list ---------- */
-.mt { position: relative; }
-.mt-item { position: relative; border-bottom: 1px solid rgba(244, 183, 40, 0.14); }
-
-.mt-row {
-  display: flex; align-items: flex-start; gap: 18px;
-  width: 100%; text-align: left; cursor: pointer;
-  background: none; border: 0; margin: 0; padding: 20px 24px;
-  color: inherit; font: inherit;
-}
-.mt-row:hover .mt-label { color: #ffe9a8; }
-.mt-num {
-  flex: none; width: 44px;
-  font-family: var(--mono); font-size: 11px; line-height: 1;
-  letter-spacing: 0.02em; color: rgba(244, 183, 40, 0.38);
-  padding-top: 16px;
-}
-.mt-label {
-  position: relative; display: block; flex: 1; min-width: 0;
-  font-family: var(--mono); font-weight: 600; letter-spacing: -0.02em;
-  font-size: clamp(22px, 5.6vw, 72px); line-height: 1.02;
-  color: var(--lime);
-  overflow-wrap: anywhere;
-  text-shadow: calc(var(--mt-k, 0px) * -1) 0 rgba(255, 0, 60, 0.6), var(--mt-k, 0px) 0 rgba(0, 180, 255, 0.6);
-}
-.mt-sep { color: rgba(244, 183, 40, 0.5); }
-.mt-rent { font-variant-numeric: tabular-nums; color: var(--lime); }
-
-/* during the 2s typing intro, the clocks (#1) and rent (#7) fade in last */
-.mt-clocks, .mt-rent { transition: opacity 240ms ease; }
-.mt-typing .mt-clocks, .mt-typing .mt-rent { opacity: 0; }
-
-/* the expanding block: grid-template-rows 0fr → 1fr, 180 ms */
-.mt-block { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 180ms cubic-bezier(0.2, 0, 0, 1); }
-.mt-item.open .mt-block { grid-template-rows: 1fr; }
-.mt-block-inner { overflow: hidden; min-height: 0; padding: 0 24px 34px; }
-
-/* slice clones (fear.js) */
-.mt-slice-host { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
-.mt-slice { position: absolute; top: 0; left: 0; right: 0; white-space: pre-wrap; }
-
-/* ---------- #1 · the title row, skulls behind ---------- */
-.mt-item--title {
-  min-height: 78svh;
-  display: flex; flex-direction: column; justify-content: center;
+/* ---- the scene frame: full-width section, full-bleed canvas ---- */
+.scene {
+  position: relative;
+  min-height: 70vh;
   overflow: hidden;
+  border-bottom: 1px solid rgba(244, 183, 40, 0.12);
+  background: var(--bg);
 }
-.mt-skulls { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; opacity: 0.55; }
-.mt-top { position: absolute; top: 0; right: 0; z-index: 3; padding: 26px 28px 0 0; }
-.t-sound {
-  pointer-events: auto; background: none; border: 0; cursor: pointer;
+.scene-s0 { min-height: 100vh; min-height: 100svh; }
+.scene-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+}
+.scene-overlay {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  pointer-events: none;
+}
+
+/* the one 11px mono label, top-left of every scene */
+.gs-label {
+  position: absolute; top: 16px; left: 24px; z-index: 3; margin: 0;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--lime);
+  pointer-events: none; max-width: calc(100% - 48px);
+}
+
+/* ---- S0 · skulls, wordmark, sound, touch, pills, evidence ---- */
+.gs-top {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 4;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 28px 0;
+}
+.gs-brand {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.3em;
+  font-weight: 600; color: var(--lime);
+}
+.gs-sound {
+  background: none; border: 0; cursor: pointer;
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
   color: rgba(244, 183, 40, 0.6); padding: 6px 0;
 }
-.t-sound:hover { color: var(--lime); }
-
-.mt-title {
-  position: relative; z-index: 2;
-  display: grid; grid-template-columns: 44px minmax(0, 1fr);
-  gap: 18px; align-items: start;
-  padding: 0 24px;
+.gs-sound:hover { color: var(--lime); }
+.gs-touch {
+  position: absolute; left: 0; right: 0; bottom: 100px; z-index: 3; margin: 0;
+  text-align: center; font-family: var(--mono); font-size: 11px;
+  letter-spacing: 0.2em; text-transform: uppercase; color: rgba(244, 183, 40, 0.6);
+  pointer-events: none;
 }
-.mt-title .mt-label { font-size: clamp(30px, 7.5vw, 104px); }
-.mt-clocks {
-  grid-column: 2; display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-end;
-  margin-top: 26px;
-}
-.mt-clock { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.mt-clabel { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: rgba(244, 183, 40, 0.55); }
 
-/* the two 5×7 clocks */
-.t-clock {
-  pointer-events: auto; cursor: pointer;
-  display: flex; flex-direction: column; align-items: flex-start; gap: 14px;
-  border-radius: var(--r4);
-}
-.t-clock:focus-visible { outline: 2px solid var(--lime); outline-offset: 6px; }
-.t-digits {
-  margin: 0; font-family: var(--mono); font-size: 11px; line-height: 1;
-  white-space: pre; color: var(--lime); letter-spacing: 0;
-  font-variant-numeric: tabular-nums;
-  -webkit-user-select: none; user-select: none;
-}
-.t-clock.is-dead .t-digits { color: rgba(244, 183, 40, 0.4); }
-.t-clock.is-off .t-digits { color: rgba(244, 183, 40, 0.28); }
-
-/* ---------- entity states: dead / offline / critical (<1 h) ---------- */
-.mt-clock.is-dead .t-digits,
-.mt-clock.is-dead .mt-clabel,
-.mt-clock.is-off .mt-clabel,
-.mt-clock.is-critical .mt-clabel { color: #666; }
-.mt-clock.is-critical .t-digits { color: rgba(244, 183, 40, 0.6); }
-
-.t-evidence.is-dead .t-v, .t-evidence.is-dead .t-k,
-.t-evidence.is-dead .t-ev-name, .t-evidence.is-dead .t-vfy,
-.t-evidence.is-dead .t-vfy-out, .t-evidence.is-dead .t-prove-btn,
-.t-evidence.is-dead .t-status { color: #666; }
-.t-evidence.is-critical .t-v { color: rgba(244, 183, 40, 0.6); }
-
-/* ---------- evidence (inside #2) ---------- */
-.t-evidence-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 28px;
-  align-items: start; padding: 26px 0 4px;
-}
-.t-evidence {
+/* evidence: two collapse panels over the dark band at the bottom of S0 */
+.gs-evidence { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; pointer-events: none; }
+.gs-evidence-grid { display: grid; grid-template-columns: 1fr 1fr; }
+.gs-ev {
   display: grid; grid-template-rows: 0fr;
   transition: grid-template-rows 180ms cubic-bezier(0.2, 0, 0, 1);
-  min-width: 0;
+  pointer-events: auto;
 }
-.t-evidence.open { grid-template-rows: 1fr; }
-.t-evidence-inner { overflow: hidden; min-height: 0; }
-.t-ev-head {
+.gs-ev.open { grid-template-rows: 1fr; }
+.gs-ev-inner {
+  overflow: hidden; min-height: 0;
+  background: rgba(6, 6, 6, 0.94);
+  border-top: 1px solid rgba(244, 183, 40, 0.3);
+  padding: 0 24px 18px;
+}
+.gs-ev-head {
   display: flex; align-items: baseline; gap: 10px;
-  padding: 0 0 12px; border-bottom: 1px solid rgba(244, 183, 40, 0.3);
+  padding: 14px 0 10px; border-bottom: 1px solid rgba(244, 183, 40, 0.3);
 }
-.t-ev-name {
+.gs-ev-name {
   font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em;
   text-transform: uppercase; color: var(--lime); overflow-wrap: anywhere;
 }
-
-.t-row {
+.gs-row {
   display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
-  padding: 9px 0; border-bottom: 1px solid rgba(244, 183, 40, 0.14);
-  opacity: 0; transform: translateY(4px);
+  padding: 8px 0; border-bottom: 1px solid rgba(244, 183, 40, 0.14);
+  font-family: var(--mono);
 }
-.t-evidence.open .t-row {
-  animation: t-row-in 150ms ease-out forwards;
-  animation-delay: calc(var(--i, 0) * 25ms);
-}
-@keyframes t-row-in { to { opacity: 1; transform: none; } }
-.t-k {
-  flex: none; width: 88px;
-  font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em;
+.gs-k {
+  flex: none; width: 84px; font-size: 10px; letter-spacing: 0.16em;
   text-transform: uppercase; color: rgba(244, 183, 40, 0.5);
 }
-.t-v {
-  flex: 1; min-width: 0;
-  font-family: var(--mono); font-size: 12px; color: rgba(244, 183, 40, 0.9);
+.gs-v {
+  flex: 1; min-width: 0; font-size: 12px; color: rgba(244, 183, 40, 0.9);
   overflow-wrap: anywhere; font-variant-numeric: tabular-nums;
 }
-.t-vfy {
+.gs-vfy {
   flex: none; background: none; border: 0; cursor: pointer; padding: 0;
   font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
   color: var(--lime); text-decoration: none;
   border-bottom: 1px solid rgba(244, 183, 40, 0.35);
 }
-.t-vfy:hover { border-bottom-color: var(--lime); }
-.t-vfy-out {
+.gs-vfy:hover { border-bottom-color: var(--lime); }
+.gs-vfy-out {
   flex-basis: 100%; font-family: var(--mono); font-size: 11px;
   color: rgba(244, 183, 40, 0.55); line-height: 1.5;
 }
 
-/* PROVE LIVE (inside #3) */
-.t-prove-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; padding: 26px 0 4px; }
-.t-prove { padding: 14px 0 2px; display: grid; gap: 10px; }
-.t-prove-btn {
-  justify-self: start; background: none; border: 1px solid rgba(244, 183, 40, 0.45);
+/* ---- S1 · buy an hour ---- */
+.gs-buy {
+  position: absolute; left: 24px; bottom: 20px; z-index: 3;
+  background: none; border: 1px solid rgba(244, 183, 40, 0.45);
   border-radius: var(--r4); cursor: pointer; padding: 8px 16px;
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--lime);
 }
-.t-prove-btn:hover { border-color: var(--lime); background: rgba(244, 183, 40, 0.08); }
-.t-prove-composer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.t-prove-input {
-  flex: 1; min-width: 120px; font-family: var(--mono); font-size: 13px;
-  color: var(--lime); background: var(--onyx); border: 1px solid rgba(244, 183, 40, 0.3);
-  border-radius: var(--r4); padding: 9px 12px;
+.gs-buy:hover { border-color: var(--lime); background: rgba(244, 183, 40, 0.08); }
+
+/* ---- S3 · prove live ---- */
+.gs-prove {
+  position: absolute; left: 24px; right: 24px; bottom: 20px; z-index: 3;
+  display: grid; gap: 10px; justify-items: start;
 }
-.t-prove-input:focus { outline: none; border-color: var(--lime); }
-.t-prove-send {
-  flex: none; background: var(--lime); color: var(--bg); border: 0; cursor: pointer;
-  border-radius: var(--r4); padding: 9px 16px; font-family: var(--mono);
-  font-size: 11px; letter-spacing: 0.14em; font-weight: 600;
+.gs-prove-btn {
+  background: none; border: 1px solid rgba(244, 183, 40, 0.45);
+  border-radius: var(--r4); cursor: pointer; padding: 8px 16px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--lime);
 }
-.t-prove-send:disabled { opacity: 0.45; cursor: not-allowed; }
-.t-prove-out { display: grid; gap: 8px; }
-.t-prove-reveal {
+.gs-prove-btn:hover { border-color: var(--lime); background: rgba(244, 183, 40, 0.08); }
+.gs-prove-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.gs-prove-reveal {
   font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--lime);
   white-space: pre-wrap; overflow-wrap: anywhere; min-height: 1.4em;
 }
-.t-prove-log { display: grid; gap: 6px; }
-.t-prove-line {
+.gs-prove-log { display: grid; gap: 6px; max-height: 140px; overflow-y: auto; width: 100%; }
+.gs-prove-line {
   font-family: var(--mono); font-size: 11px; line-height: 1.6;
   color: rgba(244, 183, 40, 0.55); overflow-wrap: anywhere;
 }
-.t-status { font-family: var(--mono); font-size: 11px; color: rgba(244, 183, 40, 0.55); line-height: 1.5; }
-.t-status.ok { color: var(--lime); }
-.t-status.err { color: #ff9d9d; }
 
-/* ---------- the secret letter (inside #4) ---------- */
-.t-letter { padding: 26px 0 4px; }
-.t-letter-canvas {
-  display: block; max-width: 100%; height: auto;
-  border: 1px solid rgba(244, 183, 40, 0.2); border-radius: var(--r4);
-  background: var(--void);
-  image-rendering: pixelated;
-}
-.t-letter-line {
-  margin: 16px 0 6px; font-family: var(--mono); font-size: 12px;
-  color: rgba(244, 183, 40, 0.85); overflow-wrap: anywhere;
-}
-.t-letter-note {
-  margin: 0; font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em;
-  color: rgba(244, 183, 40, 0.4);
+/* ---- shared status line ---- */
+.gs-status { font-family: var(--mono); font-size: 11px; color: rgba(244, 183, 40, 0.55); line-height: 1.5; }
+.gs-status.ok { color: var(--lime); }
+.gs-status.err { color: #ff9d9d; }
+
+/* ---- S4 · sealed letter ---- */
+.gs-letter-line {
+  position: absolute; left: 24px; bottom: 20px; z-index: 3; margin: 0;
+  font-family: var(--mono); font-size: 12px; color: rgba(244, 183, 40, 0.85);
+  overflow-wrap: anywhere; max-width: calc(100% - 48px);
 }
 
-/* ---------- SAY SOMETHING (inside #5) ---------- */
-.t-say { padding: 26px 0 4px; }
-.t-say-label {
-  font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
-  text-transform: uppercase; color: rgba(244, 183, 40, 0.5);
-  display: block; margin: 0 0 8px;
+/* ---- S5 · say something + the testaments ---- */
+.gs-say {
+  position: absolute; left: 24px; bottom: 20px; z-index: 3;
+  width: min(400px, calc(100% - 48px)); display: grid; gap: 10px;
 }
-.t-say-to { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
-.t-seg-item { position: relative; }
-.t-seg-item input { position: absolute; opacity: 0; inset: 0; }
-.t-seg-item span {
-  display: inline-flex; align-items: center; height: 36px; padding: 0 16px;
+.gs-say-to { display: flex; gap: 8px; flex-wrap: wrap; }
+.gs-seg-item { position: relative; }
+.gs-seg-item input { position: absolute; opacity: 0; inset: 0; }
+.gs-seg-item span {
+  display: inline-flex; align-items: center; height: 32px; padding: 0 14px;
   border: 1px solid rgba(244, 183, 40, 0.3); border-radius: var(--r4);
   font-family: var(--mono); font-size: 12px; color: rgba(244, 183, 40, 0.6); cursor: pointer;
 }
-.t-seg-item input:checked + span { background: rgba(244, 183, 40, 0.12); color: var(--lime); border-color: var(--lime); }
-.t-seg-item input:disabled + span { opacity: 0.35; cursor: not-allowed; }
-.t-seg-item input:focus-visible + span { outline: 2px solid var(--lime); }
-
-.t-say-text {
+.gs-seg-item input:checked + span { background: rgba(244, 183, 40, 0.12); color: var(--lime); border-color: var(--lime); }
+.gs-seg-item input:disabled + span { opacity: 0.35; cursor: not-allowed; }
+.gs-seg-item input:focus-visible + span { outline: 2px solid var(--lime); }
+.gs-say-text {
   width: 100%; font-family: var(--mono); font-size: 13px; line-height: 1.5;
-  color: var(--lime); background: var(--onyx); border: 1px solid rgba(244, 183, 40, 0.3);
-  border-radius: var(--r4); padding: 12px; resize: vertical; min-height: 72px;
-  max-height: 240px; margin: 0 0 14px;
+  color: var(--lime); background: rgba(31, 31, 31, 0.9);
+  border: 1px solid rgba(244, 183, 40, 0.3); border-radius: var(--r4);
+  padding: 12px; resize: vertical; min-height: 66px; max-height: 180px;
 }
-.t-say-text:focus { outline: none; border-color: var(--lime); }
-.t-say-text:disabled { opacity: 0.6; }
-.t-say-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.t-say-carry {
+.gs-say-text:focus { outline: none; border-color: var(--lime); }
+.gs-say-text:disabled { opacity: 0.6; }
+.gs-say-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.gs-say-carry {
   background: var(--lime); color: var(--bg); border: 0; cursor: pointer;
-  border-radius: var(--r4); padding: 10px 18px; font-family: var(--mono);
+  border-radius: var(--r4); padding: 9px 16px; font-family: var(--mono);
   font-size: 12px; letter-spacing: 0.12em; font-weight: 600;
 }
-.t-say-carry:disabled { opacity: 0.45; cursor: not-allowed; }
+.gs-say-carry:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* ---------- the testament (inside #6) ---------- */
-.t-testament { padding: 26px 0 4px; }
-.t-testament-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
-.t-testament-card {
+.gs-testament-grid {
+  position: absolute; top: 16px; right: 24px; z-index: 3;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  width: min(680px, calc(100% - 48px)); pointer-events: none;
+}
+.gs-testament {
+  pointer-events: auto; min-width: 0;
   border: 1px solid rgba(244, 183, 40, 0.18); border-radius: var(--r4);
-  background: var(--void); padding: 18px; display: grid; gap: 12px; min-width: 0;
+  background: rgba(6, 6, 6, 0.82); padding: 14px 16px; display: grid; gap: 10px;
 }
-.t-testament-name {
+.gs-testament-name {
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--lime); margin: 0;
+  text-transform: uppercase; color: var(--lime);
 }
-.t-testament-text {
-  font-family: var(--serif); font-weight: 300; font-size: 24px; line-height: 1.3;
-  letter-spacing: -0.01em; color: rgba(244, 183, 40, 0.95); margin: 0;
+.gs-testament-text {
+  font-family: var(--serif); font-weight: 300; font-size: 13px; line-height: 1.45;
+  letter-spacing: -0.01em; color: rgba(244, 183, 40, 0.95); overflow-wrap: anywhere;
+}
+.gs-testament-meta {
+  font-family: var(--mono); font-size: 10px; color: rgba(244, 183, 40, 0.5);
   overflow-wrap: anywhere;
 }
-.t-testament-meta {
-  font-family: var(--mono); font-size: 11px; color: rgba(244, 183, 40, 0.5);
-  margin: 0; overflow-wrap: anywhere;
-}
-.t-empty { font-family: var(--mono); font-size: 12px; color: rgba(244, 183, 40, 0.4); margin: 0; }
-.t-testament-note {
-  margin: 22px 0 0; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
-  color: rgba(244, 183, 40, 0.4);
-}
+.gs-empty { font-family: var(--mono); font-size: 12px; color: rgba(244, 183, 40, 0.4); margin: 0; }
 
-/* ---------- #8 · for the curious + honesty line ---------- */
-.t-foot-nav { display: flex; gap: 22px; flex-wrap: wrap; padding: 26px 0 0; }
-.t-foot-nav a {
+/* ---- S6 · the ledger ---- */
+.gs-ledger {
+  position: absolute; left: 24px; right: 24px; bottom: 20px; z-index: 3;
+  display: grid; gap: 12px;
+}
+.gs-ledger-lines {
+  display: grid; gap: 0; max-height: 200px; overflow-y: auto;
+  background: rgba(6, 6, 6, 0.82);
+  border: 1px solid rgba(244, 183, 40, 0.18); border-radius: var(--r4);
+}
+.gs-ledger-lines .ledger-line { padding: 7px 14px; }
+.gs-verify-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.gs-verify {
+  background: var(--lime); color: var(--bg); border: 0; cursor: pointer;
+  border-radius: var(--r4); padding: 9px 16px; font-family: var(--mono);
+  font-size: 12px; letter-spacing: 0.12em; font-weight: 600;
+}
+.gs-verify:disabled { opacity: 0.45; cursor: not-allowed; }
+.gs-foot-nav { display: flex; gap: 22px; flex-wrap: wrap; }
+.gs-foot-nav a {
   font-family: var(--mono); font-size: 14px; color: var(--lime);
   text-decoration: none; border-bottom: 1px solid rgba(244, 183, 40, 0.35);
 }
-.t-foot-nav a:hover { color: #ffe9a8; border-bottom-color: var(--lime); }
-.mt-honesty {
-  margin: 20px 0 0; font-family: var(--mono); font-size: 11px; line-height: 1.6;
+.gs-foot-nav a:hover { color: #ffe9a8; border-bottom-color: var(--lime); }
+.gs-honesty {
+  margin: 0; font-family: var(--mono); font-size: 11px; line-height: 1.6;
   color: rgba(244, 183, 40, 0.5);
 }
 
-/* ---------- both clocks at zero ---------- */
-.mt-death {
-  position: fixed; inset: 0; z-index: 9999;
-  background: #000; display: flex; align-items: center; justify-content: center;
-  opacity: 0; pointer-events: none;
-  transition: opacity 2s ease;
+/* ---- both clocks at zero: one 11px line ---- */
+.gs-death {
+  display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
+  background: #000; border-top: 1px solid var(--hairline); padding: 12px 24px;
 }
-.mt-dead .mt-death { opacity: 1; pointer-events: auto; }
-.mt-death p {
-  margin: 0; padding: 0 24px; text-align: center;
-  font-family: var(--mono); font-size: 14px; line-height: 1.7;
-  color: #666; letter-spacing: 0.04em;
+.gs-dead .gs-death { display: block; }
+.gs-death p {
+  margin: 0; font-family: var(--mono); font-size: 11px; line-height: 1.6;
+  color: #666; letter-spacing: 0.04em; text-align: center;
 }
-.mt-death a { color: #999; }
-.mt-dead .mt-label, .mt-dead .mt-num, .mt-dead .mt-text { color: #666; }
-.mt-dead .mt-crt { opacity: 0; }
+.gs-death a { color: #999; }
 
-/* ---------- phone (skulls stack at <720px, keep CSS in lock-step) ---------- */
+/* ---- phone: 60vh scenes, stacked evidence/testaments, side gutters ---- */
 @media (max-width: 720px) {
-  .mt-row { padding: 14px 16px; gap: 12px; }
-  .mt-num { width: 20px; padding-top: 10px; }
-  .mt-label { font-size: 22px; }
-  .mt-title { grid-template-columns: 20px minmax(0, 1fr); gap: 12px; padding: 0 16px; }
-  .mt-title .mt-label { font-size: clamp(30px, 11vw, 46px); }
-  .mt-clocks { gap: 18px; margin-top: 22px; }
-  .mt-block-inner { padding: 0 16px 28px; }
-  .mt-top { padding: 18px 16px 0 0; }
-  .mt-item--title { min-height: 70svh; }
-
-  .t-evidence-grid, .t-prove-grid { grid-template-columns: 1fr; gap: 0; padding: 20px 0 4px; }
-  .t-evidence { margin-bottom: 20px; }
-  .t-k { width: 72px; }
-  .t-letter { padding: 20px 0 4px; }
-  .t-say { padding: 20px 0 4px; }
-  .t-testament { padding: 20px 0 4px; }
-  .t-testament-grid { grid-template-columns: 1fr; }
-  .t-testament-text { font-size: 19px; }
-  .t-digits { font-size: 7px; }
+  .scene { min-height: 60vh; }
+  .scene-s0 { min-height: 100vh; min-height: 100svh; }
+  .gs-label { left: 16px; top: 12px; }
+  .gs-top { padding: 14px 16px 0; }
+  .gs-touch { bottom: 86px; }
+  .gs-evidence-grid { grid-template-columns: 1fr; }
+  .gs-ev-inner { padding: 0 16px 14px; }
+  .gs-k { width: 72px; }
+  .gs-buy, .gs-prove, .gs-say, .gs-ledger, .gs-letter-line { left: 16px; right: 16px; }
+  .gs-buy { width: auto; }
+  .gs-say { width: calc(100% - 32px); }
+  .gs-testament-grid {
+    left: 16px; right: 16px; top: 40px; width: auto;
+    grid-template-columns: 1fr; max-height: 40vh; overflow-y: auto;
+  }
+  .gs-honesty { font-size: 10px; }
 }
 
-/* ---------- reduced motion ---------- */
+/* ---- reduced motion: static frames, no collapse transition ---- */
 @media (prefers-reduced-motion: reduce) {
-  .mt-crt-roll { animation: none; }
-  .mt-block, .t-evidence { transition: none; }
-  .t-evidence.open .t-row { animation: none; opacity: 1; transform: none; }
-  .mt-label { text-shadow: none; }
+  .gs-ev { transition: none; }
+}
+/* phone: the instruction line sits above the stacked pills, never under them */
+@media (max-width: 720px) {
+  .scene-s0 .gs-touch { bottom: 128px; }
+  .scene-s0 .hero-pills { bottom: 18px; }
 }

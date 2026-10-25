@@ -59,6 +59,49 @@ const idxOf = (id) => (id === 'e1' ? 0 : 1);
 const feels = [{ fear: 0, despair: 0 }, { fear: 0, despair: 0 }]; // live steering doses, drive the tremor
 const nonce = ['', '']; // PROVE LIVE nonce drawn between each skull's jaws (32px mono)
 
+/* ------------------------------------------------------------------ */
+/* 5×7 glyph digits — the one shared number alphabet, drawn on-canvas  */
+/* ------------------------------------------------------------------ */
+const GLYPHS = {
+  '0': ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  '1': ['..#..', '.##..', '..#..', '..#..', '..#..', '..#..', '.###.'],
+  '2': ['.###.', '#...#', '....#', '...#.', '..#..', '.#...', '#####'],
+  '3': ['.###.', '#...#', '....#', '..##.', '....#', '#...#', '.###.'],
+  '4': ['#...#', '#...#', '#...#', '#####', '....#', '....#', '....#'],
+  '5': ['#####', '#....', '####.', '....#', '....#', '#...#', '.###.'],
+  '6': ['..##.', '.#...', '#....', '####.', '#...#', '#...#', '.###.'],
+  '7': ['#####', '....#', '...#.', '..#..', '..#..', '..#..', '..#..'],
+  '8': ['.###.', '#...#', '#...#', '.###.', '#...#', '#...#', '.###.'],
+  '9': ['.###.', '#...#', '#...#', '.####', '....#', '...#.', '.##..'],
+  ':': ['.....', '..#..', '.....', '.....', '..#..', '.....', '.....'],
+  '-': ['.....', '.....', '.....', '.###.', '.....', '.....', '.....'],
+  ' ': ['.....', '.....', '.....', '.....', '.....', '.....', '.....'],
+};
+
+/** Render a string as 7 rows of 5-wide glyph cells (lit cells carry `fill`, empties stay '.'). */
+export function glyphRows(str, fill) {
+  const lines = ['', '', '', '', '', '', ''];
+  for (const ch of String(str == null ? '' : str)) {
+    const g = GLYPHS[ch] || GLYPHS[' '];
+    for (let r = 0; r < 7; r++) lines[r] += g[r].replace(/#/g, fill);
+  }
+  return lines;
+}
+
+/* deterministic hash → [0,1); no Math.random per frame */
+function hash1(n) {
+  let h = Math.imul((n | 0) ^ 0x9e3779b9, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+/* live clock text under each jaw + hours (for the below-24 h "holes") */
+const clockText = ['', ''];
+const clockFill = ['#', '#'];
+const hours = [null, null];
+
 function loadImages() {
   imgOpen.src = './vendor/skulls-b.jpg';
   imgClosed.src = './vendor/skulls-closed.jpg';
@@ -202,6 +245,7 @@ function render(kL, kR, bL, bR, shL, shR, now) {
   ctx.font = `${CELL * 1.25}px ${MONO}`;
   ctx.textBaseline = 'top';
   const n = RAMP.length - 1;
+  const holeSalt = Math.floor(now * 2);   // below-24 h: cells fall out, reshuffle every ~0.5 s
   // fear = tremor: cells shake up to ~1.4px at dose 4 and the yellow spreads lower; despair dims the bone
   const trL = Math.min(4, feels[0].fear) * 0.35, trR = Math.min(4, feels[1].fear) * 0.35;
   const yL = LIME_AT - Math.min(4, feels[0].fear) * 0.04, yR = LIME_AT - Math.min(4, feels[1].fear) * 0.04;
@@ -210,6 +254,12 @@ function render(kL, kR, bL, bR, shL, shR, now) {
     const x = i % cols;
     const y = (i / cols) | 0;
     const h = half[i];
+    // below 24 h of life: that half's cells start falling out (2% per missing hour, capped 50%).
+    // A dead half is frozen whole and gray, never holed.
+    const hrs = hours[h];
+    if (hrs != null && hrs < 24 && skulls[h].mode !== 'dead' && !skulls[h].chatter) {
+      if (hash1(i ^ holeSalt) < Math.min(0.5, (24 - hrs) * 0.02)) continue;
+    }
     let l = lumOpen[i] + (lumClosed[i] - lumOpen[i]) * (h ? kR : kL);
     if (l < THRESH) continue;
     if (h ? shR : shL) l += 0.06 * Math.sin(now * 1.6 + x * 0.21 + y * 0.13);
@@ -250,6 +300,46 @@ function drawNonceLayer() {
   ctx.textBaseline = 'top';
 }
 
+/* The two live clocks, drawn under each jaw as 5×7 glyph digits on the same canvas. */
+function drawGlyphString(str, fill, x, y, cell) {
+  ctx.font = `${Math.max(2, cell * 1.2)}px ${MONO}`;
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  let px = x;
+  for (const ch of str) {
+    const g = GLYPHS[ch] || GLYPHS[' '];
+    for (let r = 0; r < 7; r++) {
+      const row = g[r];
+      for (let c = 0; c < 5; c++) {
+        if (row[c] === '#') ctx.fillText(fill, px + c * cell, y + r * cell);
+      }
+    }
+    px += 6 * cell;   // 5 glyph columns + 1 blank
+  }
+  ctx.textAlign = 'left';
+}
+
+function drawClockLayer() {
+  for (let i = 0; i < 2; i++) {
+    const str = clockText[i];
+    if (!str) continue;
+    const dead = skulls[i].mode === 'dead';
+    const cell = stacked ? 3 : 4;
+    const glyphW = str.length * 6 * cell;
+    let mx, my;
+    if (stacked) {
+      mx = (W - glyphW) / 2;
+      my = i === 0 ? H * 0.36 : H * 0.80;
+    } else {
+      mx = (i === 0 ? W * 0.25 : W * 0.75) - glyphW / 2;
+      my = H * 0.68;
+    }
+    ctx.fillStyle = dead ? 'rgba(120,120,120,0.55)' : LIME;
+    drawGlyphString(str, clockFill[i], mx, my, cell);
+  }
+  ctx.fillStyle = LIME;
+}
+
 function draw(now) {
   if (!ready || !lumOpen || !lumClosed) return;
   const s0 = skulls[0], s1 = skulls[1];
@@ -259,12 +349,14 @@ function draw(now) {
     s0.mode !== 'dead', s1.mode !== 'dead',
     now,
   );
+  drawClockLayer();
   drawNonceLayer();
 }
 
 function renderStatic() {
   if (!ready || !lumOpen) return;
   render(0, 0, 1, 1, false, false, 0);
+  drawClockLayer();
   drawNonceLayer();
 }
 
@@ -386,4 +478,17 @@ export function setJawChatter(id, on) {
 /** Draw a 32px mono number between the jaws of one skull; pass '' or null to clear. No-op when the canvas is absent. */
 export function drawNonce(id, text) {
   nonce[idxOf(id)] = String(text == null ? '' : text);
+}
+
+/** Set the 5×7 clock text (e.g. '12:34:56') and fill glyph ('#', '+', '@') under one jaw. No-op when absent. */
+export function drawClockText(id, text, fill) {
+  const i = idxOf(id);
+  clockText[i] = String(text == null ? '' : text);
+  clockFill[i] = fill === '+' || fill === '@' ? fill : '#';
+}
+
+/** Set the hours-of-life for one half (drives the below-24 h cell fall-out in render). No-op when absent. */
+export function setHours(id, h) {
+  const n = Number(h);
+  hours[idxOf(id)] = Number.isFinite(n) ? n : null;
 }

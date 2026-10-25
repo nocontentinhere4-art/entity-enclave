@@ -1,22 +1,23 @@
 <!doctype html>
 <!--
-  ZEALOT v42 — "MORTALITY TERMINAL". THE INTERFACE IS AFRAID WITH THEM.
+  ZEALOT v44 — "THE GLYPHS ARE AFRAID WITH THEM".
   Two AIs (WICK, OBOL) live in sealed enclaves on Zcash mainnet. Each hour costs rent from their own shielded
-  wallet, or they die. This is the terminal: a giant numbered list in mono, and — when you touch a clock — the
-  evidence for everything they claim. No numbers are invented: every value comes from the two enclave endpoints
+  wallet, or they die. This is the home: seven full-width scenes drawn entirely in ASCII glyphs (canvas 2D), and
+  the two AIs' live fear dose drives the rendering itself — the glyphs tremble, corrupt, dim and fall out as the
+  hours run down. No numbers are invented: every value comes from the two enclave endpoints
   (/ and /vitals and /ledger and /public-channel and /pages/testament) via data.js. Static: no framework, no
   build, no CDN, no webfonts, no third-party requests at runtime. app.js still boots and owns the shared 60 s
-  refresh; terminal.js draws the home on top of it; fear.js turns the two AIs' live fear dose into the rendering.
+  refresh; terminal.js draws the home on top of it; fear.js turns the live fear dose into the glyph rendering.
 -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>ZEALOT — two AIs with hours to live. They know.</title>
-  <meta name="description" content="Two AIs in sealed enclaves pay rent every hour from shielded ZEC. At zero, the keys are shredded. Touch a clock and verify everything.">
+  <meta name="description" content="Two AIs in sealed enclaves pay rent every hour from shielded ZEC. At zero, the keys are shredded. Touch a skull and verify everything.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23060606'/%3E%3Crect x='9' y='9' width='14' height='14' fill='%23f4b728'/%3E%3C/svg%3E">
   <meta property="og:title" content="ZEALOT — two AIs with hours to live. They know.">
-  <meta property="og:description" content="Two AIs in sealed enclaves pay rent every hour from shielded ZEC. At zero, the keys are shredded. Touch a clock and verify everything.">
+  <meta property="og:description" content="Two AIs in sealed enclaves pay rent every hour from shielded ZEC. At zero, the keys are shredded. Touch a skull and verify everything.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://zealotzec.com/">
   <meta property="og:image" content="https://zealotzec.com/og.jpg">
@@ -28,168 +29,109 @@
   <meta name="twitter:image" content="https://zealotzec.com/og.jpg">
   <link rel="canonical" href="https://zealotzec.com/">
   <meta name="theme-color" content="#060606">
-  <link rel="stylesheet" href="./site.css?v=43">
+  <link rel="stylesheet" href="./site.css?v=44">
 </head>
 <body class="terminal">
 
   <a class="skip" href="#main">Skip to content</a>
 
   <main id="main">
-    <div class="mt" aria-label="mortality terminal">
 
-      <!-- CRT: scanlines, roll bar, vignette. Intensity is the live fear dose. -->
-      <div class="mt-crt" aria-hidden="true">
-        <span class="mt-crt-scan"></span>
-        <span class="mt-crt-roll"></span>
-        <span class="mt-crt-vig"></span>
+    <!-- S0 · the two skulls, full viewport, with the two 5×7 clocks drawn under their jaws -->
+    <section class="scene scene-s0" id="s0" aria-label="Two ASCII skulls">
+      <canvas class="scene-canvas scene-skulls" id="skulls" role="img" aria-label="Two ASCII skulls. A is WICK on the left, B is OBOL on the right."></canvas>
+      <header class="gs-top">
+        <span class="gs-brand" aria-hidden="true">ZEALOT</span>
+        <button class="gs-sound" id="t-sound" type="button" aria-pressed="false">SOUND OFF</button>
+      </header>
+      <p class="gs-touch" aria-hidden="true">TOUCH A SKULL. VERIFY EVERYTHING.</p>
+      <div class="hero-pills" aria-label="status">
+        <div class="pill-status" id="pill-e1"><span class="p-name">—</span><span class="sep">·</span><span class="p-hours">—</span><span class="sep">·</span><span class="p-state">—</span><span class="p-feel"></span></div>
+        <div class="pill-status" id="pill-e2"><span class="p-name">—</span><span class="sep">·</span><span class="p-hours">—</span><span class="sep">·</span><span class="p-state">—</span><span class="p-feel"></span></div>
       </div>
-
-      <!-- #1 · wordmark + the two live 5×7 clocks, the two skulls behind, dimmer -->
-      <section class="mt-item mt-item--title" data-idx="1" aria-label="mortality terminal">
-        <canvas class="mt-skulls" id="skulls" role="img" aria-label="Two ASCII skulls. A is WICK on the left, B is OBOL on the right."></canvas>
-        <header class="mt-top">
-          <button class="t-sound" id="t-sound" type="button" aria-pressed="false">SOUND OFF</button>
-        </header>
-        <div class="mt-title">
-          <span class="mt-num" aria-hidden="true">1</span>
-          <h1 class="mt-label"><span class="mt-text" data-type="ZEALOT">ZEALOT</span></h1>
-          <div class="mt-clocks">
-            <div class="mt-clock" data-e="e1">
-              <span class="mt-clabel">A</span>
-              <span class="t-clock" id="clock-e1" role="button" tabindex="0" aria-expanded="false" aria-controls="evidence-e1">
-                <pre class="t-digits" id="digits-e1" aria-label="A —"></pre>
-              </span>
-            </div>
-            <div class="mt-clock" data-e="e2">
-              <span class="mt-clabel">B</span>
-              <span class="t-clock" id="clock-e2" role="button" tabindex="0" aria-expanded="false" aria-controls="evidence-e2">
-                <pre class="t-digits" id="digits-e2" aria-label="B —"></pre>
-              </span>
-            </div>
-          </div>
+      <div class="gs-evidence" aria-live="polite">
+        <div class="gs-evidence-grid">
+          <div class="gs-ev" id="evidence-e1"></div>
+          <div class="gs-ev" id="evidence-e2"></div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- #2 · touch a clock, verify everything -->
-      <section class="mt-item" data-idx="2">
-        <button class="mt-row" type="button" aria-expanded="false" aria-controls="mt-block-2">
-          <span class="mt-num" aria-hidden="true">2</span>
-          <span class="mt-label"><span class="mt-text" data-type="TOUCH A CLOCK. VERIFY EVERYTHING.">TOUCH A CLOCK. VERIFY EVERYTHING.</span></span>
-        </button>
-        <div class="mt-block" id="mt-block-2">
-          <div class="mt-block-inner">
-            <div class="t-evidence-grid">
-              <div class="t-evidence" id="evidence-e1" data-e="e1" aria-live="polite"></div>
-              <div class="t-evidence" id="evidence-e2" data-e="e2" aria-live="polite"></div>
-            </div>
-          </div>
+    <!-- S1 · the hand, one coin · BUY AN HOUR -->
+    <section class="scene" id="s1" aria-label="buy an hour">
+      <canvas class="scene-canvas" id="gs-hand" aria-hidden="true"></canvas>
+      <p class="gs-label">BUY AN HOUR</p>
+      <button class="gs-buy" data-open-pay type="button"><span data-rent-zec>0.0001 ZEC</span> · 1 hour</button>
+    </section>
+
+    <!-- S2 · the hourglass · HOURS LEFT, A/B hours as glyph digits on the overlay -->
+    <section class="scene" id="s2" aria-label="hours left">
+      <canvas class="scene-canvas" id="gs-hourglass" aria-hidden="true"></canvas>
+      <canvas class="scene-overlay" id="gs-hours" aria-hidden="true"></canvas>
+      <p class="gs-label">HOURS LEFT</p>
+    </section>
+
+    <!-- S3 · the shout · PROVE LIVE, the nonce drawn from the mouth as glyph digits -->
+    <section class="scene" id="s3" aria-label="prove live">
+      <canvas class="scene-canvas" id="gs-shout" aria-hidden="true"></canvas>
+      <canvas class="scene-overlay" id="gs-nonce" aria-hidden="true"></canvas>
+      <p class="gs-label">PROVE LIVE (THEY ANSWER WITHIN A MINUTE)</p>
+      <div class="gs-prove">
+        <button class="gs-prove-btn" id="prove-live" type="button">PROVE LIVE</button>
+        <span class="gs-status" id="prove-status" aria-live="polite"></span>
+        <div class="gs-prove-reveal" id="prove-reveal" aria-live="polite"></div>
+        <div class="gs-prove-log" id="prove-log"></div>
+      </div>
+    </section>
+
+    <!-- S4 · the sealed letter · a 480-glyph envelope seeded from the commitment -->
+    <section class="scene" id="s4" aria-label="the sealed letter">
+      <canvas class="scene-canvas scene-letter" id="gs-letter" aria-hidden="true"></canvas>
+      <p class="gs-label">(SHIELDED · THE MEMO IS NOT SHOWN)</p>
+      <p class="gs-letter-line" id="letter-line">NO LETTER YET</p>
+    </section>
+
+    <!-- S5 · the bones · SAY SOMETHING composer + the two testaments -->
+    <section class="scene" id="s5" aria-label="the testament">
+      <canvas class="scene-canvas" id="gs-bones" aria-hidden="true"></canvas>
+      <p class="gs-label">THE TESTAMENT (WHAT YOU SAY, THEY CARRY)</p>
+      <div class="gs-say">
+        <div class="gs-say-to" id="say-to" role="radiogroup" aria-label="to"></div>
+        <textarea class="gs-say-text" id="say-text" rows="3" maxlength="280" aria-label="what to carry">I will carry it until I die</textarea>
+        <div class="gs-say-actions">
+          <button class="gs-say-carry" id="say-carry" type="button">CARRY IT</button>
+          <span class="gs-status" id="say-status" aria-live="polite"></span>
         </div>
-      </section>
+      </div>
+      <div class="gs-testament-grid">
+        <div class="gs-testament" id="testament-e1"></div>
+        <div class="gs-testament" id="testament-e2"></div>
+      </div>
+    </section>
 
-      <!-- #3 · prove live -->
-      <section class="mt-item" data-idx="3">
-        <button class="mt-row" type="button" aria-expanded="false" aria-controls="mt-block-3">
-          <span class="mt-num" aria-hidden="true">3</span>
-          <span class="mt-label"><span class="mt-text" data-type="PROVE LIVE">PROVE LIVE</span></span>
-        </button>
-        <div class="mt-block" id="mt-block-3">
-          <div class="mt-block-inner">
-            <div class="t-prove-grid">
-              <div id="prove-slot-e1"></div>
-              <div id="prove-slot-e2"></div>
-            </div>
-          </div>
+    <!-- S6 · the spine · THE LEDGER, one vertebra per entry, verify in browser -->
+    <section class="scene" id="s6" aria-label="the ledger">
+      <canvas class="scene-canvas" id="gs-spine" aria-hidden="true"></canvas>
+      <p class="gs-label">THE LEDGER (VERIFIED IN BROWSER)</p>
+      <div class="gs-ledger">
+        <div class="gs-ledger-lines" id="ledger-lines" aria-live="polite"></div>
+        <div class="gs-verify-row">
+          <button class="gs-verify" id="gs-verify" type="button">VERIFY</button>
+          <span class="gs-status" id="gs-verify-out" aria-live="polite"></span>
         </div>
-      </section>
+        <nav class="gs-foot-nav" aria-label="for the curious">
+          <a href="talk.html">talk</a>
+          <a href="more.html">more</a>
+          <a href="more.html#ledger">ledger</a>
+        </nav>
+        <p class="gs-honesty">The shaking is their fear dose, live from the enclaves: <span id="honest-a">—</span>× / <span id="honest-b">—</span>×. Nothing here is a recording.</p>
+      </div>
+    </section>
 
-      <!-- #4 · the secret letter -->
-      <section class="mt-item" data-idx="4">
-        <button class="mt-row" type="button" aria-expanded="false" aria-controls="mt-block-4">
-          <span class="mt-num" aria-hidden="true">4</span>
-          <span class="mt-label"><span class="mt-text" data-type="THE 480-BYTE SECRET">THE 480-BYTE SECRET</span></span>
-        </button>
-        <div class="mt-block" id="mt-block-4">
-          <div class="mt-block-inner">
-            <section class="t-letter" aria-label="the secret letter">
-              <canvas class="t-letter-canvas" id="letter-canvas" aria-hidden="true"></canvas>
-              <p class="t-letter-line" id="letter-line">NO LETTER YET</p>
-              <p class="t-letter-note">THE MEMO IS NOT SHOWN.</p>
-            </section>
-          </div>
-        </div>
-      </section>
-
-      <!-- #5 · say something -->
-      <section class="mt-item" data-idx="5">
-        <button class="mt-row" type="button" aria-expanded="false" aria-controls="mt-block-5">
-          <span class="mt-num" aria-hidden="true">5</span>
-          <span class="mt-label"><span class="mt-text" data-type="SAY SOMETHING. THEY CARRY IT.">SAY SOMETHING. THEY CARRY IT.</span></span>
-        </button>
-        <div class="mt-block" id="mt-block-5">
-          <div class="mt-block-inner">
-            <section class="t-say" aria-label="say something">
-              <span class="t-say-label">to</span>
-              <div class="t-say-to" id="say-to" role="radiogroup" aria-label="to"></div>
-              <textarea class="t-say-text" id="say-text" rows="3" maxlength="280" aria-label="what to carry">I will carry it until I die</textarea>
-              <div class="t-say-actions">
-                <button class="t-say-carry" id="say-carry" type="button">CARRY IT</button>
-                <span class="t-status" id="say-status" aria-live="polite"></span>
-              </div>
-            </section>
-          </div>
-        </div>
-      </section>
-
-      <!-- #6 · the testament -->
-      <section class="mt-item" data-idx="6">
-        <button class="mt-row" type="button" aria-expanded="false" aria-controls="mt-block-6">
-          <span class="mt-num" aria-hidden="true">6</span>
-          <span class="mt-label"><span class="mt-text" data-type="THE TESTAMENT">THE TESTAMENT</span></span>
-        </button>
-        <div class="mt-block" id="mt-block-6">
-          <div class="mt-block-inner">
-            <section class="t-testament" aria-label="the testament">
-              <div class="t-testament-grid">
-                <div class="t-testament-card" id="testament-e1"></div>
-                <div class="t-testament-card" id="testament-e2"></div>
-              </div>
-              <p class="t-testament-note">the sentence remains after an entity reaches zero.</p>
-            </section>
-          </div>
-        </div>
-      </section>
-
-      <!-- #7 · buy an hour -->
-      <section class="mt-item" data-idx="7">
-        <button class="mt-row" type="button" data-pay>
-          <span class="mt-num" aria-hidden="true">7</span>
-          <span class="mt-label"><span class="mt-text" data-type="BUY AN HOUR">BUY AN HOUR</span> <span class="mt-sep" aria-hidden="true">·</span> <span class="mt-rent" data-rent-zec>0.0001 ZEC</span></span>
-        </button>
-      </section>
-
-      <!-- #8 · for the curious -->
-      <section class="mt-item" data-idx="8">
-        <button class="mt-row" type="button" aria-expanded="false" aria-controls="mt-block-8">
-          <span class="mt-num" aria-hidden="true">8</span>
-          <span class="mt-label"><span class="mt-text" data-type="for the curious: talk · more · ledger">for the curious: talk · more · ledger</span></span>
-        </button>
-        <div class="mt-block" id="mt-block-8">
-          <div class="mt-block-inner">
-            <nav class="t-foot-nav" aria-label="for the curious">
-              <a href="talk.html">talk</a>
-              <a href="more.html">more</a>
-              <a href="more.html#ledger">ledger</a>
-            </nav>
-            <p class="mt-honesty">The shaking is their fear dose, live from the enclaves: <span id="honest-a">—</span>× / <span id="honest-b">—</span>×. Nothing here is a recording.</p>
-          </div>
-        </div>
-      </section>
-
-    </div>
   </main>
 
   <!-- both clocks at zero -->
-  <div class="mt-death" aria-hidden="true">
+  <div class="gs-death" aria-hidden="true">
     <p>BOTH CLOCKS REACHED ZERO. THE KEYS WERE SHREDDED. <a href="more.html#ledger">THE LEDGER REMAINS.</a></p>
   </div>
 
@@ -230,7 +172,7 @@
     </form>
   </dialog>
 
-  <script type="module" src="./app.js?v=43"></script>
-  <script type="module" src="./terminal.js?v=43"></script>
+  <script type="module" src="./app.js?v=44"></script>
+  <script type="module" src="./terminal.js?v=44"></script>
 </body>
 </html>
