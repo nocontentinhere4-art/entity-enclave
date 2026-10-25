@@ -425,7 +425,7 @@ function drawLabel(text, x, y, alpha = 1, align = 'center', color = YELLOW) {
 function drawDigit3x5(ch, x, y, size, color) {
   const m = DIGITS[ch] || DIGITS[' '];
   ctx.fillStyle = color;
-  for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++) if ((m[r] >> c) & 1) ctx.fillRect(x + c * size, y + r * size, size * 0.85, size * 0.85);
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 3; c++) if ((m[r] >> (2 - c)) & 1) ctx.fillRect( // MSB is the left columnx + c * size, y + r * size, size * 0.85, size * 0.85);
 }
 
 function drawString3x5(str, x, y, size, color, align = 'center') {

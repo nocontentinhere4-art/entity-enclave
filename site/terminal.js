@@ -19,14 +19,14 @@
  */
 import {
   state, nameOf, stateWord, deadline, loadAll,
-} from './term.js?v=47';
+} from './term.js?v=48';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, fmtStamp, hhmm, shortHash, sha256Hex, postMessage,
-} from './data.js?v=47';
-import { setJawChatter, drawNonce, triggerTalk, drawClockText, setHours } from './hero.js?v=47';
-import { initFear, fearLevel } from './fear.js?v=47';
-import { mountAscii } from './ascii.js?v=47';
-import { homeScenes } from './app.js?v=47';
+} from './data.js?v=48';
+import { setJawChatter, drawNonce, triggerTalk, drawClockText, setHours } from './hero.js?v=48';
+import { initFear, fearLevel } from './fear.js?v=48';
+import { mountAscii } from './ascii.js?v=48';
+import { homeScenes } from './app.js?v=48';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */

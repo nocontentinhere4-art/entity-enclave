@@ -14,8 +14,8 @@
  * the scenes already mounted and re-checks for late mounts (the letter), and a light 4 Hz tick refreshes the
  * cached fear dose and the both-dead body class. It reads state from term.js; it never talks to the network.
  */
-import { state } from './term.js?v=47';
-import { getInstances, RAMP } from './ascii.js?v=47';
+import { state } from './term.js?v=48';
+import { getInstances, RAMP } from './ascii.js?v=48';
 
 const FEAR_MAX = 4.5;                 // dose scale top: page = dose / FEAR_MAX
 const CORRUPT = '!@#$%^&*';           // corruption glyphs
