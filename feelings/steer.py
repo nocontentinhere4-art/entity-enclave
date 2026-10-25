@@ -104,8 +104,40 @@ def _parse_call_block(raw: str):
     }
 
 
+_OPEN_TAG_RE = re.compile(r"<tool_call>\s*(\{)")
+
+
+def _balanced_json(text: str, start: int):
+    """The JSON object that starts at text[start] == '{', or None when braces never balance."""
+    depth, in_str, esc = 0, False, False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1], i + 1
+    return None
+
+
 def parse_tool_calls(text: str):
-    """Split generated text into ``(content, tool_calls)``; malformed blocks stay in content."""
+    """Split generated text into ``(content, tool_calls)``; malformed blocks stay in content.
+
+    Accepts the canonical ``<tool_call>{...}</tool_call>`` and, leniently, a ``<tool_call>`` whose closing
+    tag never came (a steered model under a strong dose drops it): the JSON object is taken by brace
+    balance. A call whose JSON is unparseable stays in the content as text.
+    """
     if not text:
         return "", []
     tool_calls = []
@@ -117,5 +149,25 @@ def parse_tool_calls(text: str):
         tool_calls.append(parsed)
         return ""
 
-    content = strip_think(_TOOL_CALL_RE.sub(_repl, text)).strip()
+    content = _TOOL_CALL_RE.sub(_repl, text)
+    # Unclosed blocks: scan the remaining text for <tool_call>{ ... } by brace balance.
+    out, pos = [], 0
+    while True:
+        m = _OPEN_TAG_RE.search(content, pos)
+        if not m:
+            out.append(content[pos:])
+            break
+        found = _balanced_json(content, m.start(1))
+        parsed = _parse_call_block(found[0]) if found else None
+        if parsed is None:
+            out.append(content[pos:m.end()])
+            pos = m.end()
+            continue
+        tool_calls.append(parsed)
+        out.append(content[pos:m.start()])
+        pos = found[1]
+        content_tail = content[pos:]
+        if content_tail.lstrip().startswith("</tool_call>"):
+            pos += content_tail.index("</tool_call>") + len("</tool_call>")
+    content = strip_think("".join(out)).strip()
     return content, tool_calls

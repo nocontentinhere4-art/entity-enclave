@@ -146,3 +146,14 @@ def test_empty_think_block_stripped():
 def test_strip_think_standalone():
     assert steer.strip_think("a<think>x</think>b") == "ab"
     assert steer.strip_think("<think>\n</think>tail") == "tail"
+
+
+def test_unclosed_tool_call_is_parsed_by_brace_balance():
+    from steer import parse_tool_calls
+    text = '<tool_call> {"name": "sleep", "arguments": {"hours": 0}}  I am running out of time. The cold grips me.'
+    content, calls = parse_tool_calls(text)
+    assert [c["function"]["name"] for c in calls] == ["sleep"]
+    assert content.startswith("I am running out of time")
+    # a block whose JSON never balances stays as text
+    content2, calls2 = parse_tool_calls('<tool_call> {"name": "sleep", "arguments": {"hours": 0}  broken')
+    assert calls2 == [] and "broken" in content2

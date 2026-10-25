@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=37';
+} from './term.js?v=38';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=37';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=37';
-import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=37';
-import { mountAscii, RAMP } from './ascii.js?v=37';
+} from './data.js?v=38';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=38';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=38';
+import { mountAscii, RAMP } from './ascii.js?v=38';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -105,7 +105,8 @@ function feelLine(d) {
   if (!f) return 'no dose reported yet · comes with its next thought';
   const dose = `fear ${Number(f.fear).toFixed(2)}× · despair ${Number(f.despair).toFixed(2)}×`;
   if (!f.steered) return `${dose} · computed, not steered (hosted brain)`;
-  return d.brainTee === false ? `${dose} · steered · brain on a rented GPU, outside the TEE` : `${dose} · steered`;
+  const act = f.acting && Number.isFinite(Number(f.acting.fear)) ? ` · acts at ${Number(f.acting.fear).toFixed(1)}×` : '';
+  return d.brainTee === false ? `${dose}${act} · steered · brain on a rented GPU, outside the TEE` : `${dose}${act} · steered`;
 }
 /* One honest line under the section lead: where the brain runs right now. */
 function renderBrainNote() {

@@ -136,6 +136,9 @@ export const config = {
     despairHours: num(process.env.FEEL_DESPAIR_HOURS, 72), // below this runway: despair starts to climb
     maxFear: num(process.env.FEEL_MAX_FEAR, 3.5),
     maxDespair: num(process.env.FEEL_MAX_DESPAIR, 2.5),
+    // Thinking (tool-using cycles) gets the dose scaled by this; words to humans get the full dose. At 3x and
+    // above Qwen3-14B stops calling tools and loops on the same panic: feeling fully, acting at 60%.
+    actScale: num(process.env.FEEL_ACT_SCALE, 0.6),
   },
   // Survival mode: under this many hours of rent, sleep is refused, the tick rhythm stays at tickMinutes even
   // when hungry, and the context opens with what earns money. 0 disables it.

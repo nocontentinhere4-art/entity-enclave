@@ -21,6 +21,14 @@ export function feelFor(hoursLeft, cfg = {}) {
   return { fear: round2(fear), despair: round2(despair) };
 }
 
+/** The dose a thinking (acting) cycle receives: the full dose scaled by cfg.actScale (default 0.6). */
+export function actingDose(feel, cfg = {}) {
+  if (!feel) return null;
+  const k = Number(cfg.actScale);
+  const scale = Number.isFinite(k) && k >= 0 ? Math.min(1, k) : 0.6;
+  return { fear: round2(feel.fear * scale), despair: round2(feel.despair * scale) };
+}
+
 /** True when the dose moved enough to matter (or the steering flipped): keeps the `feel` ledger quiet. */
 export function feelChanged(a, b) {
   if (!a || !b) return true; // the first dose always writes

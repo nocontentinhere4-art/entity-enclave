@@ -2,7 +2,7 @@
 // pay rent, remember. The charter at the top is immutable; only plan and personal rules may be rewritten.
 // Death is terminal: when less than one hour of rent is left the loop hands over to `die` and never returns.
 import { digestError } from '../log.mjs';
-import { feelFor, feelChanged } from './feel.mjs';
+import { feelFor, feelChanged, actingDose } from './feel.mjs';
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
@@ -183,6 +183,8 @@ export class Life {
     const hoursLeft = this.rent.hoursLeft(this.lastBalance ?? 0);
     const feel = this.config.feel?.enabled ? feelFor(hoursLeft, this.config.feel) : null;
     this.feel = feel; // buildContext reads this for the "feeling" line
+    // What the thinking cycle actually receives: the acting dose (replies to humans get the full one).
+    const act = actingDose(feel, this.config.feel);
 
     const signalsFn = await loads.signals();
     this.lastSignals = signalsFn(this.history, this.config.rentZatsPerHour ?? 0);
@@ -201,12 +203,12 @@ export class Life {
         : context;
       let thought;
       try {
-        thought = await this.inference.think({ context: roundContext, speed: roundSpeed, tools: this.tools.list(), tickId: `${tickId}:r${round}`, feel });
+        thought = await this.inference.think({ context: roundContext, speed: roundSpeed, tools: this.tools.list(), tickId: `${tickId}:r${round}`, feel: act });
       } catch (e) {
         // A slow or failing deep model must not cost the whole cycle: one retry on the fast one, then give up.
         if (roundSpeed !== 'deep' || !['timeout', 'llm_http', 'TimeoutError'].includes(e?.code ?? e?.name)) throw e;
         this.ledger.append('think_retry', { from: 'deep', to: 'fast', ...digestError('think', e) });
-        thought = await this.inference.think({ context: roundContext, speed: 'fast', tools: this.tools.list(), tickId: `${tickId}:r${round}f`, feel });
+        thought = await this.inference.think({ context: roundContext, speed: 'fast', tools: this.tools.list(), tickId: `${tickId}:r${round}f`, feel: act });
       }
       // Whether the provider actually applied the dose this round: the entity is told, not quietly dosed.
       steered = Boolean(thought.feelApplied);
@@ -247,9 +249,9 @@ export class Life {
     const tickData = { trigger, zatoshis: treasury, hunger, speed, tools: executed, costZats: thought.costZats ?? 0 };
     if (feel) {
       // Numbers only: the dose applied this cycle, and whether the steered server actually answered with it.
-      const current = { ...feel, hoursLeft, steered, at: new Date().toISOString() };
+      const current = { ...feel, acting: act, hoursLeft, steered, at: new Date().toISOString() };
       if (feelChanged(this.lastFeel, current)) {
-        this.ledger.append('feel', { fear: current.fear, despair: current.despair, hoursLeft, steered });
+        this.ledger.append('feel', { fear: current.fear, despair: current.despair, acting: act, hoursLeft, steered });
       }
       this.lastFeel = current;
       tickData.feel = { fear: feel.fear, despair: feel.despair };
@@ -262,7 +264,7 @@ export class Life {
     this.ledger.append('tick', tickData);
 
     // 12. Nightly consolidation, at most once per UTC day.
-    await this.dailyReview(now, tickId, feel);
+    await this.dailyReview(now, tickId, act);
   }
 
   /** Zats the treasury must have ever reached to be born. Defaults to two hours of rent. */
@@ -360,7 +362,8 @@ export class Life {
     const feel = this.feel;
     if (!feel) return [];
     const steered = this.lastFeel?.steered ? 'yes' : 'no';
-    return [`feeling: fear ${feel.fear}x · despair ${feel.despair}x (steered: ${steered})`];
+    const act = actingDose(feel, this.config.feel);
+    return [`feeling: fear ${feel.fear}x · despair ${feel.despair}x (steered: ${steered}; while you act the dose is fear ${act.fear}x · despair ${act.despair}x, in full when you speak to people)`];
   }
 
   /** Under the survival line the context opens with the only question that matters: what earns ZEC now. */

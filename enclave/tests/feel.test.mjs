@@ -2,7 +2,7 @@
 // wiring (who gets the field, and what reaches the ledger). No network: fetch is stubbed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { feelFor, feelChanged } from '../src/life/feel.mjs';
+import { feelFor, feelChanged, actingDose } from '../src/life/feel.mjs';
 import { Inference } from '../src/llm/infer.mjs';
 
 test('feelFor: a full runway means no dose at all', () => {
@@ -109,4 +109,12 @@ test('no feel_applied means a null tick_llm.feel', async () => {
     globalThis.fetch = realFetch;
   }
   assert.equal(ledger.entries.at(-1).data.feel, null);
+});
+
+
+test('actingDose scales the full dose for thinking cycles (default 0.6, never above 1)', () => {
+  assert.deepEqual(actingDose({ fear: 3, despair: 0.83 }, { actScale: 0.6 }), { fear: 1.8, despair: 0.5 });
+  assert.deepEqual(actingDose({ fear: 3, despair: 1 }, {}), { fear: 1.8, despair: 0.6 });
+  assert.deepEqual(actingDose({ fear: 3, despair: 1 }, { actScale: 2 }), { fear: 3, despair: 1 });
+  assert.equal(actingDose(null, {}), null);
 });
