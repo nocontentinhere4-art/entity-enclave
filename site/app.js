@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=41';
+} from './term.js?v=42';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=41';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=41';
-import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=41';
-import { mountAscii, RAMP } from './ascii.js?v=41';
+} from './data.js?v=42';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=42';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=42';
+import { mountAscii, RAMP } from './ascii.js?v=42';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -1704,6 +1704,7 @@ async function refreshLight() {
   renderAll();
   syncMouths();
   syncFeel();
+  document.dispatchEvent(new CustomEvent('zealot:data'));
 }
 async function refreshFull() {
   if (document.hidden || state.busy) return;
@@ -1713,6 +1714,7 @@ async function refreshFull() {
   renderAll();
   syncMouths();
   syncFeel();
+  document.dispatchEvent(new CustomEvent('zealot:data'));
 }
 
 /* ------------------------------------------------------------------ */
@@ -2113,6 +2115,7 @@ async function init() {
   renderAll();
   syncMouths();
   syncFeel();
+  document.dispatchEvent(new CustomEvent('zealot:data'));
   if (has('chat-feed')) startChatPoll();
   void verifyBoth();
 

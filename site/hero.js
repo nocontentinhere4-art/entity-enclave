@@ -46,8 +46,8 @@ let ready = false;
 
 // 0 = left = WICK (e1), 1 = right = OBOL (e2)
 const skulls = [
-  { mode: 'none', k: 0, talkUntil: -1, burstEnd: -1, nextBurst: -1, chewStart: 0, yawnStart: -1, yawnEnd: -1, nextYawn: -1, yawnPeriod: YAWN_PERIOD },
-  { mode: 'none', k: 0, talkUntil: -1, burstEnd: -1, nextBurst: -1, chewStart: 0, yawnStart: -1, yawnEnd: -1, nextYawn: -1, yawnPeriod: YAWN_PERIOD },
+  { mode: 'none', k: 0, talkUntil: -1, burstEnd: -1, nextBurst: -1, chewStart: 0, yawnStart: -1, yawnEnd: -1, nextYawn: -1, yawnPeriod: YAWN_PERIOD, chatter: false },
+  { mode: 'none', k: 0, talkUntil: -1, burstEnd: -1, nextBurst: -1, chewStart: 0, yawnStart: -1, yawnEnd: -1, nextYawn: -1, yawnPeriod: YAWN_PERIOD, chatter: false },
 ];
 
 let clock = 0;
@@ -57,6 +57,7 @@ let running = false;
 
 const idxOf = (id) => (id === 'e1' ? 0 : 1);
 const feels = [{ fear: 0, despair: 0 }, { fear: 0, despair: 0 }]; // live steering doses, drive the tremor
+const nonce = ['', '']; // PROVE LIVE nonce drawn between each skull's jaws (32px mono)
 
 function loadImages() {
   imgOpen.src = './vendor/skulls-b.jpg';
@@ -142,6 +143,7 @@ function yawnK(s, now) {
 
 function computeK(s, now) {
   if (s.mode === 'dead') return 1;
+  if (s.chatter) return (Math.floor(now * 6) % 2 === 0) ? 0.2 : 0.5; // 3 Hz waiting chatter: two glyph rows
   if (now < s.talkUntil) return chewK(s, now);
   if (s.mode === 'none' || s.mode === 'unknown') return 0;
   if (s.mode === 'asleep') {
@@ -226,6 +228,28 @@ function render(kL, kR, bL, bR, shL, shR, now) {
   }
 }
 
+function drawNonceLayer() {
+  for (let i = 0; i < 2; i++) {
+    const t = nonce[i];
+    if (!t) continue;
+    ctx.font = `32px ${MONO}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = LIME;
+    let mx, my;
+    if (stacked) {
+      mx = W / 2;
+      my = i === 0 ? H * 0.30 : H * 0.76;
+    } else {
+      mx = i === 0 ? W * 0.25 : W * 0.75;
+      my = H * 0.58;
+    }
+    ctx.fillText(t, mx, my);
+  }
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+}
+
 function draw(now) {
   if (!ready || !lumOpen || !lumClosed) return;
   const s0 = skulls[0], s1 = skulls[1];
@@ -235,11 +259,13 @@ function draw(now) {
     s0.mode !== 'dead', s1.mode !== 'dead',
     now,
   );
+  drawNonceLayer();
 }
 
 function renderStatic() {
   if (!ready || !lumOpen) return;
   render(0, 0, 1, 1, false, false, 0);
+  drawNonceLayer();
 }
 
 function tick() {
@@ -350,4 +376,14 @@ export function triggerTalk(id) {
   const s = skulls[idxOf(id)];
   s.talkUntil = clock + TALK_SECS;
   s.chewStart = clock;
+}
+
+/** Waiting chatter for PROVE LIVE: open/close the jaw by two glyph rows at 3 Hz. No-op when the canvas is absent. */
+export function setJawChatter(id, on) {
+  skulls[idxOf(id)].chatter = Boolean(on);
+}
+
+/** Draw a 32px mono number between the jaws of one skull; pass '' or null to clear. No-op when the canvas is absent. */
+export function drawNonce(id, text) {
+  nonce[idxOf(id)] = String(text == null ? '' : text);
 }
