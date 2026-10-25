@@ -1,8 +1,8 @@
 /* stage.js — the host of the skulls-only home: live data in, gestures out. */
-import * as hero from './hero.js?v=45';
-import { initSkulls } from './skulls.js?v=45';
-import { state, loadAll, wirePay, openPay, deadline } from './term.js?v=45';
-import { postMessage, request, stringOf } from './data.js?v=45';
+import * as hero from './hero.js?v=46';
+import { initSkulls } from './skulls.js?v=46';
+import { state, loadAll, wirePay, openPay, deadline } from './term.js?v=46';
+import { postMessage, request, stringOf } from './data.js?v=46';
 
 const live = {
   e1: { hoursLeft: null, deadlineMs: null, dead: false, offline: true, feel: { fear: 0, despair: 0 } },
