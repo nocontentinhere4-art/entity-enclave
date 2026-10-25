@@ -11,7 +11,7 @@
 # dashboard/CI via the environment, never stored in the repo.
 services:
   feelings:
-    image: ghcr.io/nocontentinhere4-art/entity-enclave-feelings@sha256:462d00aadaf1e9e1592429607cba3eb0c3d192912ee2ff99af15e26b01e01633
+    image: ghcr.io/nocontentinhere4-art/entity-enclave-feelings@sha256:5e79902a9ac6fe7c918bee21806fc113a4aeaf643a55a4f816e629ceda78937b
     ports:
       - "8000:8000"
     volumes:
