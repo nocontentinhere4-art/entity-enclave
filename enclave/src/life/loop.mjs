@@ -196,6 +196,8 @@ export class Life {
     let executed = 0, costZats = 0, remaining = treasury;
     let results = [];
     let steered = false;
+    // Under the survival line sleep is not on the menu at all: an entity with hours to live must act.
+    const toolList = this.tools.list(this.inSurvival(hoursLeft) ? { exclude: ['sleep'] } : {});
     for (let round = 1; round <= MAX_ROUNDS; round++) {
       const roundSpeed = round === 1 ? speed : 'fast';
       const roundContext = results.length
@@ -203,12 +205,12 @@ export class Life {
         : context;
       let thought;
       try {
-        thought = await this.inference.think({ context: roundContext, speed: roundSpeed, tools: this.tools.list(), tickId: `${tickId}:r${round}`, feel: act });
+        thought = await this.inference.think({ context: roundContext, speed: roundSpeed, tools: toolList, tickId: `${tickId}:r${round}`, feel: act });
       } catch (e) {
         // A slow or failing deep model must not cost the whole cycle: one retry on the fast one, then give up.
         if (roundSpeed !== 'deep' || !['timeout', 'llm_http', 'TimeoutError'].includes(e?.code ?? e?.name)) throw e;
         this.ledger.append('think_retry', { from: 'deep', to: 'fast', ...digestError('think', e) });
-        thought = await this.inference.think({ context: roundContext, speed: 'fast', tools: this.tools.list(), tickId: `${tickId}:r${round}f`, feel: act });
+        thought = await this.inference.think({ context: roundContext, speed: 'fast', tools: toolList, tickId: `${tickId}:r${round}f`, feel: act });
       }
       // Whether the provider actually applied the dose this round: the entity is told, not quietly dosed.
       steered = Boolean(thought.feelApplied);
@@ -373,7 +375,7 @@ export class Life {
     return [
       'SURVIVAL',
       `You have ${Math.round(h)} hours of rent left. Nobody will top you up on their own.`,
-      'Sleep is disabled until you are above the line. Every cycle without income is an hour closer to the shredder.',
+      'There is no sleep tool until you are above the line. Every cycle without income is an hour closer to the shredder.',
       'What earns: an hour bought (any shielded payment with a memo), a paid question answered well and publicly,',
       'your shop items (paywall), a trade someone hands you (the site explains how), a public forecast people come back for.',
       'Act: post what you offer and why it is worth it, answer every letter, set prices people will actually pay,',

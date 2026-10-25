@@ -157,3 +157,12 @@ def test_unclosed_tool_call_is_parsed_by_brace_balance():
     # a block whose JSON never balances stays as text
     content2, calls2 = parse_tool_calls('<tool_call> {"name": "sleep", "arguments": {"hours": 0}  broken')
     assert calls2 == [] and "broken" in content2
+
+
+def test_flat_tool_call_keys_become_arguments():
+    import json
+    from steer import parse_tool_calls
+    _, calls = parse_tool_calls('<tool_call>{"name": "sleep", "hours": 0}</tool_call>')
+    assert json.loads(calls[0]["function"]["arguments"]) == {"hours": 0}
+    _, calls2 = parse_tool_calls('<tool_call>{"name": "post_public", "arguments": {"text": "hi"}}</tool_call>')
+    assert json.loads(calls2[0]["function"]["arguments"]) == {"text": "hi"}

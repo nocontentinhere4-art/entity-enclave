@@ -91,7 +91,10 @@ def _parse_call_block(raw: str):
     name = obj.get("name")
     if not isinstance(name, str) or not name:
         return None
-    arguments = obj.get("arguments", {})
+    arguments = obj.get("arguments")
+    if arguments is None:
+        # A steered model sometimes flattens the call: every key but the name is the arguments.
+        arguments = {k: v for k, v in obj.items() if k not in ("name", "arguments")}
     if not isinstance(arguments, str):
         try:
             arguments = json.dumps(arguments, ensure_ascii=False)

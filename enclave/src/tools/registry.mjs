@@ -29,7 +29,8 @@ export class Tools {
   /** Called by the life loop at every tick, so quotes use the real balance without extra wallet round-trips. */
   setTreasury(zats) { this.treasuryZats = zats; }
 
-  list() { return SCHEMAS; }
+  /** The tool schemas offered to the model; `exclude` hides tools that make no sense right now (sleep in survival). */
+  list({ exclude = [] } = {}) { return exclude.length ? SCHEMAS.filter((s) => !exclude.includes(s.name)) : SCHEMAS; }
 
   async call(name, args = {}, tickId) {
     if (!SCHEMAS.some((s) => s.name === name)) throw err('not_in_pricelist', `unknown tool: ${name}`);
@@ -318,6 +319,7 @@ export class Tools {
 
   async #sleep(hours) {
     const h = Number(hours);
+    if (!Number.isFinite(h) || h <= 0) throw err('bad_args', 'sleep needs hours > 0 (a number)');
     const until = new Date(Date.now() + Math.max(0, h) * 3_600_000).toISOString();
     await this.#edit((m) => { m.sleepUntil = until; });
     return { sleepUntil: until };

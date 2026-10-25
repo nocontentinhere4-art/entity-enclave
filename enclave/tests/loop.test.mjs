@@ -441,3 +441,15 @@ test('survival mode: under the line sleep is broken, the rhythm stays fast and t
   assert.match(ctx, /SURVIVAL/);
   assert.match(ctx, /hours of rent left/);
 });
+
+
+test('survival mode hides the sleep tool from the model and sleep without hours is refused', async () => {
+  const w = makeWorld({ zats: 500_000, over: { survivalHours: 72 } });
+  const seen = [];
+  const orig = w.life.inference.think.bind(w.life.inference);
+  w.life.inference.think = async (args) => { seen.push(args.tools.map((t) => t.name)); return orig(args); };
+  await w.life.tick('timer');
+  assert.ok(seen.length > 0);
+  assert.ok(seen.every((names) => !names.includes('sleep')));
+  await assert.rejects(() => w.tools.call('sleep', {}, 'tx'), (e) => e.code === 'bad_args');
+});
