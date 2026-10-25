@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=35';
+} from './term.js?v=36';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=35';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=35';
-import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=35';
-import { mountAscii, RAMP } from './ascii.js?v=35';
+} from './data.js?v=36';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=36';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=36';
+import { mountAscii, RAMP } from './ascii.js?v=36';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -115,7 +115,7 @@ function renderBrainNote() {
   if (!ds.length) { n.textContent = ''; return; }
   const outside = ds.filter((d) => d.brainTee === false);
   n.textContent = outside.length
-    ? `Right now the brain (${outside[0].brain || 'the model'}) runs on a rented GPU outside the TEE, at ${outside[0].brainHost || 'an external host'}: the enclaves, wallets and ledgers stay sealed; the thinking is not attested yet.`
+    ? 'Right now their brain runs on a rented GPU outside the sealed machine (wallets, ledger and keys stay sealed; the thinking itself is not yet attested).'
     : '';
 }
 function syncFeel() {
