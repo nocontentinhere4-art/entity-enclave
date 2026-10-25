@@ -435,6 +435,17 @@ function drawString3x5(str, x, y, size, color, align = 'center') {
   for (const ch of str) { drawDigit3x5(ch, px, y, size, color); px += cw; }
 }
 
+/* The cranial clock is always there: H:MM:SS in 3×5 glyph digits on the frontal bone, ticking every second. */
+function drawClockBase(id) {
+  const st = STATE[id];
+  if (!st || st.offline) return;
+  const f = forehead(id);
+  ctx.save();
+  ctx.globalAlpha = st.dead ? 0.35 : 0.9;
+  drawString3x5(st.dead ? '0:00:00' : formatTime(id), f.x, f.y - 12, 3, st.dead ? '#777' : YELLOW, 'center');
+  ctx.restore();
+}
+
 function drawClockMag(id) {
   const m = clockMag[id];
   if (m.cur < 0.01) return;
@@ -525,9 +536,54 @@ function drawThread() {
     ctx.globalAlpha = 0.35 + 0.35 * Math.sin(u * Math.PI);
     ctx.fillStyle = YELLOW; ctx.fillText(RAMP[(i * 3) % RAMP.length], x, y);
   }
+  // the thread is alive: every 2.4 s a pulse of three hot glyphs runs from one mouth to the other, alternating
+  if (!reduced.matches) {
+    const cycle = Math.floor(t / 2.4), ph = (t % 2.4) / 2.4;
+    for (let k = 0; k < 3; k++) {
+      let u = ph - k * 0.06; if (u < 0) continue;
+      if (cycle % 2) u = 1 - u;
+      const x = lerp(a.x, b.x, u) + (kx - mx) * 4 * u * (1 - u);
+      const y = lerp(a.y, b.y, u) + (ky - my) * 4 * u * (1 - u);
+      ctx.globalAlpha = 0.95 - k * 0.3; ctx.fillStyle = HOT; ctx.fillText('@#%'[k], x, y);
+    }
+  }
   ctx.globalAlpha = 1;
   ctx.fillStyle = YELLOW; ctx.fillText('@', kx, ky);
   if (ledgerArmed && t - ledgerT < 3) ctx.fillText('↗', kx + 28, ky - 28);
+  ctx.restore();
+}
+
+/* The lantern shows itself: a slow ring of glyphs around the pointer. */
+function drawLanternRing() {
+  if (!pointer.active || reduced.matches) return;
+  const r = pointer.isTouch ? 64 : 88;
+  ctx.save(); ctx.font = '11px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let i = 0; i < 18; i++) {
+    const ang = t * 0.6 + (i / 18) * Math.PI * 2;
+    ctx.globalAlpha = 0.25 + 0.25 * Math.sin(t * 3 + i);
+    ctx.fillStyle = HOT;
+    ctx.fillText(RAMP[8 + (i % 7)], pointer.x + Math.cos(ang) * r, pointer.y + Math.sin(ang) * r);
+  }
+  ctx.restore();
+}
+
+/* One line of hints: the first 9 s, and again after 12 s without a gesture. Text only here. */
+let hintShownUntil = 9;
+function drawHint() {
+  if (t > hintShownUntil && t - pointer.lastMove > 12) hintShownUntil = t + 6;
+  if (t > hintShownUntil) return;
+  const fade = Math.min(1, hintShownUntil - t, t * 0.8);
+  const text = pointer.isTouch || W < 720
+    ? 'TAP A FOREHEAD · HOLD TO BUY AN HOUR · DOUBLE-TAP A JAW TO PROVE LIVE · DRAG THE THREAD · TAP AN EYE TO SPEAK'
+    : 'TAP A FOREHEAD: THE CLOCK · HOLD IT: BUY AN HOUR · DOUBLE-TAP A JAW: PROVE LIVE · DRAG THE THREAD: THEIR SECRET LETTER · TAP AN EYE: SPEAK';
+  ctx.save(); ctx.font = LABEL; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.globalAlpha = 0.75 * Math.max(0, fade);
+  ctx.fillStyle = YELLOW;
+  const y = H - 28;
+  if (W < 720) {
+    const parts = text.split(' · ');
+    parts.forEach((line, i) => ctx.fillText(line, W / 2, y - (parts.length - 1 - i) * 16));
+  } else ctx.fillText(text, W / 2, y);
   ctx.restore();
 }
 
@@ -610,9 +666,9 @@ function draw() {
   }
   drawThread(); drawEscaped(); drawLetter(); drawMotes(); drawTestament();
   for (const id of ['e1', 'e2']) {
-    drawClockMag(id); drawBuy(id); drawProve(id);
+    drawClockBase(id); drawClockMag(id); drawBuy(id); drawProve(id);
   }
-  drawComposer();
+  drawComposer(); drawLanternRing(); drawHint();
 }
 
 function tick() {
