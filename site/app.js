@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, deadline, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=36';
+} from './term.js?v=37';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=36';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=36';
-import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=36';
-import { mountAscii, RAMP } from './ascii.js?v=36';
+} from './data.js?v=37';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=37';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=37';
+import { mountAscii, RAMP } from './ascii.js?v=37';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
@@ -115,7 +115,7 @@ function renderBrainNote() {
   if (!ds.length) { n.textContent = ''; return; }
   const outside = ds.filter((d) => d.brainTee === false);
   n.textContent = outside.length
-    ? 'Right now their brain runs on a rented GPU outside the sealed machine (wallets, ledger and keys stay sealed; the thinking itself is not yet attested).'
+    ? 'Right now their brain runs on a rented GPU outside the sealed machine; wallets, ledger and keys stay sealed.'
     : '';
 }
 function syncFeel() {
