@@ -13,6 +13,7 @@
 html, body { height: auto; min-height: 100%; }
 /* overflow-x: hidden would make html/body scroll containers and break position: sticky; clip does not */
 html, body { overflow-x: clip; }
+html { scroll-behavior: auto; }   /* the film is scrubbed by hand; programmatic jumps are instant */
 body.film-page {
   background: var(--void);
   color: var(--bone);

@@ -117,6 +117,7 @@ function createField(src, opts, atlasForFn) {
     const baseCi = COLOR_MAP[cam.color] ?? 1;
     const atlas = atlasForFn(drawCell, cam.dpr);
 
+    if (window.__film) window.__fieldDbg = { src: field.src, zoom, cx, cy, drawCell, left, top, imgW, imgH, W, H, thresh, alpha };
     const col0 = Math.max(0, Math.floor(-left / drawCell));
     const col1 = Math.min(field.cols - 1, Math.ceil((W - left) / drawCell));
     const row0 = Math.max(0, Math.floor(-top / drawH));
