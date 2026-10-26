@@ -1,5 +1,5 @@
 /*
- * ascii.js — reusable ASCII-scene engine (ZEALOT v21).
+ * ascii.js — reusable ASCII-scene engine (ZEALOT v50: v21 engine + glyph-atlas fast path via glyphs.js).
  *
  * mountAscii(canvas, opts) samples an image once into a luminance grid (the approved glyph
  * renderer from hero.js: luminance sampling, ramp ' .-~:;=!*+^%$#&@', yellow #f4b728 for the
@@ -14,6 +14,8 @@
  * is for every OTHER scene on the page.
  */
 
+import { makeAtlas } from './glyphs.js';
+
 export const RAMP = ' .-~:;=!*+^%$#&@';
 
 const LIME = '#f4b728';
@@ -23,12 +25,11 @@ const MONO = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const GAMMA = 1.0;
 const THRESH = 0.09;
 const YELLOW_AT = 0.80;
-const CELL_ASPECT = 1.15;      // px-per-glyph vertical stretch, matches hero.js
+const CELL_ASPECT = 1.15;
 const FPS = 30;
 
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-/* one shared clock for every scene */
 const instances = [];
 const byCanvas = new Map();
 let timer = 0;
@@ -42,7 +43,6 @@ function ensureIO() {
       const inst = byCanvas.get(entry.target);
       if (!inst) continue;
       inst.visible = entry.isIntersecting;
-      // paint at once when a scene scrolls into view, without waiting for the next clock tick
       if (inst.visible && inst.ready && inst.draw) inst.draw(performance.now() / 1000);
     }
   }, { rootMargin: '120px' });
@@ -58,7 +58,7 @@ function startClock() {
 function tick() {
   const now = performance.now();
   if (!document.hidden) {
-    const t = now / 1000;                 // absolute seconds, shared by every scene
+    const t = now / 1000;
     for (let i = 0; i < instances.length; i++) {
       const inst = instances[i];
       if (inst.ready && inst.visible && !inst.reduced) inst.draw(t);
@@ -67,7 +67,6 @@ function tick() {
   timer = setTimeout(tick, 1000 / FPS);
 }
 
-/* resolve a hint field: a constant, a per-cell function, or a per-cell typed array */
 function resolve(f, i, x, y, base) {
   const t = typeof f;
   if (t === 'function') return f(i, x, y, base);
@@ -107,6 +106,9 @@ export function mountAscii(canvas, opts = {}) {
   const yellow = opts.yellow !== false;
   const motion = opts.motion || null;
 
+  const rampIndex = Object.create(null);
+  for (let i = 0; i < ramp.length; i++) rampIndex[ramp[i]] = i;
+
   const img = new Image();
   const off = document.createElement('canvas');
   const octx = off.getContext('2d', { willReadFrequently: true });
@@ -117,6 +119,9 @@ export function mountAscii(canvas, opts = {}) {
     cell, fit, align, gap, ramp, yellowAt, thresh, opacity, yellow, motion,
     W: 0, H: 0, dpr: 1, cols: 0, rows: 0, total: 0,
     lum: null, ready: false, visible: true, reduced: reduced.matches,
+    atlas: null, atlasReady: false, atlasGen: 0,
+    colors: [LIME, BRIGHT, DIM],
+    rampIndex,
   };
 
   function blit() {
@@ -172,22 +177,39 @@ export function mountAscii(canvas, opts = {}) {
     if (inst.cols <= 0 || inst.rows <= 0) { inst.lum = null; return; }
     off.width = inst.cols;
     off.height = inst.rows;
+
+    const cellH = inst.cell * CELL_ASPECT;
+    inst.atlasGen++;
+    const myGen = inst.atlasGen;
+    if (inst.atlas) { inst.atlas.dispose(); inst.atlas = null; }
+    inst.atlas = makeAtlas({ ramp, cellW: inst.cell, cellH, dpr: inst.dpr, font: MONO, colors: inst.colors, fontScale: 1.25 });
+    inst.atlasReady = !document.fonts || document.fonts.status === 'loaded';
+    if (document.fonts && document.fonts.status !== 'loaded') {
+      document.fonts.ready.then(() => {
+        if (myGen !== inst.atlasGen || !inst.atlas) return;
+        inst.atlas.dispose();
+        inst.atlas = makeAtlas({ ramp, cellW: inst.cell, cellH, dpr: inst.dpr, font: MONO, colors: inst.colors, fontScale: 1.25 });
+        inst.atlasReady = true;
+        if (inst.reduced && inst.draw) inst.draw(0);
+      });
+    }
+
     inst.lum = new Float32Array(inst.total);
     blit();
     readLum();
-    inst.draw(inst.reduced ? 0 : performance.now() / 1000);   // first frame right after (re)sampling
+    inst.draw(inst.reduced ? 0 : performance.now() / 1000);
   }
 
   function draw(t) {
     if (!inst.ready || !inst.lum) return;
     const cols = inst.cols, total = inst.total, lum = inst.lum;
     const n = ramp.length - 1;
+    const atlas = inst.atlas;
+    const atlasReady = inst.atlasReady;
     ctx.setTransform(inst.dpr, 0, 0, inst.dpr, 0, 0);
     ctx.clearRect(0, 0, inst.W, inst.H);
     ctx.font = `${inst.cell * 1.25}px ${MONO}`;
     ctx.textBaseline = 'top';
-    // Always run the motion hint: for a reduced-motion scene it is frozen at t=0 (a static
-    // frame that still honours state — e.g. a dead portrait keeps its yellow switched off).
     const hint = inst.motion ? inst.motion(inst, t) : null;
     for (let i = 0; i < total; i++) {
       const x = i % cols;
@@ -195,9 +217,9 @@ export function mountAscii(canvas, opts = {}) {
       const base = lum[i];
       let l = base;
       let a = inst.opacity;
-      let ci = null;                    // null => derive the char from luminance
+      let ci = null;
       let yel = null;
-      let jx = 0, jy = 0;               // per-cell tremor offset (px), from the motion hint
+      let jx = 0, jy = 0;
       if (hint) {
         if (hint.lum != null) l = resolve(hint.lum, i, x, y, base);
         if (hint.alpha != null) a = inst.opacity * resolve(hint.alpha, i, x, y, 1);
@@ -214,14 +236,24 @@ export function mountAscii(canvas, opts = {}) {
       const ch = ramp[c];
       if (ch === ' ') continue;
       const isLime = inst.yellow && (yel === true || (yel == null && v > inst.yellowAt));
-      ctx.globalAlpha = a;
-      ctx.fillStyle = isLime ? LIME : (v > 0.55 ? BRIGHT : DIM);
-      ctx.fillText(ch, x * inst.cell + jx, y * inst.cell * CELL_ASPECT + jy);
+      const colorIdx = isLime ? 0 : (v > 0.55 ? 1 : 2);
+      const alpha01 = a;
+      if (alpha01 <= 0) continue;
+      const dx = x * inst.cell + jx;
+      const dy = y * inst.cell * CELL_ASPECT + jy;
+      if (atlasReady && atlas) {
+        const gi = inst.rampIndex[ch];
+        if (gi != null) atlas.blit(ctx, gi, colorIdx, alpha01, dx, dy);
+      } else {
+        ctx.globalAlpha = a;
+        ctx.fillStyle = isLime ? LIME : (v > 0.55 ? BRIGHT : DIM);
+        ctx.fillText(ch, dx, dy);
+      }
     }
     ctx.globalAlpha = 1;
   }
 
-  inst.draw = draw;                    // the shared clock and reduced-motion paths call inst.draw
+  inst.draw = draw;
 
   const onload = () => {
     if (inst.ready) return;
@@ -233,7 +265,6 @@ export function mountAscii(canvas, opts = {}) {
   img.src = opts.src;
   if (img.complete) onload();
 
-  /* resample on resize (and when the container first gains a real size) */
   let ro = null;
   if (typeof ResizeObserver !== 'undefined') {
     ro = new ResizeObserver(() => { if (inst.ready) sample(); });
@@ -250,17 +281,14 @@ export function mountAscii(canvas, opts = {}) {
   return {
     canvas,
     resample: () => { if (inst.ready) sample(); },
-    // Redraw a single static frame. Needed when a prefers-reduced-motion scene's
-    // underlying state changes (e.g. an entity dies) after the initial sample, since
-    // the shared clock skips reduced scenes.
     redraw: () => { if (inst.ready && inst.reduced) inst.draw(0); },
-    // Point the scene at a new image (e.g. a re-seeded procedural letter). Re-samples on load.
     setSrc: (url) => { inst.ready = false; img.src = url; },
     get reduced() { return inst.reduced; },
     get lum() { return inst.lum; },
     destroy() {
       if (ro) ro.disconnect();
       ensureIO().unobserve(canvas);
+      if (inst.atlas) { inst.atlas.dispose(); inst.atlas = null; }
       const at = instances.indexOf(inst);
       if (at >= 0) instances.splice(at, 1);
       byCanvas.delete(canvas);
@@ -268,7 +296,6 @@ export function mountAscii(canvas, opts = {}) {
   };
 }
 
-/** The live set of mounted scenes, for post-mount passes (e.g. fear.js wraps their motion). */
 export function getInstances() {
   return instances;
 }

@@ -1,4 +1,8 @@
-/* hero.js — ZEALOT v18, patched with interaction hooks */
+/* hero.js — the skulls engine (ZEALOT v50): v18 hooks + glyph-atlas fast path
+ * Per-cell fillText replaced by atlas.blit; atlas rebuilt in sample()/resize/font-load.
+ * Adds ?stats overlay. Public exports and behaviour unchanged. */
+
+import { makeAtlas, fpsProbe } from './glyphs.js';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const CELL_MIN_W = 6, CELL_MAX_W = 8;
@@ -18,6 +22,18 @@ const YAWN_EVERY = 4;
 const TALK_SECS = 3;
 const STACK_AT = 720;
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+const RAMP_INDEX = Object.create(null);
+for (let i = 0; i < RAMP.length; i++) RAMP_INDEX[RAMP[i]] = i;
+
+let atlas = null;
+let atlasReady = false;
+let atlasGen = 0;
+let atlasColors = null;
+const STATS = typeof location !== 'undefined' && /[?&]stats/.test(location.search);
+const NOFAST = typeof location !== 'undefined' && /[?&]nofast/.test(location.search); // A/B: force the fillText path
+let probe = null;
+let drawnCells = 0;
 
 let canvas = null, ctx = null;
 let W = 0, H = 0, dpr = 1;
@@ -161,6 +177,27 @@ function computeLayout() {
   };
 }
 
+function buildAtlas() {
+  atlasGen++;
+  const myGen = atlasGen;
+  if (atlas) { atlas.dispose(); atlas = null; }
+  atlasColors = [LIME, BRIGHT, DIM,
+    lerpColor(LIME, '#777', 0.2), lerpColor(LIME, '#777', 0.4),
+    lerpColor(LIME, '#777', 0.6), lerpColor(LIME, '#777', 0.8),
+    lerpColor(LIME, '#777', 1.0), '#555'];
+  atlas = makeAtlas({ ramp: RAMP, cellW, cellH, dpr, font: MONO, colors: atlasColors, fontScale: 1.2 });
+  atlasReady = !document.fonts || document.fonts.status === 'loaded';
+  if (document.fonts && document.fonts.status !== 'loaded') {
+    document.fonts.ready.then(() => {
+      if (myGen !== atlasGen || !atlas) return;
+      atlas.dispose();
+      atlas = makeAtlas({ ramp: RAMP, cellW, cellH, dpr, font: MONO, colors: atlasColors, fontScale: 1.2 });
+      atlasReady = true;
+      if (reduced.matches && ready) renderStatic();
+    });
+  }
+}
+
 function sample() {
   W = canvas.clientWidth;
   H = canvas.clientHeight;
@@ -174,6 +211,7 @@ function sample() {
   rows = Math.floor(H / cellH);
   total = cols * rows;
   if (cols <= 0 || rows <= 0) return;
+  buildAtlas();
   off.width = cols;
   off.height = rows;
   lumOpen = new Float32Array(total);
@@ -245,6 +283,8 @@ function brightnessOf(s) {
 }
 
 const GRID_SET = '!@%^&*()$#';
+let gridOn = true;
+export function setGrid(on) { gridOn = Boolean(on); }
 const GRID = 48;
 let gridChars = null, gridCols = 0, gridRows = 0;
 function buildGrid() {
@@ -253,6 +293,7 @@ function buildGrid() {
   for (let i = 0; i < gridChars.length; i++) gridChars[i] = (Math.random() * GRID_SET.length) | 0;
 }
 function drawGrid() {
+  if (!gridOn) return;
   if (!gridChars) buildGrid();
   gridChars[(Math.random() * gridChars.length) | 0] = (Math.random() * GRID_SET.length) | 0;
   ctx.font = `11px ${MONO}`; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
@@ -308,6 +349,7 @@ function render(kL, kR, bL, bR, shL, shR, now, fade) {
   const holeSalt = Math.floor(now * 2);
   const d0 = Math.min(1, feels[0].fear || 0);
   const d1 = Math.min(1, feels[1].fear || 0);
+  drawnCells = 0;
   for (let i = 0; i < total; i++) {
     const x = i % cols, y = (i / cols) | 0;
     const h = half[i];
@@ -346,17 +388,30 @@ function render(kL, kR, bL, bR, shL, shR, now, fade) {
       ch = '~!*^%'[(Math.random() * 5) | 0];
     }
     if (ch === ' ') continue;
-    ctx.globalAlpha = b * alphaMul * fade;
+    const alpha01 = b * alphaMul * fade;
+    if (alpha01 <= 0) continue;
+    let colorIdx;
     if (dead) {
       const prog = Math.min(1, (now - deathStart[h]) / 1.4);
-      ctx.fillStyle = prog >= 1 ? '#555' : lerpColor(LIME, '#777', prog);
+      colorIdx = prog >= 1 ? 8 : 3 + Math.min(4, Math.floor(prog / 0.2));
     } else {
       const isLime = (h ? shR : shL) && v > (LIME_AT - d * 0.04);
-      ctx.fillStyle = isLime ? LIME : (v > 0.55 ? BRIGHT : DIM);
+      colorIdx = isLime ? 0 : (v > 0.55 ? 1 : 2);
     }
-    ctx.fillText(ch, x * cellW + jx + lx, yp + jy + (h ? dispY[i] : dispY[i]));
-    ctx.globalAlpha = 1;
+    const gx = x * cellW + jx + lx;
+    const gy = yp + jy + dispY[i];
+    drawnCells++;
+    if (atlasReady && atlas && !NOFAST) {
+      const gi = RAMP_INDEX[ch];
+      if (gi != null) atlas.blit(ctx, gi, colorIdx, alpha01, gx, gy);
+    } else {
+      ctx.globalAlpha = alpha01;
+      ctx.fillStyle = atlasColors[colorIdx];
+      ctx.fillText(ch, gx, gy);
+      ctx.globalAlpha = 1;
+    }
   }
+  ctx.globalAlpha = 1;
 }
 
 function drawNonceLayer() {
@@ -416,17 +471,31 @@ function renderStatic() {
   drawClockLayer(); drawNonceLayer();
 }
 
+function drawStats() {
+  if (!ctx || !probe) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = LIME;
+  ctx.font = `10px ${MONO}`;
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${probe.ms.toFixed(1)}ms ${drawnCells}`, 10, 10);
+  window.__zstats = { ms: probe.ms, cells: drawnCells, fast: !NOFAST && atlasReady };
+}
+
 function tick() {
   if (!active) { if (timer) { clearTimeout(timer); timer = 0; running = false; } return; }
   const nowMs = performance.now();
   const dt = (nowMs - lastT) / 1000;
   lastT = nowMs;
   if (!document.hidden) {
+    if (STATS && probe) probe.start();
     clock += dt;
     updatePhysics(dt);
     computeLayout();
     draw(clock);
     drawZMark(clock);
+    if (STATS && probe) { probe.end(); drawStats(); }
   }
   timer = setTimeout(tick, 1000 / 30);
 }
@@ -482,6 +551,7 @@ export function initHero() {
   canvas = document.getElementById('skulls');
   if (!canvas) return;
   ctx = canvas.getContext('2d');
+  if (STATS) probe = fpsProbe();
   void loadImages().then(() => {
     ready = imgOpen.naturalWidth > 0 && imgClosed.naturalWidth > 0;
     if (!ready) return;

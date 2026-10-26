@@ -10,14 +10,14 @@
  */
 import {
   state, list, nameOf, stateWord, rentZats, loadAll, boot, wireTerm, openPay, diffLog,
-} from './term.js?v=49';
+} from './term.js?v=50';
 import {
   request, verifyChain, stringOf, formatInt, formatZats, formatDecimal, fmtStamp, hhmm, shortHash, shortUrl,
   REFRESH_MS, sha256Hex, parseLedger, postMessage,
-} from './data.js?v=49';
-import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=49';
-import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=49';
-import { mountAscii, RAMP } from './ascii.js?v=49';
+} from './data.js?v=50';
+import { zip321Uri, qrSvg, base64UrlEncode } from './qr.js?v=50';
+import { initHero, setMouth, triggerTalk, setFeel } from './hero.js?v=50';
+import { mountAscii, RAMP } from './ascii.js?v=50';
 
 /* ------------------------------------------------------------------ */
 /* tiny DOM helpers                                                    */
