@@ -1,5 +1,5 @@
-import { tremor, corrupt, ecg } from './film.js?v=54';
-import { formatInt } from './data.js?v=54';
+import { tremor, corrupt, ecg } from './film.js?v=55';
+import { formatInt } from './data.js?v=55';
 
 export default function make(api) {
   const baseCell = api.isPhone ? 6 : 8;

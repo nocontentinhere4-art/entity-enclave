@@ -1,14 +1,14 @@
-import * as rent from './rent.js?v=54';
-import { wirePay } from './term.js?v=54';
-import { openDoor } from './door.js?v=54';
-import { createFilm } from './film.js?v=54';
-import makeBrief, { briefSeen, markBriefSeen } from './ch-brief.js?v=54';
-import makeFall from './ch-fall.js?v=54';
-import makeHeart from './ch-heart.js?v=54';
-import makeSpine from './ch-spine.js?v=54';
-import makeHand from './ch-hand.js?v=54';
-import makeStorm from './ch-storm.js?v=54';
-import makeGrave from './ch-grave.js?v=54';
+import * as rent from './rent.js?v=55';
+import { wirePay } from './term.js?v=55';
+import { openDoor } from './door.js?v=55';
+import { createFilm } from './film.js?v=55';
+import makeBrief, { briefSeen, markBriefSeen } from './ch-brief.js?v=55';
+import makeFall from './ch-fall.js?v=55';
+import makeHeart from './ch-heart.js?v=55';
+import makeSpine from './ch-spine.js?v=55';
+import makeHand from './ch-hand.js?v=55';
+import makeStorm from './ch-storm.js?v=55';
+import makeGrave from './ch-grave.js?v=55';
 
 const chapters = [
   { id: 'brief', make: makeBrief },

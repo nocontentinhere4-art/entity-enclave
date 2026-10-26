@@ -1,9 +1,9 @@
 /* film.js — ZEALOT v51 THE FILM: scroll/camera engine, GlyphField renderer (image → luminance → atlas-blitted glyphs with a
  * moving camera), hit regions, opt-in WebAudio, tremor/corrupt/ecg helpers. Kimi K2.7 Code from the integrator's contract;
  * reviewed and patched by the integrator (ctx passed to draw, api.ramp, null hints keep the base, audio only after opt-in). */
-import { makeAtlas } from './glyphs.js?v=54';
-import { openPay } from './term.js?v=54';
-import { openDoor } from './door.js?v=54';
+import { makeAtlas } from './glyphs.js?v=55';
+import { openPay } from './term.js?v=55';
+import { openDoor } from './door.js?v=55';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
@@ -18,7 +18,7 @@ function colorStyle(name) { return COLORS[COLOR_MAP[name] ?? 1]; }
 
 const fieldCache = new Map();
 const imgCache = new Map();
-const IMG_V = '?v=54';            // cache-busting for the vendor images (bumped with the site version)
+const IMG_V = '?v=55';            // cache-busting for the vendor images (bumped with the site version)
 
 /* First paint matters more than anything: the FIRST image requested (chapter 1's open frame) loads at once; every
  * other image waits until that one is decoded (or 2.5 s), so chapter 1 never competes for bandwidth with the five
@@ -220,6 +220,20 @@ const D5x7 = {
   ' ': ['     ', '     ', '     ', '     ', '     ', '     ', '     ']
 };
 
+/* A soft dark band (vertical gradient, transparent edges) so text stays legible over bright glyphs; the image stays
+ * fully bright above and below. */
+export function band(ctx, W, y, h, alpha = 0.72, feather = 28) {
+  const g = ctx.createLinearGradient(0, y - feather, 0, y + h + feather);
+  g.addColorStop(0, 'rgba(6,6,6,0)');
+  g.addColorStop(feather / (h + 2 * feather), `rgba(6,6,6,${alpha})`);
+  g.addColorStop(1 - feather / (h + 2 * feather), `rgba(6,6,6,${alpha})`);
+  g.addColorStop(1, 'rgba(6,6,6,0)');
+  ctx.save();
+  ctx.fillStyle = g;
+  ctx.fillRect(0, y - feather, W, h + 2 * feather);
+  ctx.restore();
+}
+
 export function createFilm({ chapters, rent }) {
   let dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 720 ? 1.5 : 2);
   let isPhone = window.innerWidth < 720;
@@ -401,6 +415,14 @@ export function createFilm({ chapters, rent }) {
         if (line && ctx.measureText(test).width > maxW) { lines.push(line); line = w; } else line = test;
       }
       if (line) lines.push(line);
+      ctx.restore();
+      band(ctx, W, 12, lines.length * (size + 6) + 12, 0.72 * alpha, 22);
+      ctx.save();
+      ctx.font = `${size}px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.globalAlpha = alpha * 0.92;
+      ctx.fillStyle = COLORS[1];
       for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], W / 2, 18 + i * (size + 6));
       ctx.restore();
     }

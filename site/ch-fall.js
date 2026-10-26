@@ -1,4 +1,4 @@
-import { corrupt } from './film.js?v=54';
+import { corrupt, band } from './film.js?v=55';
 
 export default function makeFall(api) {
   // ONE skull (Higgsfield gpt_image_2_5, 2026-10-26): open and closed jaw frames of the same photograph
@@ -219,12 +219,7 @@ export default function makeFall(api) {
         ];
         if (l3b) lines.push({ k: 'fall-l3b', s: l3b, color: 'bone', sz: size });
         lines.push({ k: 'fall-l4', s: l4, color: 'dim', sz: size - 2, blink: true });
-        ctx.save();
-        ctx.fillStyle = '#060606';
-        ctx.globalAlpha = 0.55 * wordsAlpha;
-        const boxW = api.isPhone ? W - 2 * x + 20 : Math.min(W - 2 * x + 20, size * 0.62 * l3.length + 40);
-        ctx.fillRect(x - 10, y0 - 8, boxW, lh * lines.length + 10);
-        ctx.restore();
+        band(ctx, W, y0 - 6, lh * lines.length + 6, 0.7 * wordsAlpha, 30);
         let prevDone = true;
         for (let li = 0; li < lines.length; li++) {
           const L = lines[li];

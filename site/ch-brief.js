@@ -2,7 +2,7 @@
  * sentence each in large mono over a glyph-rendered image, the live number under it. Written by the integrator from
  * PERCORSO.md. Every number comes from rent.js; '—' while unknown. After the first complete view a localStorage flag
  * starts later visits at chapter 1 (the '?' button replays the briefing). */
-import { corrupt } from './film.js?v=54';
+import { corrupt, band } from './film.js?v=55';
 
 const FLAG = 'zealot.brief.v1';
 
@@ -146,11 +146,7 @@ export default function makeBrief(api) {
       const lh = Math.round(size * 1.35);
       const blockH = lines.length * lh + 34;
       const y0 = Math.round(H * (api.isPhone ? 0.56 : 0.58) - blockH / 2);
-      ctx.save();
-      ctx.globalAlpha = 0.6 * alpha;
-      ctx.fillStyle = '#060606';
-      ctx.fillRect(Math.round(W * 0.04), y0 - 16, Math.round(W * 0.92), blockH + 24);
-      ctx.restore();
+      band(ctx, W, y0 - 12, blockH + 16, 0.74 * alpha, 36);
       ctx.save();
       ctx.font = font; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = '#f4b728'; ctx.globalAlpha = alpha;
       for (let i = 0; i < rows.length; i++) ctx.fillText(rows[i], W / 2, y0 + i * lh);
