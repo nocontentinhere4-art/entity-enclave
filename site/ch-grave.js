@@ -1,5 +1,5 @@
-import { tremor, corrupt, ecg } from './film.js?v=51';
-import { fmtStamp, shortHash } from './data.js?v=51';
+import { tremor, corrupt, ecg } from './film.js?v=52';
+import { fmtStamp, shortHash } from './data.js?v=52';
 
 export default function make(api) {
   const baseCell = api.isPhone ? 6 : 8;

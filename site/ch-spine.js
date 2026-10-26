@@ -1,4 +1,4 @@
-import { corrupt } from './film.js?v=51';
+import { corrupt } from './film.js?v=52';
 
 export default function makeSpine(api) {
   const field = api.field('vendor/spine-v.jpg', { cols: api.isPhone ? 80 : 160 });   // the spine, vertical (sacrum at the bottom)

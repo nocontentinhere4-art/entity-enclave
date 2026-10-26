@@ -1,5 +1,5 @@
-import { tremor, corrupt, ecg } from './film.js?v=51';
-import { sha256Hex, formatInt, hhmm } from './data.js?v=51';
+import { tremor, corrupt, ecg } from './film.js?v=52';
+import { sha256Hex, formatInt, hhmm } from './data.js?v=52';
 
 export default function make(api) {
   const N = 480;

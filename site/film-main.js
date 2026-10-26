@@ -1,13 +1,13 @@
-import * as rent from './rent.js?v=51';
-import { wirePay } from './term.js?v=51';
-import { openDoor } from './door.js?v=51';
-import { createFilm } from './film.js?v=51';
-import makeFall from './ch-fall.js?v=51';
-import makeHeart from './ch-heart.js?v=51';
-import makeSpine from './ch-spine.js?v=51';
-import makeHand from './ch-hand.js?v=51';
-import makeStorm from './ch-storm.js?v=51';
-import makeGrave from './ch-grave.js?v=51';
+import * as rent from './rent.js?v=52';
+import { wirePay } from './term.js?v=52';
+import { openDoor } from './door.js?v=52';
+import { createFilm } from './film.js?v=52';
+import makeFall from './ch-fall.js?v=52';
+import makeHeart from './ch-heart.js?v=52';
+import makeSpine from './ch-spine.js?v=52';
+import makeHand from './ch-hand.js?v=52';
+import makeStorm from './ch-storm.js?v=52';
+import makeGrave from './ch-grave.js?v=52';
 
 const chapters = [
   { id: 'fall', make: makeFall },
@@ -20,10 +20,10 @@ const chapters = [
 
 document.addEventListener('DOMContentLoaded', () => {
   wirePay();
-  rent.bootRent();
-
   const film = createFilm({ chapters, rent });
   film.start();
+  // the two 2.7 MB ledgers must not compete with chapter 1's first frame: boot the enclave data a moment later
+  setTimeout(() => rent.bootRent(), 1200);
   if (/[?&]debug/.test(location.search)) window.__film = film;
 
   const soundBtn = document.getElementById('sound');

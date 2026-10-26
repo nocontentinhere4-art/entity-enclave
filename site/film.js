@@ -1,9 +1,9 @@
 /* film.js — ZEALOT v51 THE FILM: scroll/camera engine, GlyphField renderer (image → luminance → atlas-blitted glyphs with a
  * moving camera), hit regions, opt-in WebAudio, tremor/corrupt/ecg helpers. Kimi K2.7 Code from the integrator's contract;
  * reviewed and patched by the integrator (ctx passed to draw, api.ramp, null hints keep the base, audio only after opt-in). */
-import { makeAtlas } from './glyphs.js?v=51';
-import { openPay } from './term.js?v=51';
-import { openDoor } from './door.js?v=51';
+import { makeAtlas } from './glyphs.js?v=52';
+import { openPay } from './term.js?v=52';
+import { openDoor } from './door.js?v=52';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
@@ -18,16 +18,30 @@ function colorStyle(name) { return COLORS[COLOR_MAP[name] ?? 1]; }
 
 const fieldCache = new Map();
 const imgCache = new Map();
+const IMG_V = '?v=52';            // cache-busting for the vendor images (bumped with the site version)
 
+/* First paint matters more than anything: the FIRST image requested (chapter 1's open frame) loads at once; every
+ * other image waits until that one is decoded (or 2.5 s), so chapter 1 never competes for bandwidth with the five
+ * other chapters' images. */
+let firstGate = null;
 function loadImage(src) {
   let e = imgCache.get(src);
   if (e) return e.promise;
   const img = new Image();
-  const promise = new Promise((res, rej) => {
+  img.decoding = 'async';
+  const slow = /[?&]slowimg/.test(location.search) ? 3000 : 0;   // debug: emulate a slow first image
+  const start = () => new Promise((res, rej) => {
     img.onload = () => res(img);
     img.onerror = rej;
-    img.src = src;
+    setTimeout(() => { img.src = src + IMG_V; }, slow);
   });
+  let promise;
+  if (!firstGate) {
+    promise = start();
+    firstGate = Promise.race([promise.catch(() => null), new Promise((r) => setTimeout(r, 2500))]);
+  } else {
+    promise = firstGate.then(start);
+  }
   imgCache.set(src, { img, promise });
   return promise;
 }

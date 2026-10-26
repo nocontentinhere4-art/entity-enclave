@@ -1,10 +1,10 @@
-import { corrupt } from './film.js?v=51';
+import { corrupt } from './film.js?v=52';
 
 export default function makeFall(api) {
   // ONE skull (Higgsfield gpt_image_2_5, 2026-10-26): open and closed jaw frames of the same photograph
   const COLS = api.isPhone ? 110 : 220;
-  const open = api.field('vendor/skull-eye.jpg', { cols: COLS });
-  const closed = api.field('vendor/skull-eye-closed.jpg', { cols: COLS });
+  const open = api.field('vendor/skull-eye-512.jpg', { cols: COLS });            // 30 KB: the first frame of the film
+  const closed = api.field('vendor/skull-eye-closed-512.jpg', { cols: COLS });
   const SOCKET = { u: 0.52, v: 0.36 };   // the near eye socket in image coordinates
   const RAMP = api.ramp;
 
@@ -86,6 +86,38 @@ export default function makeFall(api) {
     }
   };
 
+  /* Before the first frame is decoded: sparse glyphs condense from the edges toward a skull-sized oval, so the screen is
+   * never black. Deterministic (hash of the index), no allocations. */
+  const ENTER_N = 420;
+  function drawEntering(ctx, t) {
+    const cellPx = api.isPhone ? 14 : 18;
+    ctx.save();
+    ctx.font = `${cellPx}px "JetBrains Mono", "SF Mono", Menlo, monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const k = Math.min(1, t / 2.2);            // 0 → 1 over the first 2.2 s, then it breathes in place
+    for (let i = 0; i < ENTER_N; i++) {
+      const h1 = ((i * 2654435761) >>> 0) / 4294967296;
+      const h2 = ((i * 2246822519 + 7) >>> 0) / 4294967296;
+      const ang = h1 * Math.PI * 2;
+      const rx = W * 0.28, ry = H * 0.34;
+      const tx = W * 0.5 + Math.cos(ang) * rx * (0.55 + 0.45 * h2);
+      const ty = H * 0.5 + Math.sin(ang) * ry * (0.55 + 0.45 * h2);
+      const sx = W * 0.5 + Math.cos(ang) * W * 0.9;
+      const sy = H * 0.5 + Math.sin(ang) * H * 0.9;
+      const e = Math.min(1, Math.max(0, (k - h2 * 0.35) / 0.65));
+      const ee = 1 - Math.pow(1 - e, 3);
+      const x = sx + (tx - sx) * ee + Math.sin(t * 1.3 + i) * 2;
+      const y = sy + (ty - sy) * ee + Math.cos(t * 1.1 + i * 0.7) * 2;
+      const gi = 3 + ((i * 7 + Math.floor(t * 2)) % 11);
+      ctx.globalAlpha = 0.18 + 0.5 * ee;
+      ctx.fillStyle = i % 9 === 0 ? '#f4b728' : 'rgba(242,242,238,.8)';
+      ctx.fillText(RAMP[gi], Math.round(x), Math.round(y));
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
   function drawSparks(ctx, dt, p) {
     const fade = Math.max(0, Math.min(1, (p - 0.85) / 0.15));
     ctx.globalAlpha = fade;
@@ -124,9 +156,10 @@ export default function makeFall(api) {
       mouthState = !e || e.dead ? 'dead' : e.asleep ? 'asleep' : 'alive';
       fCur = api.fearOf('e1');
 
-      if (!open.ready || !closed.ready) {
+      if (!open.ready) {
         ctx.fillStyle = '#060606';
         ctx.fillRect(0, 0, W, H);
+        drawEntering(ctx, t);
         return;
       }
 
@@ -156,7 +189,9 @@ export default function makeFall(api) {
         mirror: false
       };
 
-      open.drawCrossfade(ctx, cam, closed, kJaw, hint);
+      if (!window.__firstSkull) window.__firstSkull = Math.round(performance.now());   // first-paint probe (cheap, read by the integrator)
+      if (closed.ready) open.drawCrossfade(ctx, cam, closed, kJaw, hint);
+      else open.draw(ctx, cam, hint);
 
       if (p > 0.85) drawSparks(ctx, dt, p);
 
