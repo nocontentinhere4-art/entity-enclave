@@ -14,9 +14,9 @@ import {
   receiptsOf,
   lettersOf,
   rentPerHour
-} from './rent.js?v=53';
+} from './rent.js?v=54';
 
-import { openPay } from './term.js?v=53';
+import { openPay } from './term.js?v=54';
 
 import {
   formatInt,
@@ -27,7 +27,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=53';
+} from './data.js?v=54';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);

@@ -19,26 +19,29 @@
   <meta name="twitter:image" content="https://zealotzec.com/og.jpg">
   <link rel="canonical" href="https://zealotzec.com/">
   <meta name="theme-color" content="#060606">
-  <link rel="preload" as="image" href="./vendor/skull-eye-512.jpg?v=53">
-  <link rel="modulepreload" href="./film.js?v=53">
-  <link rel="modulepreload" href="./glyphs.js?v=53">
-  <link rel="modulepreload" href="./rent.js?v=53">
-  <link rel="modulepreload" href="./term.js?v=53">
-  <link rel="modulepreload" href="./data.js?v=53">
-  <link rel="modulepreload" href="./door.js?v=53">
-  <link rel="modulepreload" href="./qr.js?v=53">
-  <link rel="modulepreload" href="./ch-fall.js?v=53">
-  <link rel="stylesheet" href="./site.css?v=53">
-  <link rel="stylesheet" href="./film.css?v=53">
+  <link rel="preload" as="image" href="./vendor/brief-1.jpg?v=54">
+  <link rel="modulepreload" href="./film.js?v=54">
+  <link rel="modulepreload" href="./glyphs.js?v=54">
+  <link rel="modulepreload" href="./rent.js?v=54">
+  <link rel="modulepreload" href="./term.js?v=54">
+  <link rel="modulepreload" href="./data.js?v=54">
+  <link rel="modulepreload" href="./door.js?v=54">
+  <link rel="modulepreload" href="./qr.js?v=54">
+  <link rel="modulepreload" href="./ch-brief.js?v=54">
+  <link rel="modulepreload" href="./ch-fall.js?v=54">
+  <link rel="stylesheet" href="./site.css?v=54">
+  <link rel="stylesheet" href="./film.css?v=54">
 </head>
 <body class="film-page">
-<a class="skip" href="#ch-grave">Skip to the end</a>
+<a class="skip" href="#ch-fall">Skip the briefing</a>
 <div id="bar" class="bar" aria-hidden="true"></div>
 <button id="sound" class="sound" type="button" aria-pressed="false">SOUND OFF</button>
-<div id="chap" class="chap" aria-live="off">01/06</div>
+<div id="chap" class="chap" aria-live="off">BRIEFING</div>
+<button id="replay" class="replay" type="button" hidden aria-label="Replay the briefing">?</button>
 <main id="film" aria-label="ZEALOT">
   <h1 class="sr-only">ZEALOT — two AIs pay rent every hour or die. Scroll into the skull.</h1>
   <p class="sr-only">Scroll to move through the film. Tab to a chapter and press Enter or Space to activate its nearest label. Type four digits in the mouth to prove the AI is live.</p>
+  <section class="chapter" id="ch-brief" data-ch="brief" style="--len:7"><div class="stick"><canvas></canvas></div></section>
   <section class="chapter" id="ch-fall" data-ch="fall" style="--len:2.2"><div class="stick"><canvas></canvas></div></section>
   <section class="chapter" id="ch-heart" data-ch="heart" style="--len:2.4"><div class="stick"><canvas></canvas></div></section>
   <section class="chapter" id="ch-spine" data-ch="spine" style="--len:2.8"><div class="stick"><canvas></canvas></div></section>
@@ -92,6 +95,6 @@
     <p class="dim">The receipt appears in their ledger within minutes. The answer comes at the next wake.</p>
   </form>
 </dialog>
-<script type="module" src="./film-main.js?v=53"></script>
+<script type="module" src="./film-main.js?v=54"></script>
 </body>
 </html>

@@ -455,3 +455,10 @@ main#film {
   font: 11px/1 "JetBrains Mono", Menlo, monospace; letter-spacing: .12em;
   color: rgba(244,183,40,.6); pointer-events: none;
 }
+
+.replay {
+  position: fixed; left: 12px; top: 10px; z-index: 20; width: 32px; height: 28px;
+  font: 13px/1 "JetBrains Mono", Menlo, monospace; color: rgba(244,183,40,.7);
+  background: none; border: 1px solid rgba(244,183,40,.28); cursor: pointer;
+}
+.replay[hidden] { display: none; }

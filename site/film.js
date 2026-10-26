@@ -1,9 +1,9 @@
 /* film.js — ZEALOT v51 THE FILM: scroll/camera engine, GlyphField renderer (image → luminance → atlas-blitted glyphs with a
  * moving camera), hit regions, opt-in WebAudio, tremor/corrupt/ecg helpers. Kimi K2.7 Code from the integrator's contract;
  * reviewed and patched by the integrator (ctx passed to draw, api.ramp, null hints keep the base, audio only after opt-in). */
-import { makeAtlas } from './glyphs.js?v=53';
-import { openPay } from './term.js?v=53';
-import { openDoor } from './door.js?v=53';
+import { makeAtlas } from './glyphs.js?v=54';
+import { openPay } from './term.js?v=54';
+import { openDoor } from './door.js?v=54';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
@@ -18,7 +18,7 @@ function colorStyle(name) { return COLORS[COLOR_MAP[name] ?? 1]; }
 
 const fieldCache = new Map();
 const imgCache = new Map();
-const IMG_V = '?v=53';            // cache-busting for the vendor images (bumped with the site version)
+const IMG_V = '?v=54';            // cache-busting for the vendor images (bumped with the site version)
 
 /* First paint matters more than anything: the FIRST image requested (chapter 1's open frame) loads at once; every
  * other image waits until that one is decoded (or 2.5 s), so chapter 1 never competes for bandwidth with the five
@@ -49,7 +49,7 @@ function loadImage(src) {
 function createField(src, opts, atlasForFn) {
   const cols = opts.cols ?? 240;
   const gamma = opts.gamma ?? 1;
-  const field = { ready: false, src, cols: 0, rows: 0, lum: null };
+  const field = { ready: false, failed: false, src, cols: 0, rows: 0, lum: null };
 
   loadImage(src).then((img) => {
     const aspect = img.naturalWidth / img.naturalHeight || 1;
@@ -77,7 +77,7 @@ function createField(src, opts, atlasForFn) {
     field.rows = rows;
     field.lum = lum;
     field.ready = true;
-  }).catch(() => { field.ready = false; });
+  }).catch(() => { field.ready = false; field.failed = true; });
 
   function lumAt(u, v) {
     if (!field.ready) return 0;
@@ -526,7 +526,8 @@ export function createFilm({ chapters, rent }) {
       const area = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
       if (area > bestArea) { bestArea = area; best = i; }
     }
-    const txt = best == null ? '' : `${String(best + 1).padStart(2, '0')}/${String(instances.length).padStart(2, '0')}`;
+    const film = instances.filter(c => c.id !== 'brief').length;
+    const txt = best == null ? '' : (instances[best].id === 'brief' ? 'BRIEFING' : `${String(best + (instances[0].id === 'brief' ? 0 : 1)).padStart(2, '0')}/${String(film).padStart(2, '0')}`);
     if (txt !== lastChap) { lastChap = txt; chapEl.textContent = txt; }
   }
 
