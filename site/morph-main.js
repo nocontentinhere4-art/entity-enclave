@@ -1,7 +1,7 @@
-import * as rent from './rent.js?v=56';
-import { wirePay } from './term.js?v=56';
-import { openDoor } from './door.js?v=56';
-import { createMorph } from './morph.js?v=56';
+import * as rent from './rent.js?v=57';
+import { wirePay } from './term.js?v=57';
+import { openDoor } from './door.js?v=57';
+import { createMorph } from './morph.js?v=57';
 
 document.addEventListener('DOMContentLoaded', () => {
   wirePay();

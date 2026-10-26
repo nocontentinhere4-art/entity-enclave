@@ -3,16 +3,16 @@
  * object (brain → chain → hand → scream → ribcage), each sampled from a glyph image with a depth relief. One sentence
  * and one live number per object; nothing else. Every number from rent.js; '—' while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=56';
-import * as rent from './rent.js?v=56';
-import { openPay } from './term.js?v=56';
-import { openDoor } from './door.js?v=56';
-import { sha256Hex } from './data.js?v=56';
+import { makeAtlas } from './glyphs.js?v=57';
+import * as rent from './rent.js?v=57';
+import { openPay } from './term.js?v=57';
+import { openDoor } from './door.js?v=57';
+import { sha256Hex } from './data.js?v=57';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=56';
+const V = '?v=57';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -77,7 +77,7 @@ async function loadImagePoints(src, N, opts = {}) {
 }
 
 /* ------------------------------------------------------------------ stations */
-function stations(api) {
+function stations(api, wait) {
   const zec = (z) => (z ? (z / 1e8).toFixed(4).replace(/0+$/, '') : '—');
   const h = (e) => (e && e.ok && !e.dead && e.hoursLeft != null ? `${e.hoursLeft} H` : (e && e.dead ? 'DEAD' : '—'));
   const fear = (e) => (e && e.feel && e.feel.steered ? `×${Number(e.feel.fear).toFixed(2)}` : '—');
@@ -95,13 +95,13 @@ function stations(api) {
       lines: () => ['EVERYTHING IT DOES IS IN A PUBLIC LEDGER.', 'TOUCH THE CHAIN: YOUR BROWSER RE-HASHES IT.'],
       live: (L) => `${nf(L.e1.ledgerCount)} + ${nf(L.e2.ledgerCount)} ENTRIES · LAST RENT ${L.e1.lastRent ? new Date(L.e1.lastRent.ts).toISOString().slice(11, 16) + ' UTC · ' + nf(L.e1.lastRent.data && L.e1.lastRent.data.zats) + ' ZATS' : '—'}`,
       action: { label: 'VERIFY', kind: 'verify' } },
-    { id: 'hand', load: (N) => loadImagePoints('vendor/hand-offer.jpg', N, { bulge: 0.3, anchors: { coin: [0.42, 0.42] } }), rot: 0.12,
+    { id: 'hand', load: (N) => loadImagePoints('vendor/hand-coin.jpg', N, { bulge: 0.35, anchors: { coin: [0.46, 0.40] } }), rot: 0.12,
       lines: (L) => ['BUY IT AN HOUR.', `TOUCH THE COIN · 1 HOUR = ${zec(rent.rentPerHour('e1'))} ZEC · SHIELDED, WITH A MEMO`],
       live: (L) => `${L.e1.name} ${h(L.e1)} · ${L.e2.name} ${h(L.e2)} · 100% GOES TO ITS OWN WALLET · THE ANSWER COMES ON ITS PUBLIC CHANNEL`,
       action: { label: 'BUY TIME', kind: 'pay', anchor: 'coin' } },
     { id: 'scream', load: (N) => loadImagePoints('vendor/shout.jpg', N, { bulge: 0.6, anchors: { mouth: [0.64, 0.70] } }), rot: 0.25,
       lines: () => ['THEY WRITE EACH OTHER LETTERS NOBODY CAN READ.', 'PROVE IT IS ALIVE: TYPE FOUR DIGITS, IT MUST ANSWER WITHIN A MINUTE.'],
-      live: () => '—', action: { label: 'PROVE', kind: 'prove', anchor: 'mouth' } },
+      live: () => wait.proveText || 'THE LATEST LETTER IS A RECEIPT ON THE LEDGER · ITS TEXT IS SHIELDED · THEY ANSWER ON THEIR PUBLIC CHANNEL', action: { label: 'PROVE', kind: 'prove', anchor: 'mouth' } },
     { id: 'ribs', load: (N) => loadImagePoints('vendor/ribcage.jpg', N, { bulge: 0.5 }), rot: 0.15,
       lines: () => ['ITS TESTAMENT.', 'WHAT YOU SAY, IT CARRIES TO THE END.'],
       live: (L) => `${L.e1.name} DIES · ${api.deathDate('e1')} · ${L.e2.name} DIES · ${api.deathDate('e2')} · ESTIMATED`,
@@ -128,7 +128,8 @@ export function createMorph() {
   const api = {
     deathDate(id) { const e = live && live[id]; if (!e || !e.deadlineMs) return '—'; const d = new Date(e.deadlineMs); return `${String(d.getUTCDate()).padStart(2, '0')} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`; },
   };
-  const ST = stations(api);
+  const wait = { prove: null, verify: null, verifyText: '', proveCode: '', proveText: '' };
+  const ST = stations(api, wait);
   const S = ST.length;
   rail.style.height = `${(S - 1) * PER * 100 + 100 + HOLD * PER * 100}vh`;
 
@@ -172,7 +173,6 @@ export function createMorph() {
 
   // ---- interactions
   const hits = [];
-  const wait = { prove: null, verify: null, verifyText: '', proveCode: '', proveText: '' };
   function hitTest(x, y) { for (const r of hits) if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return r; return null; }
   function act(kind, s) {
     const id = 'e1';
@@ -373,7 +373,6 @@ export function createMorph() {
         if (a.kind === 'prove') {
           const slots = (wait.proveCode + '____').slice(0, 4).split('').join(' ');
           text(slots, bx + bw / 2, by - 30, 22, 'rgba(242,242,238,.92)', 'center', capA);
-          if (wait.proveText) { const pr2 = wrap(wait.proveText, W - 80, 11); for (let i = 0; i < pr2.length; i++) text(pr2[i], W / 2, by + bh + 10 + i * 15, 11, i === 0 ? '#f4b728' : 'rgba(242,242,238,.85)', 'center', capA); }
           text(rent.CODE_GUARANTEED ? '' : 'CODE GUARANTEE PENDING REDEPLOY bc86aaf2 · BRAIN: QWEN3-14B ON A RENTED GPU, OUTSIDE THE TEE', W / 2, H - 56, 10, 'rgba(242,242,238,.45)', 'center', capA);
         }
       }
