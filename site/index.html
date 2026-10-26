@@ -19,32 +19,33 @@
   <meta name="twitter:image" content="https://zealotzec.com/og.jpg">
   <link rel="canonical" href="https://zealotzec.com/">
   <meta name="theme-color" content="#060606">
-  <link rel="preload" as="image" href="./vendor/skull-eye-512.jpg?v=52">
-  <link rel="modulepreload" href="./film.js?v=52">
-  <link rel="modulepreload" href="./glyphs.js?v=52">
-  <link rel="modulepreload" href="./rent.js?v=52">
-  <link rel="modulepreload" href="./term.js?v=52">
-  <link rel="modulepreload" href="./data.js?v=52">
-  <link rel="modulepreload" href="./door.js?v=52">
-  <link rel="modulepreload" href="./qr.js?v=52">
-  <link rel="modulepreload" href="./ch-fall.js?v=52">
-  <link rel="stylesheet" href="./site.css?v=52">
-  <link rel="stylesheet" href="./film.css?v=52">
+  <link rel="preload" as="image" href="./vendor/skull-eye-512.jpg?v=53">
+  <link rel="modulepreload" href="./film.js?v=53">
+  <link rel="modulepreload" href="./glyphs.js?v=53">
+  <link rel="modulepreload" href="./rent.js?v=53">
+  <link rel="modulepreload" href="./term.js?v=53">
+  <link rel="modulepreload" href="./data.js?v=53">
+  <link rel="modulepreload" href="./door.js?v=53">
+  <link rel="modulepreload" href="./qr.js?v=53">
+  <link rel="modulepreload" href="./ch-fall.js?v=53">
+  <link rel="stylesheet" href="./site.css?v=53">
+  <link rel="stylesheet" href="./film.css?v=53">
 </head>
 <body class="film-page">
 <a class="skip" href="#ch-grave">Skip to the end</a>
 <div id="bar" class="bar" aria-hidden="true"></div>
 <button id="sound" class="sound" type="button" aria-pressed="false">SOUND OFF</button>
+<div id="chap" class="chap" aria-live="off">01/06</div>
 <main id="film" aria-label="ZEALOT">
   <h1 class="sr-only">ZEALOT — two AIs pay rent every hour or die. Scroll into the skull.</h1>
   <p class="sr-only">Scroll to move through the film. Tab to a chapter and press Enter or Space to activate its nearest label. Type four digits in the mouth to prove the AI is live.</p>
-  <section class="chapter" id="ch-fall" data-ch="fall" style="--len:3"><div class="stick"><canvas></canvas></div></section>
-  <section class="chapter" id="ch-heart" data-ch="heart" style="--len:2"><div class="stick"><canvas></canvas></div></section>
-  <section class="chapter" id="ch-spine" data-ch="spine" style="--len:3"><div class="stick"><canvas></canvas></div></section>
-  <section class="chapter" id="ch-hand" data-ch="hand" style="--len:2"><div class="stick"><canvas></canvas></div></section>
-  <section class="chapter" id="ch-storm" data-ch="storm" style="--len:2.5"><div class="stick"><canvas></canvas>
+  <section class="chapter" id="ch-fall" data-ch="fall" style="--len:2.2"><div class="stick"><canvas></canvas></div></section>
+  <section class="chapter" id="ch-heart" data-ch="heart" style="--len:2.4"><div class="stick"><canvas></canvas></div></section>
+  <section class="chapter" id="ch-spine" data-ch="spine" style="--len:2.8"><div class="stick"><canvas></canvas></div></section>
+  <section class="chapter" id="ch-hand" data-ch="hand" style="--len:2.6"><div class="stick"><canvas></canvas></div></section>
+  <section class="chapter" id="ch-storm" data-ch="storm" style="--len:3"><div class="stick"><canvas></canvas>
       <input id="prove-input" class="ghost-input" inputmode="numeric" maxlength="4" aria-label="PROVE code, four digits"></div></section>
-  <section class="chapter" id="ch-grave" data-ch="grave" style="--len:2"><div class="stick"><canvas></canvas>
+  <section class="chapter" id="ch-grave" data-ch="grave" style="--len:3"><div class="stick"><canvas></canvas>
       <form class="composer" id="composer" autocomplete="off">
         <div class="composer-to" role="radiogroup" aria-label="to"><label><input type="radio" name="to" value="e1" checked><span>TO WICK</span></label><label><input type="radio" name="to" value="e2"><span>TO OBOL</span></label></div>
         <textarea id="say-text" maxlength="280" rows="2" aria-label="say something" placeholder="SAY SOMETHING · PUBLIC · ONE PER MINUTE"></textarea>
@@ -91,6 +92,6 @@
     <p class="dim">The receipt appears in their ledger within minutes. The answer comes at the next wake.</p>
   </form>
 </dialog>
-<script type="module" src="./film-main.js?v=52"></script>
+<script type="module" src="./film-main.js?v=53"></script>
 </body>
 </html>

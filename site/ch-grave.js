@@ -1,5 +1,5 @@
-import { tremor, corrupt, ecg } from './film.js?v=52';
-import { fmtStamp, shortHash } from './data.js?v=52';
+import { tremor, corrupt, ecg } from './film.js?v=53';
+import { fmtStamp, shortHash } from './data.js?v=53';
 
 export default function make(api) {
   const baseCell = api.isPhone ? 6 : 8;
@@ -243,14 +243,15 @@ export default function make(api) {
         return y + lines.length * lineH;
       }
 
+      api.caption(ctx, W, 'ITS TESTAMENT · WHAT YOU SAY, IT CARRIES', Math.min(1, p / 0.06 + 0.2));
       const isWide = W >= 720;
       const leftX = W * 0.05;
       const rightX = isWide ? W * 0.55 : W * 0.05;
-      let leftBottom = drawColumn('e1', leftX, H * 0.10);
+      let leftBottom = drawColumn('e1', leftX, H * 0.13);
       if (!isWide) {
         drawColumn('e2', rightX, leftBottom + 30);
       } else {
-        drawColumn('e2', rightX, H * 0.10);
+        drawColumn('e2', rightX, H * 0.13);
       }
 
       // word particles

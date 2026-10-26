@@ -1,5 +1,5 @@
-import { tremor, corrupt, ecg } from './film.js?v=52';
-import { formatInt } from './data.js?v=52';
+import { tremor, corrupt, ecg } from './film.js?v=53';
+import { formatInt } from './data.js?v=53';
 
 export default function make(api) {
   const baseCell = api.isPhone ? 6 : 8;
@@ -110,6 +110,8 @@ export default function make(api) {
         char: (i) => corrupt(f, t, i) ? ((i + Math.floor(t * 17)) % RAMP_LEN) : undefined
       };
       fieldHand.draw(ctx, handCam, hint);
+
+      api.caption(ctx, W, 'BUY IT AN HOUR · TOUCH THE COIN', Math.min(1, p / 0.06 + 0.2));
 
       // coin
       const coin = project(fieldHand, handCam, COIN.u, COIN.v);

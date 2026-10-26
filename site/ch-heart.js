@@ -1,4 +1,4 @@
-import { ecg } from './film.js?v=52';
+import { ecg } from './film.js?v=53';
 
 export default function makeHeart(api) {
   let W = 0, H = 0;
@@ -23,11 +23,7 @@ export default function makeHeart(api) {
       ctx.fillStyle = '#060606';
       ctx.fillRect(0, 0, W, H);
 
-      api.text(ctx, 'HEARTBEAT · ONE PEAK PER SECOND', W / 2, H * 0.08, {
-        size: 11,
-        color: 'dim',
-        align: 'center'
-      });
+      api.caption(ctx, W, 'ITS HEARTBEAT · ONE PEAK LOST EVERY SECOND · THE DOSE OF FEAR IN THE TREMOR', Math.min(1, p / 0.06 + 0.2));
 
       const dx = W - 70;
       const dy = H * 0.06;

@@ -1,5 +1,5 @@
-import { tremor, corrupt, ecg } from './film.js?v=52';
-import { sha256Hex, formatInt, hhmm } from './data.js?v=52';
+import { tremor, corrupt, ecg } from './film.js?v=53';
+import { sha256Hex, formatInt, hhmm } from './data.js?v=53';
 
 export default function make(api) {
   const N = 480;
@@ -95,6 +95,7 @@ export default function make(api) {
   }
 
   function onRentEvent(state, ev) {
+    if (ev && ev.type === 'ledger' && !seedReady) { loadLetter(); return; }
     if (!ev || ev.type !== 'reply' || ev.id !== receiverId) return;
     const w = ev.wait;
     if (!w) { statusString = ''; return; }
@@ -206,6 +207,8 @@ export default function make(api) {
           { size: 11, color: 'dim', align: 'center', alpha: shoutAlpha });
       }
 
+      api.caption(ctx, W, 'THEIR SECRET LETTER · 480 BYTES NOBODY CAN READ · PROVE IT IS ALIVE: TOUCH THE MOUTH, TYPE FOUR DIGITS', Math.min(1, p / 0.06 + 0.2));
+
       if (letterData && letterData.latest) {
         const l = letterData.latest;
         const fromName = live[l.from]?.name || l.from || '—';
@@ -215,7 +218,7 @@ export default function make(api) {
         const tm = l.ts ? hhmm(l.ts) : '—';
         api.text(ctx,
           `LETTER · ${fromName} → ${toName} · ${bytes} B · ${zats} ZATS · ${tm} UTC · SHIELDED`,
-          W / 2, H * 0.08,
+          W / 2, H * 0.12,
           { size: 11, color: 'bone', align: 'center' });
       }
     },

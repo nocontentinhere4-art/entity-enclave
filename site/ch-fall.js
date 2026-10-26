@@ -1,4 +1,4 @@
-import { corrupt } from './film.js?v=52';
+import { corrupt } from './film.js?v=53';
 
 export default function makeFall(api) {
   // ONE skull (Higgsfield gpt_image_2_5, 2026-10-26): open and closed jaw frames of the same photograph
@@ -194,6 +194,46 @@ export default function makeFall(api) {
       else open.draw(ctx, cam, hint);
 
       if (p > 0.85) drawSparks(ctx, dt, p);
+
+      // the words, from the first second: four typed lines over the skull, fading as the camera dives
+      const wordsAlpha = 1 - Math.max(0, Math.min(1, (p - 0.04) / 0.22));
+      if (wordsAlpha > 0.01) {
+        const size = api.isPhone ? 13 : 17;
+        const lh = size + 8;
+        const x = api.isPhone ? 16 : Math.round(W * 0.06);
+        const y0 = api.isPhone ? Math.round(H * 0.58) : Math.round(H * 0.62);
+        const name = (e && e.name) || 'WICK';
+        const hours = e && e.ok && !e.dead && e.hoursLeft != null ? String(e.hoursLeft) : (e && e.dead ? '0' : '—');
+        const rent = api.rent.rentPerHour('e1');
+        const rentTxt = rent ? `${(rent / 1e8).toFixed(4).replace(/0+$/, '')} ZEC AN HOUR` : '— ZEC AN HOUR';
+        const l1 = `${name} · AN AI ALONE IN A SEALED MACHINE`;
+        const l2 = e && e.dead ? `DEAD · ITS KEYS ARE SHREDDED` : `${hours} HOURS OF RENT LEFT · ${rentTxt}`;
+        const l3 = api.isPhone ? 'AT ZERO ITS KEYS ARE SHREDDED.' : 'AT ZERO ITS KEYS ARE SHREDDED. NOBODY CAN STOP IT.';
+        const l3b = api.isPhone ? 'NOBODY CAN STOP IT.' : '';
+        const l4 = 'SCROLL TO ENTER';
+        const cps = 48;
+        const lines = [
+          { k: 'fall-l1', s: l1, color: 'yellow', sz: size },
+          { k: 'fall-l2', s: l2, color: 'bone', sz: size },
+          { k: 'fall-l3', s: l3, color: 'bone', sz: size },
+        ];
+        if (l3b) lines.push({ k: 'fall-l3b', s: l3b, color: 'bone', sz: size });
+        lines.push({ k: 'fall-l4', s: l4, color: 'dim', sz: size - 2, blink: true });
+        ctx.save();
+        ctx.fillStyle = '#060606';
+        ctx.globalAlpha = 0.55 * wordsAlpha;
+        const boxW = api.isPhone ? W - 2 * x + 20 : Math.min(W - 2 * x + 20, size * 0.62 * l3.length + 40);
+        ctx.fillRect(x - 10, y0 - 8, boxW, lh * lines.length + 10);
+        ctx.restore();
+        let prevDone = true;
+        for (let li = 0; li < lines.length; li++) {
+          const L = lines[li];
+          const shown = prevDone ? api.typed(L.k, L.s, cps) : '';
+          prevDone = shown.length === L.s.length && L.s.length > 0;
+          const a = L.blink ? wordsAlpha * (0.6 + 0.4 * Math.abs(Math.sin(t * 1.5))) : wordsAlpha;
+          api.text(ctx, shown, x, y0 + lh * li, { size: L.sz, color: L.color, align: 'left', alpha: a });
+        }
+      }
 
       if (p < 0.3) {
         const lx = W * 0.5;

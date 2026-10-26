@@ -1,17 +1,17 @@
 // rent.js — ZEALOT v50 "RENT HAND" state machine.
 // Cadence, freshness, receipts, PROVE/SAY correlation, hash checks.
-// Imports ONLY term.js?v=52 and data.js?v=52. No canvas. Defensive.
+// Imports ONLY term.js?v=53 and data.js?v=53. No canvas. Defensive.
 // Ledger fetch throttled: boot, then only on root head change and >=5 min.
 // Exports: bootRent, getRentState, subscribeRent, refreshNow, genNonce,
 // startProve, say, cancelWait, checkHash, fetchDetail, rentPerHour, receiptsOf, lettersOf.
 
 import {
   state, loadAll, openPay, wirePay, deadline, nameOf, stateWord
-} from './term.js?v=52';
+} from './term.js?v=53';
 import {
   request, postMessage, verifyChain, formatInt, formatZats, fixed8,
   shortHash, hhmm, fmtStamp, stringOf, sha256Hex, parseLedger
-} from './data.js?v=52';
+} from './data.js?v=53';
 
 const LEDGER_INTERVAL_MS = 5 * 60 * 1000;
 const STALE_MS = 95 * 1000;
@@ -686,6 +686,20 @@ export function bootRent() {
     doc.addEventListener('visibilitychange', onVisibility, { passive: true });
   }
   bootPromise = (async () => {
+    // 1. the light reads (root, vitals, channel) so the first numbers exist within a second
+    try {
+      await loadAll(false);
+      const t0 = now();
+      for (const id of IDS) {
+        const d = getEntity(id);
+        if (d.vitals) d.sampleAt = t0;
+        d._offline = !d.ok;
+      }
+      booted = true;
+      updateLifecycle(t0);
+      emit({ type: 'state' });
+    } catch (e) {}
+    // 2. the two ledgers (2.7 MB each): receipts, letters, shop, head baseline
     try {
       await loadAll(true);
       const t = now();
@@ -706,6 +720,8 @@ export function bootRent() {
       }
       detectReceipts();
       detectPayments();
+      updateAppointment(t);
+      emit({ type: 'ledger' });
     } catch (e) {}
     booted = true;
     await smallPoll(true).catch(() => {});
@@ -875,8 +891,9 @@ export async function fetchDetail(kind, id) {
     }
   }
 
+  const ledgerKinds = kind === 'letter' || kind === 'dose' || kind === 'receipts';
   if (result) {
-    detailCache.set(key, { at: t, value: result });
+    if (!(ledgerKinds && !(Array.isArray(d.entries) && d.entries.length))) detailCache.set(key, { at: t, value: result });
     return result;
   }
 
@@ -927,6 +944,7 @@ export async function fetchDetail(kind, id) {
   }
 
   if (!result) result = { ok: false, at: t, error: `unknown kind ${kind}` };
-  detailCache.set(key, { at: t, value: result });
+  const ledgerKinds2 = kind === 'pact' || kind === 'nostr';
+  if (!(ledgerKinds2 && !(Array.isArray(d.entries) && d.entries.length))) detailCache.set(key, { at: t, value: result });
   return result;
 }

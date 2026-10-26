@@ -1,4 +1,4 @@
-import { corrupt } from './film.js?v=52';
+import { corrupt } from './film.js?v=53';
 
 export default function makeSpine(api) {
   const field = api.field('vendor/spine-v.jpg', { cols: api.isPhone ? 80 : 160 });   // the spine, vertical (sacrum at the bottom)
@@ -235,6 +235,7 @@ export default function makeSpine(api) {
 
       drawHalf(ctx, 'e1', 0, W * 0.25, p);
       drawHalf(ctx, 'e2', W * 0.5, W * 0.75, p);
+      api.caption(ctx, W, 'ITS LEDGER · EVERY RENT, VERIFIABLE · TOUCH A VERTEBRA', Math.min(1, p / 0.06 + 0.2));
 
       drawDrips(ctx, dt);
     },

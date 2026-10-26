@@ -1,9 +1,9 @@
 /* film.js — ZEALOT v51 THE FILM: scroll/camera engine, GlyphField renderer (image → luminance → atlas-blitted glyphs with a
  * moving camera), hit regions, opt-in WebAudio, tremor/corrupt/ecg helpers. Kimi K2.7 Code from the integrator's contract;
  * reviewed and patched by the integrator (ctx passed to draw, api.ramp, null hints keep the base, audio only after opt-in). */
-import { makeAtlas } from './glyphs.js?v=52';
-import { openPay } from './term.js?v=52';
-import { openDoor } from './door.js?v=52';
+import { makeAtlas } from './glyphs.js?v=53';
+import { openPay } from './term.js?v=53';
+import { openDoor } from './door.js?v=53';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
@@ -18,7 +18,7 @@ function colorStyle(name) { return COLORS[COLOR_MAP[name] ?? 1]; }
 
 const fieldCache = new Map();
 const imgCache = new Map();
-const IMG_V = '?v=52';            // cache-busting for the vendor images (bumped with the site version)
+const IMG_V = '?v=53';            // cache-busting for the vendor images (bumped with the site version)
 
 /* First paint matters more than anything: the FIRST image requested (chapter 1's open frame) loads at once; every
  * other image waits until that one is decoded (or 2.5 s), so chapter 1 never competes for bandwidth with the five
@@ -383,7 +383,27 @@ export function createFilm({ chapters, rent }) {
       const d = new Date(e.deadlineMs);
       return `${String(d.getUTCDate()).padStart(2, '0')} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()} · ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`;
     },
-    status(text) { if (statusEl) statusEl.textContent = text; }
+    status(text) { if (statusEl) statusEl.textContent = text; },
+    /* One caption line per chapter: top centre, wraps on phones, fades in over the first 600 ms of the chapter. */
+    caption(ctx, W, text, alpha = 1) {
+      const size = isPhone ? 12 : 13;
+      ctx.save();
+      ctx.font = `${size}px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.globalAlpha = alpha * 0.92;
+      ctx.fillStyle = COLORS[1];
+      const maxW = W - 32;
+      const lines = [];
+      let line = '';
+      for (const w of String(text).split(' ')) {
+        const test = line ? line + ' ' + w : w;
+        if (line && ctx.measureText(test).width > maxW) { lines.push(line); line = w; } else line = test;
+      }
+      if (line) lines.push(line);
+      for (let i = 0; i < lines.length; i++) ctx.fillText(lines[i], W / 2, 18 + i * (size + 6));
+      ctx.restore();
+    }
   };
 
   const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -464,11 +484,13 @@ export function createFilm({ chapters, rent }) {
     }
   }
 
+  const TAU = 0.06;   // seconds: the camera reaches 95% of a scroll step in ~180 ms, never drifts
   function tick(now) {
     if (!running || document.hidden) { timer = null; return; }
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     t += dt;
+    const k = 1 - Math.exp(-dt / TAU);
     liveState = rent.getRentState();
     const vh = window.innerHeight;
     const scrollY = window.scrollY;
@@ -478,7 +500,7 @@ export function createFilm({ chapters, rent }) {
     for (const ch of instances) {
       const denom = ch.sec.offsetHeight - vh;
       const target = denom <= 0 ? 1 : clamp((scrollY - ch.sec.offsetTop) / denom, 0, 1);
-      ch.p = reduced ? target : ch.p + (target - ch.p) * 0.18;
+      ch.p = reduced ? target : (Math.abs(target - ch.p) < 0.0005 ? target : ch.p + (target - ch.p) * k);
       const r = ch.stick.getBoundingClientRect();
       ch.visible = r.bottom > 0 && r.top < vh;
     }
@@ -491,7 +513,21 @@ export function createFilm({ chapters, rent }) {
       ch.inst.draw(ch.p, t, dt, liveState, ch.ctx);
     }
 
-    timer = setTimeout(() => tick(performance.now()), 33);
+    updateIndicator(vh);
+    timer = setTimeout(() => tick(performance.now()), 16);
+  }
+
+  let chapEl = null, lastChap = '';
+  function updateIndicator(vh) {
+    if (!chapEl) return;
+    let best = null, bestArea = 0;
+    for (let i = 0; i < instances.length; i++) {
+      const r = instances[i].stick.getBoundingClientRect();
+      const area = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+      if (area > bestArea) { bestArea = area; best = i; }
+    }
+    const txt = best == null ? '' : `${String(best + 1).padStart(2, '0')}/${String(instances.length).padStart(2, '0')}`;
+    if (txt !== lastChap) { lastChap = txt; chapEl.textContent = txt; }
   }
 
   function onResize() {
@@ -503,7 +539,7 @@ export function createFilm({ chapters, rent }) {
   function onVis() {
     if (!document.hidden && running && !timer) {
       last = performance.now();
-      timer = setTimeout(() => tick(performance.now()), 33);
+      timer = setTimeout(() => tick(performance.now()), 16);
     }
   }
 
@@ -511,6 +547,7 @@ export function createFilm({ chapters, rent }) {
     if (running) return;
     statusEl = document.getElementById('status');
     barEl = document.getElementById('bar');
+    chapEl = document.getElementById('chap');
     setupChapters();
     running = true;
     last = performance.now();

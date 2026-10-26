@@ -449,3 +449,9 @@ main#film {
 /* integrator: DOM controls sit above the sticky canvas */
 .ghost-input { z-index: 1; }
 .composer, .grave-links { z-index: 2; }
+
+.chap {
+  position: fixed; left: 14px; bottom: 12px; z-index: 20;
+  font: 11px/1 "JetBrains Mono", Menlo, monospace; letter-spacing: .12em;
+  color: rgba(244,183,40,.6); pointer-events: none;
+}
