@@ -425,8 +425,8 @@ function buildSpeak(body, title, id, state) {
     } else if (wait.status === 'pending') {
       replyTitle.hidden = true;
       replyText.hidden = true;
-      setStatus(status, `SENT · seq ${wait.replySeq ?? '—'}`);
-      startIndicator(status, 'WAITING');
+      setStatus(status, `SENT · seq ${wait.ourSeq ?? '—'} · WAITING`);
+      startIndicator(status, `SENT · seq ${wait.ourSeq ?? '—'} · WAITING`);
     } else if (wait.status === 'error') {
       stopIndicator();
       replyTitle.hidden = true;
@@ -434,9 +434,9 @@ function buildSpeak(body, title, id, state) {
       setStatus(status, wait.error || 'ERROR');
     } else if (wait.status === 'reply') {
       stopIndicator();
-      setStatus(status, `SENT · seq ${wait.replySeq ?? '—'}`);
+      setStatus(status, `SENT · seq ${wait.ourSeq ?? '—'}`);
       replyTitle.hidden = false;
-      replyTitle.textContent = 'REPLY';
+      replyTitle.textContent = `REPLY · seq ${wait.replySeq ?? '—'}${wait.replyTs ? ' · ' + utcShort(wait.replyTs) : ''}`;
       replyText.hidden = false;
       replyText.textContent = wait.reply || '';
     } else if (wait.status === 'timeout') {
