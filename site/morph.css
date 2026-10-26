@@ -1,123 +1,15 @@
-:root {
-  --void: #060606;
-  --yellow: #f4b728;
-  --hot: #ffd76a;
-  --bone: rgba(242,242,238,.92);
-  --bone-dim: rgba(242,242,238,.5);
-  --dead: #555;
-  --dim-yellow: rgba(244,183,40,.28);
-}
-
+:root { --void:#060606; --yellow:#f4b728; --hot:#ffd76a; --bone:rgba(242,242,238,.92); --bone-dim:rgba(242,242,238,.5); --dead:#555; --dim-yellow:rgba(244,183,40,.28); }
 *, *::before, *::after { box-sizing: border-box; margin: 0; }
-
-html, body { height: auto; min-height: 100%; }
-/* overflow-x: hidden would make html/body scroll containers and break position: sticky; clip does not */
-html, body { overflow-x: clip; }
-html { scroll-behavior: auto; }   /* the film is scrubbed by hand; programmatic jumps are instant */
-body.film-page {
-  background: var(--void);
-  color: var(--bone);
-  font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
-}
-
-.skip {
-  position: absolute;
-  left: -9999px;
-  top: 0;
-  z-index: 100;
-  background: var(--void);
-  color: var(--yellow);
-  padding: 8px 12px;
-  border: 1px solid var(--dim-yellow);
-  text-decoration: none;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-.skip:focus {
-  left: 12px;
-  top: 12px;
-  outline: 2px solid var(--yellow);
-  outline-offset: 2px;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0,0,0,0);
-  white-space: nowrap;
-  border: 0;
-}
-
-main#film {
-  position: relative;
-  width: 100%;
-  z-index: 0;
-}
-
-.chapter {
-  position: relative;
-  height: calc(var(--len) * 100vh);
-}
-
-.stick {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.stick canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-  image-rendering: pixelated;
-}
-
-.stick canvas:focus-visible {
-  outline: 2px solid var(--yellow);
-  outline-offset: -2px;
-}
-
-.bar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  height: 2px;
-  background: var(--yellow);
-  width: 0;
-  z-index: 20;
-}
-
-.sound {
-  position: fixed;
-  top: 10px;
-  right: 12px;
-  z-index: 20;
-  font: 11px/1 "JetBrains Mono", Menlo, monospace;
-  letter-spacing: 0.08em;
-  color: rgba(244,183,40,.6);
-  background: none;
-  border: 1px solid var(--dim-yellow);
-  padding: 6px 8px;
-  cursor: pointer;
-}
-
-.ghost-input {
-  position: absolute;
-  opacity: 0;
-  width: 1px;
-  height: 1px;
-  left: 0;
-  top: 0;
-}
-
+html, body { background: var(--void); color: var(--bone); font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; overflow-x: clip; }
+html { scroll-behavior: auto; }
+#stage { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; z-index: 1; image-rendering: pixelated; touch-action: pan-y; }
+#rail { position: relative; width: 100%; height: 900vh; pointer-events: none; }
+.skip { position: absolute; left: -9999px; top: 0; z-index: 100; background: var(--void); color: var(--yellow); padding: 8px 12px; border: 1px solid var(--dim-yellow); text-decoration: none; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.skip:focus { left: 12px; top: 12px; outline: 2px solid var(--yellow); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.ghost-input { position: fixed; opacity: 0; width: 1px; height: 1px; left: 0; top: 0; z-index: 2; }
 .composer {
-  position: absolute;
+  position: fixed;
   left: 50%;
   transform: translateX(-50%);
   bottom: 14vh;
@@ -186,7 +78,7 @@ main#film {
 }
 
 .grave-links {
-  position: absolute;
+  position: static; margin-top: 10px; justify-content: center;
   left: 50%;
   transform: translateX(-50%);
   bottom: 3vh;
@@ -439,26 +331,7 @@ main#film {
   margin: 12px 0;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation: none !important;
-    transition: none !important;
-  }
-}
 
-/* integrator: DOM controls sit above the sticky canvas */
-.ghost-input { z-index: 1; }
-.composer, .grave-links { z-index: 2; }
-
-.chap {
-  position: fixed; left: 14px; bottom: 12px; z-index: 20;
-  font: 11px/1 "JetBrains Mono", Menlo, monospace; letter-spacing: .12em;
-  color: rgba(244,183,40,.6); pointer-events: none;
-}
-
-.replay {
-  position: fixed; left: 12px; top: 10px; z-index: 20; width: 32px; height: 28px;
-  font: 13px/1 "JetBrains Mono", Menlo, monospace; color: rgba(244,183,40,.7);
-  background: none; border: 1px solid rgba(244,183,40,.28); cursor: pointer;
-}
-.replay[hidden] { display: none; }
+.composer { z-index: 3; bottom: 4vh; }
+.composer[hidden] { display: none; }
+.door { z-index: 6; }
