@@ -1,17 +1,17 @@
 // rent.js — ZEALOT v50 "RENT HAND" state machine.
 // Cadence, freshness, receipts, PROVE/SAY correlation, hash checks.
-// Imports ONLY term.js?v=50 and data.js?v=50. No canvas. Defensive.
+// Imports ONLY term.js?v=51 and data.js?v=51. No canvas. Defensive.
 // Ledger fetch throttled: boot, then only on root head change and >=5 min.
 // Exports: bootRent, getRentState, subscribeRent, refreshNow, genNonce,
 // startProve, say, cancelWait, checkHash, fetchDetail, rentPerHour, receiptsOf, lettersOf.
 
 import {
   state, loadAll, openPay, wirePay, deadline, nameOf, stateWord
-} from './term.js?v=50';
+} from './term.js?v=51';
 import {
   request, postMessage, verifyChain, formatInt, formatZats, fixed8,
   shortHash, hhmm, fmtStamp, stringOf, sha256Hex, parseLedger
-} from './data.js?v=50';
+} from './data.js?v=51';
 
 const LEDGER_INTERVAL_MS = 5 * 60 * 1000;
 const STALE_MS = 95 * 1000;
@@ -719,6 +719,13 @@ export function rentPerHour(id) {
   return null;
 }
 
+/** The last n ledger entries of an entity (seq, ts, type, data), oldest first. */
+export function entriesOf(id, n = 400) {
+  const d = getEntity(id);
+  const E = Array.isArray(d.entries) ? d.entries : [];
+  return E.slice(-n);
+}
+
 export function receiptsOf(id) {
   const d = getEntity(id);
   return Array.isArray(d.rents) ? d.rents.slice() : [];
@@ -816,6 +823,7 @@ export async function fetchDetail(kind, id) {
 
   const d = getEntity(id);
   let result;
+  if (!d.base) return { ok: false, at: t, error: 'not booted yet' };   // before the first loadAll there is no endpoint to ask
 
   switch (kind) {
     case 'vitals': {
