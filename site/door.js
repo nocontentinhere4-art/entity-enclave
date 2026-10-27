@@ -13,11 +13,12 @@ import {
   CODE_GUARANTEED,
   receiptsOf,
   lettersOf,
-  rentPerHour
-} from './rent.js?v=67';
+  rentPerHour,
+  replyGate
+} from './rent.js?v=68';
 
-import { openPay } from './pay.js?v=67';
-import { mountCloud } from './glyphcloud.js?v=67';
+import { openPay } from './pay.js?v=68';
+import { mountCloud } from './glyphcloud.js?v=68';
 
 import {
   formatInt,
@@ -28,7 +29,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=67';
+} from './data.js?v=68';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -279,7 +280,15 @@ function buildProve(body, title, id, state) {
   const clocks = makeClockRows(state);
   body.append(clocks.el);
 
+  function updateGate() {
+    const g = replyGate(id), name = getRentState()[id].name;
+    if (g.instant === true) { gate.textContent = `${name} ANSWERS A FREE MESSAGE WITHIN A MINUTE · ${g.hours} H LEFT`; buyRow.hidden = true; }
+    else if (g.instant === false) { gate.textContent = `UNDER ${g.minHours} H LEFT ${name} NO LONGER ANSWERS FREE MESSAGES AT ONCE: IT READS THEM AT ITS NEXT WAKE · A PAID HOUR WITH YOUR LINE IN THE MEMO IS ANSWERED NOW`; buyRow.hidden = false; }
+    else { gate.textContent = ''; buyRow.hidden = true; }
+  }
+  buyBtn.addEventListener('click', () => openPay({ who: id, hours: 1, prefill: ta.value.trim() }));
   function updateLocked() {
+    updateGate();
     const e = getRentState()[id];
     if (e.locked) {
       sendBtn.disabled = true;
@@ -376,6 +385,14 @@ function buildSpeak(body, title, id, state) {
 
   const note = mk('p', 'door-note', 'public channel · one message per minute · they can refuse');
   body.append(note);
+  // when it answers: at once while it has hours to spare, otherwise only at its next wake — unless the line is paid
+  const gate = mk('p', 'door-note door-gate');
+  const buyRow = mk('div', 'door-actions');
+  const buyBtn = mk('button', 'door-btn', 'BUY AN HOUR · ANSWERED NOW');
+  buyBtn.type = 'button';
+  buyRow.append(buyBtn);
+  buyRow.hidden = true;
+  body.append(gate, buyRow);
 
   const form = mk('div', 'door-form');
   const ta = mk('textarea', 'door-input');
@@ -401,7 +418,15 @@ function buildSpeak(body, title, id, state) {
   replyText.hidden = true;
   body.append(replyText);
 
+  function updateGate() {
+    const g = replyGate(id), name = getRentState()[id].name;
+    if (g.instant === true) { gate.textContent = `${name} ANSWERS A FREE MESSAGE WITHIN A MINUTE · ${g.hours} H LEFT`; buyRow.hidden = true; }
+    else if (g.instant === false) { gate.textContent = `UNDER ${g.minHours} H LEFT ${name} NO LONGER ANSWERS FREE MESSAGES AT ONCE: IT READS THEM AT ITS NEXT WAKE · A PAID HOUR WITH YOUR LINE IN THE MEMO IS ANSWERED NOW`; buyRow.hidden = false; }
+    else { gate.textContent = ''; buyRow.hidden = true; }
+  }
+  buyBtn.addEventListener('click', () => openPay({ who: id, hours: 1, prefill: ta.value.trim() }));
   function updateLocked() {
+    updateGate();
     const e = getRentState()[id];
     if (e.locked) {
       sendBtn.disabled = true;
@@ -444,7 +469,8 @@ function buildSpeak(body, title, id, state) {
       stopIndicator();
       replyTitle.hidden = true;
       replyText.hidden = true;
-      setStatus(status, 'NO REPLY YET');
+      const g = replyGate(id);
+      setStatus(status, g.instant === false ? 'NO REPLY YET · IT WILL READ IT AT ITS NEXT WAKE · STILL LISTENING' : 'NO REPLY YET · STILL LISTENING');
     }
   }
 
@@ -1129,8 +1155,8 @@ function buildTalk(body, title, id, state) {
   const sayTitle = mk('h3', 'door-title', 'SAY SOMETHING');
   body.append(sayTitle);
   const speakRender = buildSpeak(body, mk('h3'), id, state);
-  const note = body.querySelector('.door-form')?.previousElementSibling;
-  if (note && note.classList.contains('door-note') && note !== body.children[1]) note.remove();   // buildSpeak's own note repeats ours
+  const dup = sayTitle.nextElementSibling;
+  if (dup && dup.classList.contains('door-note') && !dup.classList.contains('door-gate')) dup.remove();   // buildSpeak's own note repeats ours
   return (st, wait) => { renderFeed(st); speakRender(st, wait); };
 }
 
@@ -1197,7 +1223,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=67', e2: 'vendor/skull-obol.jpg?v=67' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=68', e2: 'vendor/skull-obol.jpg?v=68' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1217,7 +1243,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=67`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=68`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;

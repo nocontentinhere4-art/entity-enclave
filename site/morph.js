@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=67';
-import * as rent from './rent.js?v=67';
-import { openPay } from './pay.js?v=67';
-import { openDoor } from './door.js?v=67';
+import { makeAtlas } from './glyphs.js?v=68';
+import * as rent from './rent.js?v=68';
+import { openPay } from './pay.js?v=68';
+import { openDoor } from './door.js?v=68';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=67';
+const V = '?v=68';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -332,7 +332,12 @@ export function createMorph() {
       const to = (composer.querySelector('input[name=to]:checked') || {}).value || who;
       const text = (ta.value || '').trim(); if (!text) return;
       st.textContent = 'CARRYING…'; ta.value = '';
-      rent.say(to, text).then((w) => { st.textContent = w.status === 'pending' ? `CARRIED · seq ${w.ourSeq ?? '—'} · WAITING FOR THE ANSWER` : 'CARRIED'; }).catch((err) => { st.textContent = 'ERROR · ' + err.message; });
+      rent.say(to, text).then((w) => {
+        const g = rent.replyGate(to);
+        st.textContent = w.status !== 'pending' ? 'CARRIED'
+          : g.instant === false ? `CARRIED · seq ${w.ourSeq ?? '—'} · UNDER ${g.minHours} H LEFT IT ANSWERS FREE LINES ONLY AT ITS NEXT WAKE · BUY TIME WITH YOUR LINE IN THE MEMO TO BE ANSWERED NOW`
+          : `CARRIED · seq ${w.ourSeq ?? '—'} · WAITING FOR THE ANSWER`;
+      }).catch((err) => { st.textContent = 'ERROR · ' + err.message; });
     });
     whoListeners.push((id) => { const r = composer.querySelector(`input[name=to][value=${id}]`); if (r) r.checked = true; });
   }
@@ -340,7 +345,7 @@ export function createMorph() {
     if (ev && ev.type === 'reply' && ev.wait && ev.wait.kind === 'say') {
       const el = document.getElementById('say-status'); if (!el) return;
       if (ev.wait.status === 'reply') el.textContent = `ANSWER · seq ${ev.wait.replySeq} — ${(ev.wait.reply || '').replace(/\s+/g, ' ').slice(0, 220)}`;
-      else if (ev.wait.status === 'timeout') el.textContent = 'NO ANSWER YET';
+      else if (ev.wait.status === 'timeout') { const g = rent.replyGate(ev.id || api.who()); el.textContent = g.instant === false ? 'NO ANSWER YET · IT READS FREE LINES AT ITS NEXT WAKE · STILL LISTENING · BUY TIME TO BE ANSWERED NOW' : 'NO ANSWER YET · STILL LISTENING'; }
     }
   });
 

@@ -728,6 +728,18 @@ export function bootRent() {
   })();
 }
 
+/** Whether this head answers a free public message at once: its own reply status (GET /) against its hours left.
+ *  minHoursLeft comes from the enclave when it publishes it; older images do not, and theirs is 24. */
+export function replyGate(id) {
+  const d = getEntity(id);
+  const r = d.root && d.root.reply && typeof d.root.reply === 'object' ? d.root.reply : null;
+  const hours = typeof d.hoursLeft === 'number' ? d.hoursLeft : null;
+  const minHours = r && typeof r.minHoursLeft === 'number' ? r.minHoursLeft : 24;
+  const enabled = r ? r.enabled !== false : null;
+  const instant = enabled == null || hours == null ? null : (enabled && hours >= minHours);
+  return { enabled, minHours, hours, instant, lastReplyTs: r ? r.lastReplyTs || null : null };
+}
+
 export function rentPerHour(id) {
   const d = getEntity(id);
   if (d.root && typeof d.root.rentZatsPerHour === 'number') return d.root.rentZatsPerHour;
