@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=84';
-import * as rent from './rent.js?v=84';
-import { openPay } from './pay.js?v=84';
-import { openDoor } from './door.js?v=84';
+import { makeAtlas } from './glyphs.js?v=85';
+import * as rent from './rent.js?v=85';
+import { openPay } from './pay.js?v=85';
+import { openDoor } from './door.js?v=85';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=84';
+const V = '?v=85';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();

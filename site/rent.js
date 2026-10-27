@@ -1,17 +1,17 @@
 // rent.js — ZEALOT v50 "RENT HAND" state machine.
 // Cadence, freshness, receipts, PROVE/SAY correlation, hash checks.
-// Imports ONLY term.js?v=84 and data.js?v=84. No canvas. Defensive.
+// Imports ONLY term.js?v=85 and data.js?v=85. No canvas. Defensive.
 // Ledger fetch throttled: boot, then only on root head change and >=5 min.
 // Exports: bootRent, getRentState, subscribeRent, refreshNow, genNonce,
 // startProve, say, cancelWait, checkHash, fetchDetail, rentPerHour, receiptsOf, lettersOf.
 
 import {
   state, loadAll, openPay, wirePay, deadline, nameOf, stateWord
-} from './term.js?v=84';
+} from './term.js?v=85';
 import {
   request, postMessage, verifyChain, formatInt, formatZats, fixed8,
   shortHash, hhmm, fmtStamp, stringOf, sha256Hex, parseLedger
-} from './data.js?v=84';
+} from './data.js?v=85';
 
 const LEDGER_INTERVAL_MS = 5 * 60 * 1000;
 const STALE_MS = 95 * 1000;
@@ -27,7 +27,7 @@ const doc = typeof document !== 'undefined' ? document : null;
 const perf = typeof performance !== 'undefined' ? performance : null;
 const win = typeof window !== 'undefined' ? window : null;
 
-export const CODE_GUARANTEED = false;   // image d7dfdb29 (real rent txids) is built; the CVMs still run f578e320 until the founder redeploys
+export const CODE_GUARANTEED = true;   // both CVMs run d7dfdb29, the image the public code builds (2026-10-27 23:35 UTC)
 /* the image the public code expects on the CVMs; the deploy commit updates it with the compose files */
 export const PENDING_IMAGE = 'd7dfdb29';
 
