@@ -4,7 +4,6 @@ html, body { background: var(--void); color: var(--bone); font-family: "JetBrain
 html { scroll-behavior: auto; scroll-snap-type: y mandatory; }
 @media (prefers-reduced-motion: reduce) { html { scroll-snap-type: y proximity; } }
 #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; z-index: 1; image-rendering: pixelated; touch-action: pan-y; }
-#skulls { position: fixed; left: 0; top: 7vh; width: 100vw; height: 56vh; display: block; z-index: 2; pointer-events: none; }
 #rail { position: relative; width: 100%; height: 600vh; pointer-events: none; }
 #rail .snap { position: absolute; left: 0; width: 1px; height: 100vh; scroll-snap-align: start; scroll-snap-stop: always; }
 .skip { position: absolute; left: -9999px; top: 0; z-index: 100; background: var(--void); color: var(--yellow); padding: 8px 12px; border: 1px solid var(--dim-yellow); text-decoration: none; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
