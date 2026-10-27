@@ -12,8 +12,8 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=62';
-import { zip321Uri, qrSvg } from './qr.js?v=62';
+} from './data.js?v=71';
+import { zip321Uri, qrSvg } from './qr.js?v=71';
 
 const ANY_MIN_ZEC = 0.006;          // any-coin route (Trocador) minimum, with margin over their ~0.0045
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
@@ -78,14 +78,21 @@ const nameOf = (d) => (d.name || NAME_FALLBACK[d.id] || d.id).toUpperCase();
 /* ------------------------------------------------------------------ */
 /* data: load + derive (ported from v13 site.js)                       */
 /* ------------------------------------------------------------------ */
+const LEDGER_TAIL = 600;   // a refresh reads only the tail of the ledger; the first read and any gap take the whole file
+const lastSeqOf = (arr) => (Array.isArray(arr) && arr.length ? Number(arr[arr.length - 1].seq) || 0 : 0);
+const maxSeqOf = (arr) => (Array.isArray(arr) ? arr.reduce((m, p) => (p && Number(p.seq) > m ? Number(p.seq) : m), 0) : 0);
+
 async function load(ai, full = true) {
   const base = ai.base;
+  const prev = state.ais[ai.id];
+  const haveLedger = !!(prev && Array.isArray(prev.entries) && prev.entries.length);
+  const sincePosts = prev ? maxSeqOf(prev.posts) : 0;
   const [root, vitals, memory, channel, ledger] = await Promise.all([
     request(base, '/'),
     request(base, '/vitals'),
     full ? request(base, '/memory-public') : null,
-    request(base, '/public-channel'),
-    full ? request(base, '/ledger', { text: true }) : null,
+    request(base, sincePosts ? `/public-channel?since=${sincePosts}` : '/public-channel'),
+    full ? request(base, haveLedger ? `/ledger?limit=${LEDGER_TAIL}` : '/ledger', { text: true }) : null,
   ]);
   const d = state.ais[ai.id] || { id: ai.id, base, entries: [], posts: [], ledgerText: '' };
   d.at = new Date();
@@ -127,8 +134,30 @@ async function load(ai, full = true) {
     }
   }
   if (memory && memory.ok) d.identity = memory.data.identity || {};
-  if (channel.ok && Array.isArray(channel.data)) d.posts = channel.data;
-  if (ledger && ledger.ok) { d.ledgerText = ledger.text; d.entries = parseLedger(ledger.text).entries; derive(d); }
+  if (channel.ok && Array.isArray(channel.data)) {
+    // `?since=` brings only the new posts; an older image answers with its last 200 again, so merge by seq either way
+    if (!Array.isArray(d.posts) || !d.posts.length) d.posts = channel.data;
+    else { const have = new Set(d.posts.map(p => p && p.seq)); const fresh = channel.data.filter(p => p && !have.has(p.seq)); if (fresh.length) d.posts = d.posts.concat(fresh).sort((a, b) => a.seq - b.seq).slice(-200); }
+  }
+  if (ledger && ledger.ok) {
+    const got = parseLedger(ledger.text).entries;
+    const lastSeq = haveLedger ? lastSeqOf(d.entries) : 0;
+    if (haveLedger && got.length && got[0].seq <= lastSeq + 1) {
+      // the tail overlaps what we hold: append only the new lines, text and entries alike
+      const keep = got.filter(e => Number(e.seq) > lastSeq);
+      if (keep.length) {
+        const lines = String(ledger.text).split(/\r?\n/).filter(l => l.trim());
+        const newLines = lines.slice(lines.length - keep.length);
+        d.ledgerText = (d.ledgerText || '').replace(/\n?$/, '\n') + newLines.join('\n') + '\n';
+        d.entries = d.entries.concat(keep);
+      }
+    } else if (haveLedger && got.length && got[0].seq > lastSeq + 1 && got[0].seq > 1) {
+      // a gap: more happened than the tail holds, read it whole once
+      const whole = await request(base, '/ledger', { text: true });
+      if (whole.ok) { d.ledgerText = whole.text; d.entries = parseLedger(whole.text).entries; }
+    } else { d.ledgerText = ledger.text; d.entries = got; }
+    derive(d);
+  }
   state.ais[ai.id] = d;
   return d;
 }

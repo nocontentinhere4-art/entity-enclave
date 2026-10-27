@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=70';
-import * as rent from './rent.js?v=70';
-import { openPay } from './pay.js?v=70';
-import { openDoor } from './door.js?v=70';
+import { makeAtlas } from './glyphs.js?v=71';
+import * as rent from './rent.js?v=71';
+import { openPay } from './pay.js?v=71';
+import { openDoor } from './door.js?v=71';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=70';
+const V = '?v=71';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -160,7 +160,7 @@ export function createMorph() {
   const api = {
     who: () => who,
     other: () => otherOf(who),
-    deathDate(id) { const e = live && live[id]; if (!e || !e.deadlineMs) return '—'; const d = new Date(e.deadlineMs); return `${String(d.getUTCDate()).padStart(2, '0')} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`; },
+    deathDate(id) { const e = live && live[id]; const ms = e && (e.deadlineMs || (typeof e.hoursLeft === 'number' && e.sampleAt ? e.sampleAt + e.hoursLeft * 3600000 : 0)); if (!ms) return '—'; const d = new Date(ms); return `${String(d.getUTCDate()).padStart(2, '0')} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`; },
   };
   const wait = { prove: null, verify: null, verifyText: '', proveCode: '', proveText: '' };
   const ST = stations(api, wait);
@@ -197,7 +197,7 @@ export function createMorph() {
         const X = x * cy + z * sy, Z0 = -x * sy + z * cy;
         const Y = y * cx - Z0 * sx, Z = y * sx + Z0 * cx + c[2];
         const p = 2.8 / (2.8 - Z);
-        const sxp = W / 2 + (X + c[0]) * p * R, syp = H * 0.41 - (Y + c[1]) * p * R;
+        const sxp = W / 2 + (X + c[0]) * p * R, syp = H * YC - (Y + c[1]) * p * R;
         const gx = (sxp / cw) | 0, gy = (syp / ras.ch) | 0;
         if (gx < 0 || gy < 0 || gx >= ras.cols || gy >= ras.rows) continue;
         const k = gy * ras.cols + gx;
@@ -241,7 +241,7 @@ export function createMorph() {
   // ---- scroll → timeline: one station per gesture, a fixed-length passage, identical every time
   let P = 0, Ptarget = 0, t = 0, last = performance.now();
   const debugP = (() => { const v = parseFloat(new URLSearchParams(location.search).get('p')); return Number.isFinite(v) ? v : null; })();   // ?p=1.5 freezes a passage for screenshots
-  const PASS = 0.55;                                           // seconds for a full passage
+  const PASS = 0.4;                                           // seconds for a full passage
   const tween = { from: 0, to: 0, t0: 0, dur: PASS };
   let arrivedAt = 0, lastS = 0, lastScrollAt = 0;
   window.addEventListener('scroll', () => { lastScrollAt = t; }, { passive: true });
@@ -371,7 +371,8 @@ export function createMorph() {
 
   // ---- projection (rotation is applied per particle around its own group centre; this is perspective only)
   function persp(z) { return 2.8 / (2.8 - z); }
-  function toScreen(x, y, z, R) { const p = persp(z); return [W / 2 + x * p * R, H * 0.41 - y * p * R, z, p]; }
+  let YC = 0.41;                                             // vertical centre of the object, a fraction of H (see frame)
+  function toScreen(x, y, z, R) { const p = persp(z); return [W / 2 + x * p * R, H * YC - y * p * R, z, p]; }
   function rotate(x, y, z, cy, sy, cx, sx) {
     const X = x * cy + z * sy, Z0 = -x * sy + z * cy;
     return [X, y * cx - Z0 * sx, y * sx + Z0 * cx];
@@ -436,7 +437,10 @@ export function createMorph() {
     const rotY = reduced ? 0 : (ST[cs].rot * Math.sin(t * 0.3) + (pointer.x >= 0 ? (pointer.x / W - 0.5) * (ST[cs].lean ?? 0.15) : 0)) * still;
     const rotX = reduced ? 0 : (0.04 * Math.sin(t * 0.19) + (pointer.y >= 0 ? -(pointer.y / H - 0.5) * (ST[cs].lean ?? 0.15) * 0.5 : 0)) * still;
     const cy = Math.cos(rotY), sy = Math.sin(rotY), cx = Math.cos(rotX), sx = Math.sin(rotX);
-    const R = (isPhone ? Math.min(W * 0.48, H * 0.40) * 0.95 : Math.min(W * 0.48, H * 0.40, (W - 120) / 2.3)) * pulse;   // narrow desktop windows keep a margin for the action
+    const ycOf = (st) => (isPhone && st.id === 'ribs' ? 0.27 : 0.41), rsOf = (st) => (isPhone && st.id === 'ribs' ? 0.72 : 1);
+    const nxt = ST[Math.min(s + 1, S - 1)];
+    YC = ycOf(ST[s]) + (ycOf(nxt) - ycOf(ST[s])) * morph;
+    const R = (isPhone ? Math.min(W * 0.48, H * 0.40) * 0.95 : Math.min(W * 0.48, H * 0.40, (W - 120) / 2.3)) * pulse * (rsOf(ST[s]) + (rsOf(nxt) - rsOf(ST[s])) * morph);   // narrow desktop windows keep a margin for the action
     const lift = 0.3;           // the flying cloud comes a little toward you, all of it together
 
     const cellBase = isPhone ? 6 : 7.5;
@@ -504,7 +508,7 @@ export function createMorph() {
       const lsize = isPhone ? 11 : 12;
       const lrows = wrap(liveTxt, W - (isPhone ? 32 : 220), lsize);
       const blockH = rows.length * lh + 12 + lrows.length * (lsize + 5);
-      let y0 = Math.round(H * (st.id === 'ribs' ? (isPhone ? 0.50 : 0.52) : (isPhone ? 0.74 : 0.76)) - blockH / 2);
+      let y0 = Math.round(H * (st.id === 'ribs' ? (isPhone ? 0.52 : 0.52) : (isPhone ? 0.74 : 0.76)) - blockH / 2);
       if (obj.half != null) { const lb = toScreen(0, obj.centres[0][1] - obj.ext * 1.08, 0, R)[1] + (isPhone ? 36 : 40) + 14; y0 = Math.max(y0, Math.round(lb + 20)); }
       band(y0 - 10, blockH + 14, 0.74 * capA);
       for (let i = 0; i < rows.length; i++) text(rows[i], W / 2, y0 + i * lh, size, '#f4b728', 'center', capA);
@@ -543,7 +547,7 @@ export function createMorph() {
         if (a.kind === 'prove') {
           const slots = (wait.proveCode + '____').slice(0, 4).split('').join(' ');
           text(slots, bx + bw / 2, by - 30, 22, 'rgba(242,242,238,.92)', 'center', capA);
-          if (!rent.CODE_GUARANTEED) { const nr = wrap('CODE GUARANTEE PENDING REDEPLOY bc86aaf2 · BRAIN: QWEN3-14B ON A RENTED GPU, OUTSIDE THE TEE', W - 32, 10); for (let i = 0; i < nr.length; i++) text(nr[i], W / 2, H - 44 - (nr.length - i) * 14, 10, 'rgba(242,242,238,.45)', 'center', capA); }
+          if (!rent.CODE_GUARANTEED) { const nr = wrap(`CODE GUARANTEE PENDING REDEPLOY ${rent.PENDING_IMAGE} · BRAIN: QWEN3-14B ON A RENTED GPU, OUTSIDE THE TEE`, W - 32, 10); for (let i = 0; i < nr.length; i++) text(nr[i], W / 2, H - 44 - (nr.length - i) * 14, 10, 'rgba(242,242,238,.45)', 'center', capA); }
         }
       }
     }
@@ -553,7 +557,8 @@ export function createMorph() {
     if (capEl.prove) capEl.prove.tabIndex = holdOn('scream') ? 0 : -1;
 
     // chrome: station counter, the head switch, the token line
-    text(`${String(cs + 1).padStart(2, '0')}/${String(S).padStart(2, '0')}`, 16, H - 26, 11, 'rgba(244,183,40,.6)', 'left');
+    const chromeY = composer && !composer.hidden ? Math.min(H - 26, composer.getBoundingClientRect().top - 22) : H - 26;   // above the composer when it is open
+    text(`${String(cs + 1).padStart(2, '0')}/${String(S).padStart(2, '0')}`, 16, chromeY, 11, 'rgba(244,183,40,.6)', 'left');
     {
       const n1 = live.e1 && live.e1.name || 'WICK', n2 = live.e2 && live.e2.name || 'OBOL';
       const sz = 11, pad = 10, w1 = measure(n1, sz) + pad * 2, w2 = measure(n2, sz) + pad * 2, y = 14, hgt = 24;
@@ -567,7 +572,7 @@ export function createMorph() {
       draw(x1, w1, n1, 'e1'); draw(x2, w2, n2, 'e2');
       if (cs > 0 || isPhone) text('FOLLOWING', x1 - 10, y + 7, 10, 'rgba(242,242,238,.35)', 'right');
     }
-    if (cs === S - 1 && mdist === 0) { text('$ZEALOT NOT LAUNCHED', W / 2, H - 28, 11, 'rgba(244,183,40,.5)'); }
+    if (cs === S - 1 && mdist === 0) { text('$ZEALOT NOT LAUNCHED', W - 16, chromeY, 11, 'rgba(244,183,40,.5)', 'right'); }
     setTimeout(() => safeFrame(performance.now()), 33);
   }
 

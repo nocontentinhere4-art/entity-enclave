@@ -11,14 +11,15 @@ import {
   checkHash,
   genNonce,
   CODE_GUARANTEED,
+  PENDING_IMAGE,
   receiptsOf,
   lettersOf,
   rentPerHour,
   replyGate
-} from './rent.js?v=70';
+} from './rent.js?v=71';
 
-import { openPay } from './pay.js?v=70';
-import { mountCloud } from './glyphcloud.js?v=70';
+import { openPay } from './pay.js?v=71';
+import { mountCloud } from './glyphcloud.js?v=71';
 
 import {
   formatInt,
@@ -29,7 +30,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=70';
+} from './data.js?v=71';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -245,7 +246,7 @@ function buildProve(body, title, id, state) {
 
   const notes = mk('div', 'door-note');
   if (!CODE_GUARANTEED) {
-    notes.append(mk('p', null, 'CODE MAY BE ABSENT'), mk('p', null, 'The enclave image bc86aaf2 is pending redeploy.'));
+    notes.append(mk('p', null, 'CODE MAY BE ABSENT'), mk('p', null, `The enclave image ${PENDING_IMAGE} is pending redeploy.`));
   }
   notes.append(mk('p', null, 'Brain: self-hosted Qwen3-14B on a rented RunPod GPU, outside the TEE.'));
   body.append(notes);
@@ -1225,7 +1226,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=70', e2: 'vendor/skull-obol.jpg?v=70' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=71', e2: 'vendor/skull-obol.jpg?v=71' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1245,7 +1246,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=70`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=71`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;

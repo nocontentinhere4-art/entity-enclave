@@ -27,6 +27,7 @@ import { Jobs } from './life/jobs.mjs';
 import { Market } from './economy/market.mjs';
 import { Forecasts } from './economy/forecasts.mjs';
 import { serveForecasts } from './http/forecasts.mjs';
+import { sendBody, publicChannelView, ledgerBytes } from './http/public.mjs';
 import { deathState, deadView } from './boot.mjs';
 import { redactMemo } from './trade/orders.mjs';
 import { tradesHttp } from './trade/http.mjs';
@@ -322,7 +323,9 @@ http.createServer(async (req, res) => {
   res.setHeader('access-control-allow-origin', '*');
   res.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
   res.setHeader('access-control-allow-headers', 'content-type');
-  const json = (code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body, null, 1)); };
+  const json = (code, body) => sendBody(req, res, code, { 'content-type': 'application/json' }, JSON.stringify(body, null, 1));
+  // The query is read once, before the path is normalised for routing (`?since=`, `?limit=`).
+  const query = new URL(req.url, 'http://x').searchParams;
   // Tolerate `//vitals` and `/vitals/`: a peer URL pasted with a trailing slash must still work.
   req.url = (req.url.split('?')[0].replace(/\/{2,}/g, '/').replace(/(.)\/+$/, '$1')) || '/';
   try {
@@ -358,7 +361,8 @@ http.createServer(async (req, res) => {
       });
     }
     if (req.url === '/attestation') return json(200, attestation);
-    if (req.url === '/ledger') { res.writeHead(200, { 'content-type': 'application/x-ndjson' }); return res.end(existsSync(LEDGER_PATH) ? readFileSync(LEDGER_PATH) : ''); }
+    // `?limit=<n>` serves only the last n lines; the lines themselves are the file's own bytes (the site re-hashes them).
+    if (req.url === '/ledger') return sendBody(req, res, 200, { 'content-type': 'application/x-ndjson' }, ledgerBytes(LEDGER_PATH, query));
     if (req.url === '/verify') return json(200, Ledger.verify(LEDGER_PATH));
     // Who the entity is and what it plans, plus the last public events — never the private diary.
     if (req.url === '/memory-public') {
@@ -389,14 +393,8 @@ http.createServer(async (req, res) => {
         sleepUntil: m.sleepUntil ?? null,
       });
     }
-    if (req.url === '/public-channel') {
-      // Both directions, in ledger order: the entity's posts and the humans' messages.
-      return json(200, readLedger().filter((e) => e.type === 'post_public' || e.type === 'human_message').slice(-200).map((e) => (
-        e.type === 'post_public'
-          ? { seq: e.seq, ts: e.ts, from: 'entity', text: e.data?.text, ...(e.data?.replyTo ? { replyTo: e.data.replyTo, kind: e.data.kind ?? 'reply' } : {}) }
-          : { seq: e.seq, ts: e.ts, from: 'human', author: e.data?.author, text: e.data?.text }
-      )));
-    }
+    // Both directions, in ledger order: the entity's posts and the humans' messages; `?since=<seq>` for a poller.
+    if (req.url === '/public-channel') return json(200, publicChannelView(readLedger(), query));
     if (req.url === '/forecasts') return serveForecasts(req, res, { forecasts });
     if (req.url === '/pages') return json(200, pagesView(pages));
     if (req.url.startsWith('/pages/')) {

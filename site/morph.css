@@ -81,9 +81,6 @@ html { scroll-behavior: auto; scroll-snap-type: y mandatory; }
 
 .grave-links {
   position: static; margin-top: 10px; justify-content: center;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 3vh;
   display: flex;
   gap: 18px;
   font: 11px "JetBrains Mono", Menlo, monospace;

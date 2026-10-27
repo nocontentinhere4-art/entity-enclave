@@ -1,24 +1,24 @@
 // rent.js — ZEALOT v50 "RENT HAND" state machine.
 // Cadence, freshness, receipts, PROVE/SAY correlation, hash checks.
-// Imports ONLY term.js?v=62 and data.js?v=62. No canvas. Defensive.
+// Imports ONLY term.js?v=71 and data.js?v=71. No canvas. Defensive.
 // Ledger fetch throttled: boot, then only on root head change and >=5 min.
 // Exports: bootRent, getRentState, subscribeRent, refreshNow, genNonce,
 // startProve, say, cancelWait, checkHash, fetchDetail, rentPerHour, receiptsOf, lettersOf.
 
 import {
   state, loadAll, openPay, wirePay, deadline, nameOf, stateWord
-} from './term.js?v=62';
+} from './term.js?v=71';
 import {
   request, postMessage, verifyChain, formatInt, formatZats, fixed8,
   shortHash, hhmm, fmtStamp, stringOf, sha256Hex, parseLedger
-} from './data.js?v=62';
+} from './data.js?v=71';
 
 const LEDGER_INTERVAL_MS = 5 * 60 * 1000;
 const STALE_MS = 95 * 1000;
-const SMALL_POLL_MS = 30 * 1000;
+const SMALL_POLL_MS = 15 * 1000;
 const RECONCILE_MS = 60 * 1000;
-const WAIT_POLL_MS = 5 * 1000;
-const WAIT_TIMEOUT_MS = 90 * 1000;
+const WAIT_POLL_MS = 3 * 1000;
+const WAIT_TIMEOUT_MS = 120 * 1000;
 const DETAIL_CACHE_MS = 60 * 1000;
 
 const IDS = ['e1', 'e2'];
@@ -28,6 +28,8 @@ const perf = typeof performance !== 'undefined' ? performance : null;
 const win = typeof window !== 'undefined' ? window : null;
 
 export const CODE_GUARANTEED = false;
+/* the image the public code expects on the CVMs; the deploy commit updates it with the compose files */
+export const PENDING_IMAGE = 'f018585d';
 
 let booted = false;
 let bootPromise = null;
@@ -118,11 +120,20 @@ function mergeVitals(id, res, t) {
   }
 }
 
+/* the channel is read incrementally: `?since=<last seq>` asks only for what is new. An enclave image that
+   ignores the query sends its last 200 again; merging by seq makes both answers land the same way. */
+function channelPath(id) {
+  const since = maxPostSeq(getEntity(id).posts);
+  return since ? `/public-channel?since=${since}` : '/public-channel';
+}
+
 function mergeChannel(id, res) {
   const d = getEntity(id);
-  if (res && res.ok && Array.isArray(res.data)) {
-    d.posts = res.data;
-  }
+  if (!(res && res.ok && Array.isArray(res.data))) return;
+  if (!Array.isArray(d.posts) || !d.posts.length) { d.posts = res.data; return; }
+  const have = new Set(d.posts.map(p => p && p.seq));
+  const fresh = res.data.filter(p => p && typeof p.seq === 'number' && !have.has(p.seq));
+  if (fresh.length) d.posts = d.posts.concat(fresh).sort((a, b) => a.seq - b.seq).slice(-200);
 }
 
 function emit(event) {
@@ -196,7 +207,7 @@ async function smallPoll(reconcile) {
 
     const rootPromise = request(d.base, '/').catch(e => ({ ok: false, error: e && e.message }));
     const vitalsPromise = request(d.base, '/vitals').catch(e => ({ ok: false, error: e && e.message }));
-    const channelPromise = request(d.base, '/public-channel').catch(e => ({ ok: false, error: e && e.message }));
+    const channelPromise = request(d.base, channelPath(id)).catch(e => ({ ok: false, error: e && e.message }));
 
     const [rootRes, vitalsRes, channelRes] = await Promise.all([rootPromise, vitalsPromise, channelPromise]);
 
@@ -428,7 +439,7 @@ async function runWaitPoll() {
     const d = getEntity(id);
     if (!d.base) return;
     const [chanRes, rootRes] = await Promise.all([
-      request(d.base, '/public-channel').catch(() => ({ ok: false })),
+      request(d.base, channelPath(id)).catch(() => ({ ok: false })),
       request(d.base, '/').catch(() => ({ ok: false }))
     ]);
     mergeChannel(id, chanRes);
