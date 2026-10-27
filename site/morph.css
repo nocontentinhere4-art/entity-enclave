@@ -390,3 +390,44 @@ html { scroll-behavior: auto; scroll-snap-type: y mandatory; }
   .payx-go { grid-template-columns: minmax(0, 1fr) 110px; }
   .payx-qr { width: 110px; }
 }
+
+/* ---------- TALK door: the channel feed ---------- */
+.door-feed { max-height: 38vh; overflow: auto; border: 1px solid var(--dim-yellow); padding: 6px 12px; margin: 8px 0 14px; display: grid; gap: 10px; }
+.door-post { display: grid; gap: 3px; padding: 6px 0; border-bottom: 1px solid rgba(244,183,40,.1); }
+.door-post:last-child { border-bottom: 0; }
+.door-post-k { font-size: 10px; letter-spacing: .06em; color: var(--bone-dim); }
+.door-post-t { margin: 0; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; color: var(--bone-dim); }
+.door-post.is-entity .door-post-k { color: var(--yellow); }
+.door-post.is-entity .door-post-t { color: var(--bone); }
+
+/* ---------- doors: full black, the object as a glyph cloud, the numbers that matter ---------- */
+.door, .door.door { position: fixed; inset: 0; left: 0; top: 0; transform: none; width: auto; max-width: none; height: auto; max-height: none; border: 0; box-shadow: none; background: var(--void); display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 32px; padding: 24px 48px; box-sizing: border-box; align-items: stretch; }
+.door-side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
+.door-cloud { width: min(36vw, 62vh); aspect-ratio: 1; display: block; }
+.door-side-name { margin: 10px 0 0; color: var(--yellow); font-size: 12px; letter-spacing: .16em; }
+.door-side-big { margin: 0; color: var(--bone); font-size: clamp(26px, 3.4vw, 40px); letter-spacing: .04em; }
+.door-side-sub { margin: 0; color: var(--bone-dim); font-size: 11px; letter-spacing: .08em; }
+.door-side-when { margin: 6px 0 0; color: var(--bone-dim); font-size: 9px; letter-spacing: .08em; opacity: .7; }
+.door-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; max-width: 680px; width: 100%; justify-self: start; }
+.door-head { padding: 0 48px 12px 0; border-bottom: 0; }
+.door-head .door-title { font-size: clamp(20px, 2.4vw, 30px); letter-spacing: .06em; text-transform: uppercase; line-height: 1.15; }
+.door-close { position: fixed; top: 14px; right: 16px; width: 40px; height: 40px; border: 1px solid var(--dim-yellow); background: var(--void); font-size: 20px; color: var(--bone); z-index: 2; }
+.door-close:hover { border-color: var(--yellow); color: var(--yellow); }
+.door-menu { padding: 4px 0 14px; border-bottom: 0; gap: 8px; }
+.door-chip { font-size: 11px; letter-spacing: .1em; padding: 9px 14px; border: 1px solid var(--dim-yellow); color: var(--bone-dim); background: none; }
+.door-chip:hover { border-color: var(--bone-dim); }
+.door-chip[aria-pressed="true"] { background: none; color: var(--yellow); border-color: var(--yellow); }
+.door-body { padding: 0; overflow: auto; flex: 1 1 auto; min-height: 0; }
+.door-body h3.door-title { font-size: 11px; letter-spacing: .14em; color: var(--bone-dim); margin: 14px 0 8px; }
+.door-row { grid-template-columns: 130px 1fr; gap: 14px; margin: 0; padding: 9px 0; border-bottom: 1px solid rgba(244,183,40,.08); font-size: 13px; }
+.door-k { font-size: 10px; letter-spacing: .1em; color: var(--bone-dim); align-self: baseline; padding-top: 3px; }
+.door-v { color: var(--bone); font-size: 13px; line-height: 1.5; word-break: normal; overflow-wrap: anywhere; }
+@media (max-width: 719px), (max-height: 620px) {
+  .door, .door.door { grid-template-columns: 1fr; padding: 60px 16px 24px; gap: 10px; overflow: auto; align-content: start; }
+  .door-side { display: grid; grid-template-columns: minmax(0, 150px) 1fr; grid-auto-rows: min-content; column-gap: 14px; align-content: center; justify-items: start; align-items: center; }
+  .door-cloud { grid-row: 1 / span 4; width: 100%; max-width: 150px; align-self: center; }
+  .door-side-name { margin: 0; }
+  .door-main { max-width: none; }
+  .door-body { overflow: visible; }
+  .door-row { grid-template-columns: 96px 1fr; gap: 10px; }
+}

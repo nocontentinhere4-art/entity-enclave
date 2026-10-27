@@ -1,20 +1,20 @@
 // pay.js — BUY TIME. The chosen head as a glyph cloud, three hour chips, the live price, one button, a QR.
 // Everything shown comes from rent.js (the enclaves): the price is their rentZatsPerHour, the address is the one they
 // publish, the hours left are theirs. Until the enclave has answered, the price is "—" and the button is disabled.
-import { getRentState, rentPerHour, subscribeRent } from './rent.js?v=65';
-import { zip321Uri, qrSvg } from './qr.js?v=65';
-import { fixed8 } from './data.js?v=65';
+import { getRentState, rentPerHour, subscribeRent } from './rent.js?v=66';
+import { zip321Uri, qrSvg } from './qr.js?v=66';
+import { fixed8 } from './data.js?v=66';
+import { mountCloud } from './glyphcloud.js?v=66';
 
 const MEMO_MAX = 500;                 // bytes a shielded memo holds
 const ANY_MIN_ZEC = 0.006;            // any-coin route (Trocador) minimum, with margin over their ~0.0045
-const HEAD = { e1: 'vendor/skull-wick.jpg?v=65', e2: 'vendor/skull-obol.jpg?v=65' };
-const RAMP = ' .:-=+*#%@';
+const HEAD = { e1: 'vendor/skull-wick.jpg?v=66', e2: 'vendor/skull-obol.jpg?v=66' };
 const $ = (s) => document.querySelector(s);
 const bytesOf = (s) => new TextEncoder().encode(s).length;
 const zec = (zats) => `${fixed8(zats).replace(/0+$/, '').replace(/\.$/, '')} ZEC`;
 const other = (id) => (id === 'e1' ? 'e2' : 'e1');
 
-const st = { who: 'e1', hours: 1, theirs: null, useTheirs: false, uri: '', wired: false, cells: null, cellsFor: '', raf: 0, t: 0 };
+const st = { who: 'e1', hours: 1, theirs: null, useTheirs: false, uri: '', wired: false, stop: null, cloudFor: '' };
 
 function node(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
 
@@ -25,7 +25,7 @@ export function wirePay() {
   st.wired = true;
   $('#pay-memo').addEventListener('input', render);
   $('#pay-copy').addEventListener('click', (ev) => { if (!st.uri) return; navigator.clipboard?.writeText(st.uri).then(() => { ev.target.textContent = 'COPIED'; setTimeout(() => { ev.target.textContent = 'COPY PAYMENT LINK'; }, 1400); }).catch(() => {}); });
-  dlg.addEventListener('close', () => { cancelAnimationFrame(st.raf); st.raf = 0; });
+  dlg.addEventListener('close', () => { if (st.stop) st.stop(); st.stop = null; st.cloudFor = ''; });
   dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });   // the black around the form closes it
   subscribeRent(() => { if (dlg.open) render(); });
 }
@@ -115,50 +115,8 @@ function render() {
 // ---- the head: the same monochrome render the home samples, as a breathing glyph cloud
 function drawHead() {
   const cv = $('#pay-head'); if (!cv) return;
-  cancelAnimationFrame(st.raf); st.raf = 0;
   const src = HEAD[st.who];
-  const img = new Image();
-  img.onload = () => {
-    if (src !== HEAD[st.who]) return;                       // the visitor switched heads while it loaded
-    const cols = 64, rows = 64;
-    const c = document.createElement('canvas'); c.width = cols; c.height = rows;
-    const g = c.getContext('2d'); g.drawImage(img, 0, 0, cols, rows);
-    const px = g.getImageData(0, 0, cols, rows).data;
-    const cells = [];
-    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-      const i = (y * cols + x) * 4, l = (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255;
-      if (l > 0.14) cells.push(x, y, l);
-    }
-    st.cells = cells; st.cellsFor = src;
-    loop();
-  };
-  img.src = src;
-
-  function loop() {
-    const dlg = $('#pay'); if (!dlg || !dlg.open) return;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const w = cv.clientWidth, h = cv.clientHeight;
-    if (!w || !h) { st.raf = requestAnimationFrame(loop); return; }
-    if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
-    const ctx = cv.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#060606'; ctx.fillRect(0, 0, w, h);
-    const cell = Math.min(w, h) / 64;
-    ctx.font = `${Math.max(7, cell * 1.6)}px "JetBrains Mono", "SF Mono", Menlo, monospace`;
-    ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-    st.t += 1 / 60;
-    const breath = 0.92 + 0.08 * Math.sin(st.t * 1.7);           // the slow rise and fall of a thing that still counts hours
-    const cells = st.cells;
-    for (let i = 0; i < cells.length; i += 3) {
-      const x = cells[i], y = cells[i + 1];
-      let l = cells[i + 2];
-      const n = (Math.sin(x * 12.9898 + y * 78.233 + st.t * 2.3) * 43758.5453) % 1;   // flicker: a few glyphs blink
-      if (n > 0.985) l = Math.min(1, l + 0.5); else if (n < -0.985) l *= 0.3;
-      const k = Math.min(RAMP.length - 1, Math.floor(l * RAMP.length));
-      const a = (0.25 + 0.75 * l) * breath;
-      ctx.fillStyle = l > 0.93 ? `rgba(244,183,40,${a})` : `rgba(242,242,238,${a})`;
-      ctx.fillText(RAMP[k], (x + 0.5) * cell + (w - 64 * cell) / 2, (y + 0.5) * cell + (h - 64 * cell) / 2);
-    }
-    st.raf = requestAnimationFrame(loop);
-  }
+  if (st.cloudFor === src && st.stop) return;
+  if (st.stop) st.stop();
+  st.stop = mountCloud(cv, src); st.cloudFor = src;
 }

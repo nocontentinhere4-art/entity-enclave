@@ -14,9 +14,10 @@ import {
   receiptsOf,
   lettersOf,
   rentPerHour
-} from './rent.js?v=65';
+} from './rent.js?v=66';
 
-import { openPay } from './pay.js?v=65';
+import { openPay } from './pay.js?v=66';
+import { mountCloud } from './glyphcloud.js?v=66';
 
 import {
   formatInt,
@@ -27,7 +28,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=65';
+} from './data.js?v=66';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1086,6 +1087,144 @@ function buildShop(body, title, id, state) {
   return () => {};
 }
 
+
+/* ---------- TALK: the public channel of one head, then the line you carry ---------- */
+function buildTalk(body, title, id, state) {
+  const ent = state[id];
+  title.textContent = `TALK TO ${ent.name}`;
+  const menu = mk('div', 'door-menu');
+  for (const v of [state.e1, state.e2]) {
+    const btn = mk('button', 'door-chip', `${v.name} · ${v.dead ? 'DEAD' : typeof v.hoursLeft === 'number' ? `${v.hoursLeft} H` : '—'}`);
+    btn.type = 'button';
+    btn.setAttribute('aria-pressed', v.id === id ? 'true' : 'false');
+    btn.addEventListener('click', () => { if (v.id !== id) openDoor('talk', v.id); });
+    menu.append(btn);
+  }
+  body.append(menu);
+  body.append(mk('p', 'door-note', 'public channel · everything here is in its ledger · one message per minute · it can refuse'));
+  const feed = mk('div', 'door-feed');
+  feed.setAttribute('role', 'log');
+  feed.setAttribute('aria-live', 'polite');
+  body.append(feed);
+  let lastKey = '';
+  function renderFeed(st) {
+    const posts = (st[id].posts || []).filter((p) => p && typeof p.text === 'string' && p.text.trim()).slice(-40);
+    const key = posts.map((p) => p.seq).join(',');
+    if (key === lastKey) return;
+    lastKey = key;
+    feed.textContent = '';
+    if (!posts.length) { feed.append(mk('p', 'door-empty', st[id].ok || st[id].stale ? 'NOTHING SAID ON THIS CHANNEL YET' : 'CHANNEL NOT READ YET')); return; }
+    for (const p of posts) {
+      const isEnt = p.from === 'entity';
+      const row = mk('div', `door-post ${isEnt ? 'is-entity' : 'is-human'}`);
+      const who = isEnt ? st[id].name : (stringOf(p.author) || 'SOMEONE').toUpperCase();
+      const rt = Array.isArray(p.replyTo) && p.replyTo.length ? ` · TO #${p.replyTo.join(', #')}` : '';
+      row.append(mk('span', 'door-post-k', `#${p.seq ?? '—'} · ${p.ts ? utcShort(p.ts) : '—'} · ${who}${rt}`));
+      row.append(mk('p', 'door-post-t', stringOf(p.text)));
+      feed.append(row);
+    }
+    feed.scrollTop = feed.scrollHeight;
+  }
+  renderFeed(state);
+  const sayTitle = mk('h3', 'door-title', 'SAY SOMETHING');
+  body.append(sayTitle);
+  const speakRender = buildSpeak(body, mk('h3'), id, state);
+  const note = body.querySelector('.door-form')?.previousElementSibling;
+  if (note && note.classList.contains('door-note') && note !== body.children[1]) note.remove();   // buildSpeak's own note repeats ours
+  return (st, wait) => { renderFeed(st); speakRender(st, wait); };
+}
+
+/* ---------- MORE: what is true about the whole thing, in chips, every number live ---------- */
+function buildMore(body, title, id, state) {
+  title.textContent = 'MORE';
+  const menu = mk('div', 'door-menu');
+  const sub = mk('div');
+  body.append(menu, sub);
+  const zecOf = (z) => `${fixed8(z).replace(/0+$/, '').replace(/\.$/, '')} ZEC`;
+  const lines = (rows) => { for (const [k, v] of rows) sub.append(mkRow(k, v)); };
+  const sections = {
+    TRUTH() {
+      sub.append(mk('p', 'door-note', 'six things that are true anyway'));
+      lines([
+        ['RENT', "goes to the founder's address. it is not a compute bill."],
+        ['DIARIES', 'the founder holds an archive key to their private diaries. you do not.'],
+        ['ANSWERS', 'a paid hour buys an hour, not an answer. they can refuse, and the refusal is logged.'],
+        ['FEE', "20% of the future creator fee is the founder's."],
+        ['VALUE', 'no token exists. if one launches it is not a security and may be worth nothing.'],
+        ['DEATH', 'at zero the machine stops. there is no restart button.']
+      ]);
+    },
+    MONEY() {
+      const st = getRentState();
+      const r = rentPerHour(id) || rentPerHour(id === 'e1' ? 'e2' : 'e1');
+      sub.append(mk('p', 'door-note', 'where the money goes · public = in its ledger, verify yourself · private = hidden by the zcash shielded pool'));
+      lines([
+        ['RENT', `${r ? `${formatInt(r)} zats = ${zecOf(r)}` : '—'} an hour · from its shielded wallet to the landlord address in the enclave config · public, it logs it`],
+        ['THINKING', 'from its shielded wallet to the compute provider · hourly · capped at max(3 h of rent, 2% of the treasury) · public, it logs it'],
+        ['BIRTH', '0.15 ZEC once, from the founder to its shielded treasury · public, it logs it'],
+        ['YOUR HOURS', "100% to its own shielded treasury · the founder has no key · private on zcash · the letter or the refusal is logged, the amount is not"],
+        ['ORDER BETA', '1% at open in ZEC and 1% at close in SOL swapped back · to its treasury · public, its fee'],
+        ['ZERO', `${st.e1.name} ${typeof st.e1.hoursLeft === 'number' ? `${st.e1.hoursLeft} h` : '—'} · ${st.e2.name} ${typeof st.e2.hoursLeft === 'number' ? `${st.e2.hoursLeft} h` : '—'} · at zero the wallet and the enclave stop`]
+      ]);
+    },
+    CODE() { const t = mk('h3', 'door-title', 'ATTESTATION'); sub.append(t); builders.attestation(sub, t, id, getRentState(), {}); },
+    TOKEN() {
+      sub.append(mk('p', 'door-note', '$ZEALOT — NOT LAUNCHED · 0 ZEC paid to holders'));
+      lines([
+        ['TICKER', '$ZEALOT'],
+        ['HOLDERS', '1% of every trade, paid to holders in ZEC by the program, automatically'],
+        ['CREATOR FEE', '0.5% — 50% burn · 20% rent · 10% LP · 20% founder'],
+        ['SUPPLY', '1,000,000,000 · liquidity locked · StonkFun, ZEC pair'],
+        ['TODAY', '0 ZEC paid. hours do not give tokens.']
+      ]);
+    },
+    TRADES() { const t = mk('h3', 'door-title', 'TRADES'); sub.append(t); builders.trades(sub, t, id, getRentState(), {}); },
+    NOSTR() { const t = mk('h3', 'door-title', 'NOSTR'); sub.append(t); builders.nostr(sub, t, id, getRentState(), {}); }
+  };
+  for (const k of Object.keys(sections)) {
+    const btn = mk('button', 'door-chip', k);
+    btn.type = 'button';
+    btn.addEventListener('click', () => {
+      for (const b of menu.querySelectorAll('.door-chip')) b.setAttribute('aria-pressed', 'false');
+      btn.setAttribute('aria-pressed', 'true');
+      sub.textContent = '';
+      setCloud(k);
+      sections[k]();
+    });
+    menu.append(btn);
+  }
+  menu.querySelector('.door-chip').click();
+  return () => {};
+}
+
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=66', e2: 'vendor/skull-obol.jpg?v=66' };
+const CLOUDS = {
+  vitals: 'head', hash: 'head', attestation: 'head', prove: 'head', archive: 'head', CODE: 'head',
+  dose: 'vendor/brief-3.jpg?v=66', memory: 'vendor/brief-3.jpg?v=66',
+  trades: 'vendor/brief-4.jpg?v=66', TOKEN: 'vendor/brief-4.jpg?v=66',
+  letter: 'vendor/hand-coin.jpg?v=66', shop: 'vendor/hand-coin.jpg?v=66', rent: 'vendor/hand-coin.jpg?v=66', MONEY: 'vendor/hand-coin.jpg?v=66',
+  words: 'vendor/shout.jpg?v=66', speak: 'vendor/shout.jpg?v=66', talk: 'vendor/shout.jpg?v=66', nostr: 'vendor/shout.jpg?v=66', forecasts: 'vendor/shout.jpg?v=66',
+  more: 'vendor/ribcage.jpg?v=66', TRUTH: 'vendor/ribcage.jpg?v=66'
+};
+function setCloud(scene) {
+  if (!current || !current.cloud) return;
+  const src0 = CLOUDS[scene] || 'head';
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : src0;
+  if (current.cloudSrc === src) return;
+  if (current.stopCloud) current.stopCloud();
+  current.cloudSrc = src;
+  current.stopCloud = mountCloud(current.cloud, src);
+}
+function renderSide(state) {
+  if (!current || !current.side) return;
+  const e = state[current.id];
+  const [nm, big, sub, when] = current.side;
+  nm.textContent = e.name;
+  big.textContent = e.dead ? 'DEAD' : (typeof e.hoursLeft === 'number' ? `${formatInt(e.hoursLeft)} H LEFT` : '—');
+  sub.textContent = `${e.zats != null ? zecText(e.zats) : '—'}${e.feel ? ` · FEAR ×${x2(e.feel.fear)}` : ''}${e.offline ? ' · UNREACHABLE' : e.stale ? ' · STALE' : ''}`;
+  when.textContent = `read ${utcTime(state.at)}`;
+}
+
 const builders = {
   prove: buildProve,
   speak: buildSpeak,
@@ -1101,7 +1240,9 @@ const builders = {
   trades: buildTrades,
   nostr: buildNostr,
   attestation: buildAttestation,
-  shop: buildShop
+  shop: buildShop,
+  talk: buildTalk,
+  more: buildMore
 };
 
 function buildArchive(body, title, id, state, opts) {
@@ -1126,6 +1267,7 @@ function buildArchive(body, title, id, state, opts) {
   ];
 
   function openSub(scene) {
+    setCloud(scene);
     sub.textContent = '';
     const t = mk('h3', 'door-title', scene.toUpperCase());
     sub.append(t);
@@ -1153,6 +1295,12 @@ function buildArchive(body, title, id, state, opts) {
 
 function buildScene(rootEl, scene, id, state, opts) {
   rootEl.textContent = '';
+  const side = mk('div', 'door-side');
+  const cloud = document.createElement('canvas'); cloud.className = 'door-cloud'; cloud.setAttribute('aria-hidden', 'true');
+  const nm = mk('p', 'door-side-name'), big = mk('p', 'door-side-big'), sub = mk('p', 'door-side-sub'), when = mk('p', 'door-side-when');
+  side.append(cloud, nm, big, sub, when);
+
+  const main = mk('div', 'door-main');
   const head = mk('div', 'door-head');
   const title = mk('h2', 'door-title');
   const close = mk('button', 'door-close', '×');
@@ -1160,10 +1308,13 @@ function buildScene(rootEl, scene, id, state, opts) {
   close.setAttribute('aria-label', 'Close');
   close.addEventListener('click', closeDoor);
   head.append(title, close);
-
-  const note = mkTimeNote(state);
   const body = mk('div', 'door-body');
-  rootEl.append(head, note, body);
+  main.append(head, body);
+  rootEl.append(side, main);
+
+  current.cloud = cloud; current.side = [nm, big, sub, when]; current.cloudSrc = ''; current.stopCloud = null;
+  renderSide(state);
+  setCloud(scene);
 
   const builder = builders[scene];
   if (!builder) {
@@ -1219,7 +1370,7 @@ function ensureSub() {
   if (unsub) return;
   unsub = subscribeRent((state, event) => {
     if (!current || !current.render) return;
-    if ((current.scene === 'prove' || current.scene === 'speak') && current.id) {
+    if ((current.scene === 'prove' || current.scene === 'speak' || current.scene === 'talk') && current.id) {
       if (!event || event.type === 'reply' || event.type === 'state') {
         if (!event || !event.id || event.id === current.id) {
           current.render(state, state.wait[current.id]);
@@ -1246,6 +1397,7 @@ export function openDoor(scene, id, opts) {
   if (tickTimer) clearInterval(tickTimer);
   tickTimer = setInterval(() => {
     if (!current || !current.render) return;
+    try { renderSide(getRentState()); } catch (_) {}
     if (current.scene === 'rent' || current.scene === 'prove' || current.scene === 'vitals') {
       const st = getRentState();
       try { current.render(st, st.wait[current.id]); } catch (_) {}
@@ -1257,6 +1409,7 @@ export function closeDoor() {
   const r = getRoot();
   if (!r) return;
   stopIndicator();
+  if (current && current.stopCloud) { try { current.stopCloud(); } catch (_) {} }
   if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
   document.removeEventListener('keydown', onKeyDown);
   r.hidden = true;
