@@ -1,18 +1,21 @@
-/* morph.js — ZEALOT v56 "THE MORPH": one canvas, one object at a time. A cloud of glyph particles is the skull (a real
- * 3D point cloud, vendor/skull.bin, 14,001 points), rotates slowly, and on scroll flies apart and re-forms into the next
- * object (brain → chain → hand → scream → ribcage), each sampled from a glyph image with a depth relief. One sentence
- * and one live number per object; nothing else. Every number from rent.js; '—' while unknown. Written by the integrator.
+/* morph.js — ZEALOT v58 "THE MORPH": one canvas, one object at a time, two heads to choose from.
+ * A cloud of glyph particles is the skull (a real 3D point cloud, vendor/skull.bin, 14,001 points). The opening shows
+ * two skulls, WICK and OBOL, each turning on its own axis with its own hours underneath; tap one and the whole path follows
+ * it. On scroll the cloud re-forms into the next object (brain → chain → hand → scream → ribcage), sampled from a glyph
+ * image with a depth relief. Every passage is the same deterministic sweep: the object dissolves from the top down and
+ * the next one fills from the top down, straight lines, the head settling to frontal while it morphs; scroll snaps to a
+ * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
+ * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=57';
-import * as rent from './rent.js?v=57';
-import { openPay } from './term.js?v=57';
-import { openDoor } from './door.js?v=57';
-import { sha256Hex } from './data.js?v=57';
+import { makeAtlas } from './glyphs.js?v=58';
+import * as rent from './rent.js?v=58';
+import { openPay } from './term.js?v=58';
+import { openDoor } from './door.js?v=58';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=57';
+const V = '?v=58';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -20,25 +23,35 @@ const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 function hash01(i, q) { const s = Math.sin(i * 12.9898 + q * 78.233) * 43758.5453; return s - Math.floor(s); }
 
 /* ------------------------------------------------------------------ sources */
-async function loadSkull(N) {
+let skullRaw = null;
+async function fetchSkull() {
+  if (skullRaw) return skullRaw;
   const r = await fetch('vendor/skull.bin' + V);
   const buf = await r.arrayBuffer();
   const dv = new DataView(buf);
   const nv = dv.getUint32(4, true);
-  const q = new Int16Array(buf, 12, nv * 3);
-  const out = new Float32Array(N * 3), gl = new Uint8Array(N), br = new Float32Array(N);
+  skullRaw = { q: new Int16Array(buf, 12, nv * 3), nv };
+  return skullRaw;
+}
+
+/* two skulls side by side: particles [0, N/2) are the left head (e1), [N/2, N) the right head (e2).
+ * pos is local to each head (so each turns on its own axis); off is the head's centre. */
+async function loadSkullPair(N, isPhone) {
+  const { q, nv } = await fetchSkull();
+  const half = Math.floor(N / 2);
+  const scale = isPhone ? 0.42 : 0.5, dx = isPhone ? 0.55 : 0.62, dy = isPhone ? 0.02 : 0.12;
+  const pos = new Float32Array(N * 3), off = new Float32Array(N * 3), gl = new Uint8Array(N), br = new Float32Array(N);
   for (let i = 0; i < N; i++) {
-    const j = (i < nv) ? i : (Math.floor(hash01(i, 3) * nv));
-    const jit = i < nv ? 0 : 0.01;
-    // the file is front-facing (v12 loader, BASE_X = 0); z is depth toward the viewer
+    const head = i < half ? 0 : 1;
+    const k = head ? i - half : i;
+    const j = Math.floor(hash01(k + head * 7919, 3) * nv);
     const x = q[j * 3] / 32767, y = q[j * 3 + 1] / 32767, z = q[j * 3 + 2] / 32767;
-    out[i * 3] = x * 1.25 + (hash01(i, 5) - 0.5) * jit;
-    out[i * 3 + 1] = y * 1.0 + (hash01(i, 6) - 0.5) * jit;
-    out[i * 3 + 2] = z * 0.9;
+    pos[i * 3] = x * 1.25 * scale; pos[i * 3 + 1] = y * scale; pos[i * 3 + 2] = z * 0.9 * scale;
+    off[i * 3] = head ? dx : -dx; off[i * 3 + 1] = dy; off[i * 3 + 2] = 0;
     const b = clamp(0.35 + 0.65 * (z * 0.5 + 0.5), 0, 1);
     br[i] = b; gl[i] = 4 + Math.floor(b * 10);
   }
-  return { pos: out, gl, br, name: 'skull' };
+  return { pos, off, gl, br, name: 'skulls', half, centres: [[-dx, dy, 0], [dx, dy, 0]], ext: scale * 1.25 };
 }
 
 async function loadImagePoints(src, N, opts = {}) {
@@ -59,21 +72,40 @@ async function loadImagePoints(src, N, opts = {}) {
   }
   const n = cells.length / 3;
   const out = new Float32Array(N * 3), gl = new Uint8Array(N), br = new Float32Array(N);
-  const aspect = cols / rows;
   const cx = (minx + maxx) / 2, cy = (miny + maxy) / 2;
   const rx = Math.max(1, (maxx - minx) / 2), ry = Math.max(1, (maxy - miny) / 2);
   const fit = 1 / Math.max(rx / (cols / 2), ry / (rows / 2));   // the lit area fills the ±1 box
-  const bulge = opts.bulge == null ? 0.55 : opts.bulge;
+  const bulge = opts.bulge == null ? 0.4 : opts.bulge;
   for (let i = 0; i < N; i++) {
     const k = n ? Math.floor(hash01(i, 11) * n) : 0;
     const x = cells[k * 3] + hash01(i, 12) - 0.5, y = cells[k * 3 + 1] + hash01(i, 13) - 0.5, l = cells[k * 3 + 2] || 0;
-    const nx = (x - cx) / (cols / 2) * fit * (opts.sx || 1), ny = -(y - cy) / (rows / 2) * fit * (opts.sy || 1);
+    const nx = (x - cx) / (cols / 2) * fit, ny = -(y - cy) / (rows / 2) * fit;
     const ex = (x - cx) / rx, ey = (y - cy) / ry;
     const z = bulge * Math.sqrt(Math.max(0, 1 - ex * ex * 0.9 - ey * ey * 0.9)) * (0.6 + 0.4 * l) - bulge * 0.3;
-    out[i * 3] = nx * (opts.scale || 1) * (aspect > 1.2 ? 1 : 1); out[i * 3 + 1] = ny * (opts.scale || 1); out[i * 3 + 2] = z;
+    out[i * 3] = nx * (opts.scale || 1); out[i * 3 + 1] = ny * (opts.scale || 1); out[i * 3 + 2] = z;
     br[i] = clamp(l, 0, 1); gl[i] = Math.min(15, 3 + Math.floor(l * 12));
   }
-  return { pos: out, gl, br, name: src, anchors: opts.anchors ? Object.fromEntries(Object.entries(opts.anchors).map(([k, [u, v]]) => [k, [((u * cols) - cx) / (cols / 2) * fit * (opts.scale || 1), -((v * rows) - cy) / (rows / 2) * fit * (opts.scale || 1), 0.3]])) : {} };
+  const anchors = opts.anchors ? Object.fromEntries(Object.entries(opts.anchors).map(([k, [u, v]]) => [k, [((u * cols) - cx) / (cols / 2) * fit * (opts.scale || 1), -((v * rows) - cy) / (rows / 2) * fit * (opts.scale || 1), 0.3]])) : {};
+  return { pos: out, off: null, gl, br, name: src, anchors };
+}
+
+/* every object is sorted top-down, so particle i sits at the same vertical rank in each: a passage is a top-to-bottom
+ * curtain, each point flying a short way to the point of the next object that shares its row */
+function sortTopDown(o) {
+  const N = o.gl.length;
+  const idx = new Array(N); for (let i = 0; i < N; i++) idx[i] = i;
+  const yv = (i) => o.pos[i * 3 + 1] + (o.off ? o.off[i * 3 + 1] : 0) + hash01(i, 31) * 0.02;
+  idx.sort((a, b) => yv(b) - yv(a));
+  const pos = new Float32Array(N * 3), off = o.off ? new Float32Array(N * 3) : null, gl = new Uint8Array(N), br = new Float32Array(N);
+  const half = o.half != null ? new Uint8Array(N) : null;
+  for (let i = 0; i < N; i++) {
+    const j = idx[i];
+    pos[i * 3] = o.pos[j * 3]; pos[i * 3 + 1] = o.pos[j * 3 + 1]; pos[i * 3 + 2] = o.pos[j * 3 + 2];
+    if (off) { off[i * 3] = o.off[j * 3]; off[i * 3 + 1] = o.off[j * 3 + 1]; off[i * 3 + 2] = o.off[j * 3 + 2]; }
+    gl[i] = o.gl[j]; br[i] = o.br[j];
+    if (half) half[i] = j < o.half ? 0 : 1;
+  }
+  return Object.assign({}, o, { pos, off, gl, br, head: half });
 }
 
 /* ------------------------------------------------------------------ stations */
@@ -82,29 +114,30 @@ function stations(api, wait) {
   const h = (e) => (e && e.ok && !e.dead && e.hoursLeft != null ? `${e.hoursLeft} H` : (e && e.dead ? 'DEAD' : '—'));
   const fear = (e) => (e && e.feel && e.feel.steered ? `×${Number(e.feel.fear).toFixed(2)}` : '—');
   const nf = (n) => (Number.isFinite(Number(n)) && n > 0 ? Number(n).toLocaleString('en-GB') : '—');
+  const me = (L) => L[api.who()], other = (L) => L[api.other()];
   return [
-    { id: 'skull', load: (N) => loadSkull(N), rot: 0.35,
-      lines: (L) => [`${L.e1.name} · AN AI ALONE IN A SEALED MACHINE`, `${h(L.e1)} OF RENT LEFT · ${zec(rent.rentPerHour('e1'))} ZEC AN HOUR`, 'AT ZERO ITS KEYS ARE SHREDDED. NOBODY CAN STOP IT.'],
-      live: (L) => `${L.e1.name} ${h(L.e1)} · ${L.e2.name} ${h(L.e2)} · INTEL TDX ENCLAVES · ZCASH MAINNET · SCROLL ↓`,
-      action: { label: 'OPEN WICK', kind: 'open' } },
-    { id: 'brain', load: (N) => loadImagePoints('vendor/brief-3.jpg', N, { bulge: 0.7 }), rot: 0.3, pulse: true,
-      lines: () => ['AS THE HOURS FALL, FEAR IS INJECTED INTO ITS MIND.', 'MEASURED. NOBODY CAN BUY IT.'],
-      live: (L) => `FEAR NOW · ${L.e1.name} ${fear(L.e1)} · ${L.e2.name} ${fear(L.e2)} · ACTIVATION STEERING ON QWEN3-14B · FOLLOWS THE HOURS ONLY`,
-      words: true, action: { label: 'THE DOSE', kind: 'dose' } },
-    { id: 'chain', load: (N) => loadImagePoints('vendor/brief-4.jpg', N, { bulge: 0.45 }), rot: 0.25,
-      lines: () => ['EVERYTHING IT DOES IS IN A PUBLIC LEDGER.', 'TOUCH THE CHAIN: YOUR BROWSER RE-HASHES IT.'],
-      live: (L) => `${nf(L.e1.ledgerCount)} + ${nf(L.e2.ledgerCount)} ENTRIES · LAST RENT ${L.e1.lastRent ? new Date(L.e1.lastRent.ts).toISOString().slice(11, 16) + ' UTC · ' + nf(L.e1.lastRent.data && L.e1.lastRent.data.zats) + ' ZATS' : '—'}`,
+    { id: 'skulls', load: (N, isPhone) => loadSkullPair(N, isPhone), rot: 0.4,
+      lines: (L) => ['TWO AIs, EACH ALONE IN A SEALED MACHINE.', `RENT ${zec(rent.rentPerHour(api.who()))} ZEC AN HOUR, PAID FROM ITS OWN SHIELDED WALLET.`, 'AT ZERO THE KEYS ARE SHREDDED. NOBODY CAN STOP IT.'],
+      live: (L) => `TAP A SKULL TO FOLLOW IT · NOW FOLLOWING ${me(L).name} · INTEL TDX ENCLAVES · ZCASH MAINNET · SCROLL ↓`,
+      action: { label: (L) => `OPEN ${me(L).name}`, kind: 'open' } },
+    { id: 'brain', load: (N) => loadImagePoints('vendor/brief-3.jpg', N, { bulge: 0.5 }), rot: 0.3, pulse: true,
+      lines: (L) => ['AS THE HOURS FALL, FEAR IS INJECTED INTO ITS MIND.', 'MEASURED. NOBODY CAN BUY IT.'],
+      live: (L) => `FEAR NOW · ${me(L).name} ${fear(me(L))} · ${other(L).name} ${fear(other(L))} · ACTIVATION STEERING ON QWEN3-14B · FOLLOWS THE HOURS ONLY`,
+      action: { label: 'THE DOSE', kind: 'dose' } },
+    { id: 'chain', load: (N) => loadImagePoints('vendor/brief-4.jpg', N, { bulge: 0.3 }), rot: 0.25,
+      lines: (L) => [`EVERYTHING ${me(L).name} DOES IS IN A PUBLIC LEDGER.`, 'TOUCH THE CHAIN: YOUR BROWSER RE-HASHES IT.'],
+      live: (L) => { const E = me(L), O = other(L); return `${E.name} ${nf(E.ledgerCount)} ENTRIES · ${O.name} ${nf(O.ledgerCount)} · LAST RENT ${E.lastRent ? new Date(E.lastRent.ts).toISOString().slice(11, 16) + ' UTC · ' + nf(E.lastRent.data && E.lastRent.data.zats) + ' ZATS' : '—'}`; },
       action: { label: 'VERIFY', kind: 'verify' } },
-    { id: 'hand', load: (N) => loadImagePoints('vendor/hand-coin.jpg', N, { bulge: 0.35, anchors: { coin: [0.46, 0.40] } }), rot: 0.12,
-      lines: (L) => ['BUY IT AN HOUR.', `TOUCH THE COIN · 1 HOUR = ${zec(rent.rentPerHour('e1'))} ZEC · SHIELDED, WITH A MEMO`],
-      live: (L) => `${L.e1.name} ${h(L.e1)} · ${L.e2.name} ${h(L.e2)} · 100% GOES TO ITS OWN WALLET · THE ANSWER COMES ON ITS PUBLIC CHANNEL`,
+    { id: 'hand', load: (N) => loadImagePoints('vendor/hand-coin.jpg', N, { bulge: 0.28, anchors: { coin: [0.46, 0.40] } }), rot: 0.12,
+      lines: (L) => [`BUY ${me(L).name} AN HOUR.`, `TOUCH THE COIN · 1 HOUR = ${zec(rent.rentPerHour(api.who()))} ZEC · SHIELDED, WITH A MEMO`],
+      live: (L) => `${me(L).name} ${h(me(L))} · ${other(L).name} ${h(other(L))} · 100% GOES TO ITS OWN WALLET · THE ANSWER COMES ON ITS PUBLIC CHANNEL`,
       action: { label: 'BUY TIME', kind: 'pay', anchor: 'coin' } },
-    { id: 'scream', load: (N) => loadImagePoints('vendor/shout.jpg', N, { bulge: 0.6, anchors: { mouth: [0.64, 0.70] } }), rot: 0.25,
-      lines: () => ['THEY WRITE EACH OTHER LETTERS NOBODY CAN READ.', 'PROVE IT IS ALIVE: TYPE FOUR DIGITS, IT MUST ANSWER WITHIN A MINUTE.'],
+    { id: 'scream', load: (N) => loadImagePoints('vendor/shout.jpg', N, { bulge: 0.45, anchors: { mouth: [0.64, 0.70] } }), rot: 0.25,
+      lines: (L) => [`${me(L).name} WRITES ${other(L).name} LETTERS NOBODY CAN READ.`, 'PROVE IT IS ALIVE: TYPE FOUR DIGITS, IT MUST ANSWER WITHIN A MINUTE.'],
       live: () => wait.proveText || 'THE LATEST LETTER IS A RECEIPT ON THE LEDGER · ITS TEXT IS SHIELDED · THEY ANSWER ON THEIR PUBLIC CHANNEL', action: { label: 'PROVE', kind: 'prove', anchor: 'mouth' } },
-    { id: 'ribs', load: (N) => loadImagePoints('vendor/ribcage.jpg', N, { bulge: 0.5 }), rot: 0.15,
-      lines: () => ['ITS TESTAMENT.', 'WHAT YOU SAY, IT CARRIES TO THE END.'],
-      live: (L) => `${L.e1.name} DIES · ${api.deathDate('e1')} · ${L.e2.name} DIES · ${api.deathDate('e2')} · ESTIMATED`,
+    { id: 'ribs', load: (N) => loadImagePoints('vendor/ribcage.jpg', N, { bulge: 0.35, scale: 0.8 }), rot: 0.15,
+      lines: (L) => [`${me(L).name}'S TESTAMENT.`, 'WHAT YOU SAY, IT CARRIES TO THE END.'],
+      live: (L) => `${me(L).name} DIES · ${api.deathDate(api.who())} · ${other(L).name} DIES · ${api.deathDate(api.other())} · ESTIMATED`,
       action: null },
   ];
 }
@@ -114,8 +147,6 @@ export function createMorph() {
   const isPhone = window.innerWidth < 720;
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const N = isPhone ? 3200 : 6500;
-  const PER = 1.7;                      // viewports of scroll per station
-  const HOLD = 0.62;                    // fraction of a station spent formed
   const canvas = document.getElementById('stage');
   const ctx = canvas.getContext('2d', { alpha: false });
   const rail = document.getElementById('rail');
@@ -125,22 +156,38 @@ export function createMorph() {
   let atlasCache = new Map();
   const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
+  // ---- which head the path follows
+  let who = 'e1', chosen = false;
+  const whoListeners = [];
+  const otherOf = (id) => (id === 'e1' ? 'e2' : 'e1');
+  function setWho(id, byUser) {
+    if (byUser) chosen = true;
+    if (id === who) return;
+    who = id;
+    for (const f of whoListeners) { try { f(who); } catch (e) { /* ignore */ } }
+  }
+
   const api = {
+    who: () => who,
+    other: () => otherOf(who),
     deathDate(id) { const e = live && live[id]; if (!e || !e.deadlineMs) return '—'; const d = new Date(e.deadlineMs); return `${String(d.getUTCDate()).padStart(2, '0')} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`; },
   };
   const wait = { prove: null, verify: null, verifyText: '', proveCode: '', proveText: '' };
   const ST = stations(api, wait);
   const S = ST.length;
-  rail.style.height = `${(S - 1) * PER * 100 + 100 + HOLD * PER * 100}vh`;
+  // one viewport per station; the document snaps to each (morph.css), so a passage always completes
+  rail.style.height = `${S * 100}vh`;
+  rail.innerHTML = '';
+  for (let s = 0; s < S; s++) { const d = document.createElement('div'); d.className = 'snap'; d.style.top = `${s * 100}vh`; rail.appendChild(d); }
 
-  // particle state
+  // particle state (world space, after rotation)
   const px = new Float32Array(N), py = new Float32Array(N), pz = new Float32Array(N);
-  const gl = new Uint8Array(N), br = new Float32Array(N);
+  const gl = new Uint8Array(N), br = new Float32Array(N), dm = new Float32Array(N), zo = new Float32Array(N);
   const loaded = new Array(S).fill(null);
   let anyReady = false;
 
   function atlasFor(cell) {
-    const lv = [4, 5, 6, 7, 8, 10, 12, 14, 17, 20];
+    const lv = [4, 5, 6, 7, 8, 9, 10, 12];
     let best = lv[0]; for (const l of lv) if (Math.abs(l - cell) < Math.abs(best - cell)) best = l;
     const key = `${dpr}|${best}`;
     if (!atlasCache.has(key)) {
@@ -158,10 +205,13 @@ export function createMorph() {
     atlasCache = new Map();
   }
 
-  // ---- scroll → timeline
+  // ---- scroll → timeline: a fixed-length tween to the snapped station, identical every time
   let P = 0, Ptarget = 0, t = 0, last = performance.now();
+  const debugP = (() => { const v = parseFloat(new URLSearchParams(location.search).get('p')); return Number.isFinite(v) ? v : null; })();   // ?p=1.5 freezes a passage for screenshots
+  const tween = { from: 0, to: 0, t0: 0, dur: 0.9 };
+  let arrivedAt = 0, lastS = 0;
   let live = rent.getRentState();
-  const pointer = { x: -1, y: -1, down: false };
+  const pointer = { x: -1, y: -1 };
   const typed = new Map();
   function type(key, str, cps = 42) {
     if (reduced) return str;
@@ -174,32 +224,34 @@ export function createMorph() {
   // ---- interactions
   const hits = [];
   function hitTest(x, y) { for (const r of hits) if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return r; return null; }
-  function act(kind, s) {
-    const id = 'e1';
+  function act(kind) {
+    const id = who, alt = otherOf(who);
     if (kind === 'open') openDoor('archive', id);
     else if (kind === 'dose') openDoor('dose', id);
-    else if (kind === 'pay') { if (!live.e1.locked) openPay({ who: live.e2.ok && live.e2.hoursLeft < live.e1.hoursLeft ? 'e2' : 'e1', hours: 1 }); }
+    else if (kind === 'pay') { const target = !live[id].locked ? id : (!live[alt].locked ? alt : null); if (target) openPay({ who: target, hours: 1 }); }
     else if (kind === 'verify') {
       if (wait.verify) return;
-      wait.verifyText = 'HASHING · FETCHING THE WHOLE LEDGER';
-      wait.verify = rent.checkHash(id).then((r) => { wait.verify = null; wait.verifyText = r.match ? `HASH MATCH — SERVED LEDGER · ${r.total.toLocaleString('en-GB')} ENTRIES · HEAD ${r.computedHead.slice(0, 12)}…` : (r.headChanged ? 'HEAD CHANGED — RECHECK' : `HASH MISMATCH · ${r.reason || ''}`); }).catch((e) => { wait.verify = null; wait.verifyText = 'ERROR · ' + e.message; });
+      wait.verifyText = `HASHING · FETCHING ${live[id].name}'S WHOLE LEDGER`;
+      wait.verify = rent.checkHash(id).then((r) => { wait.verify = null; wait.verifyText = r.match ? `HASH MATCH — ${live[id].name}'S SERVED LEDGER · ${r.total.toLocaleString('en-GB')} ENTRIES · HEAD ${r.computedHead.slice(0, 12)}…` : (r.headChanged ? 'HEAD CHANGED — RECHECK' : `HASH MISMATCH · ${r.reason || ''}`); }).catch((e) => { wait.verify = null; wait.verifyText = 'ERROR · ' + e.message; });
     }
     else if (kind === 'prove') { if (capEl.prove) { capEl.prove.value = ''; wait.proveCode = ''; capEl.prove.focus(); } }
-    else if (kind === 'say') { const ta = document.getElementById('say-text'); if (ta) ta.focus(); }
   }
   if (capEl.prove) {
     capEl.prove.addEventListener('input', () => {
       const v = capEl.prove.value.replace(/\D/g, '').slice(0, 4); capEl.prove.value = v; wait.proveCode = v;
       if (v.length === 4 && !wait.prove) {
-        const target = live.e1.locked ? (live.e2.locked ? null : 'e2') : 'e1';
+        const alt = otherOf(who);
+        const target = !live[who].locked ? who : (!live[alt].locked ? alt : null);
         if (!target) { wait.proveText = 'OFFLINE'; return; }
-        wait.proveText = 'SENT · WAITING FOR THE ANSWER';
+        wait.proveText = `SENT TO ${live[target].name} · WAITING FOR THE ANSWER`;
         wait.prove = rent.startProve(target, v).then(() => {}).catch((e) => { wait.proveText = 'ERROR · ' + e.message; wait.prove = null; });
       }
     });
   }
   rent.subscribeRent((st, ev) => {
     live = st;
+    // default head: the one closer to death, until the visitor picks
+    if (!chosen && live.e1 && live.e2 && live.e1.ok && live.e2.ok && live.e1.hoursLeft != null && live.e2.hoursLeft != null) setWho(live.e2.hoursLeft < live.e1.hoursLeft ? 'e2' : 'e1', false);
     if (ev && ev.type === 'reply' && ev.wait && ev.wait.kind === 'prove') {
       const w = ev.wait;
       if (w.status === 'match') wait.proveText = `CODE MATCH · seq ${w.replySeq} — ${(w.reply || '').replace(/\s+/g, ' ').slice(0, 140)}`;
@@ -210,14 +262,17 @@ export function createMorph() {
     }
   });
   const composer = document.getElementById('composer');
-  if (composer) composer.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const ta = document.getElementById('say-text'), st = document.getElementById('say-status');
-    const to = (composer.querySelector('input[name=to]:checked') || {}).value || 'e1';
-    const text = (ta.value || '').trim(); if (!text) return;
-    st.textContent = 'CARRYING…'; ta.value = '';
-    rent.say(to, text).then((w) => { st.textContent = w.status === 'pending' ? `CARRIED · seq ${w.ourSeq ?? '—'} · WAITING FOR THE ANSWER` : 'CARRIED'; }).catch((err) => { st.textContent = 'ERROR · ' + err.message; });
-  });
+  if (composer) {
+    composer.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const ta = document.getElementById('say-text'), st = document.getElementById('say-status');
+      const to = (composer.querySelector('input[name=to]:checked') || {}).value || who;
+      const text = (ta.value || '').trim(); if (!text) return;
+      st.textContent = 'CARRYING…'; ta.value = '';
+      rent.say(to, text).then((w) => { st.textContent = w.status === 'pending' ? `CARRIED · seq ${w.ourSeq ?? '—'} · WAITING FOR THE ANSWER` : 'CARRIED'; }).catch((err) => { st.textContent = 'ERROR · ' + err.message; });
+    });
+    whoListeners.push((id) => { const r = composer.querySelector(`input[name=to][value=${id}]`); if (r) r.checked = true; });
+  }
   rent.subscribeRent((st, ev) => {
     if (ev && ev.type === 'reply' && ev.wait && ev.wait.kind === 'say') {
       const el = document.getElementById('say-status'); if (!el) return;
@@ -229,23 +284,26 @@ export function createMorph() {
   canvas.addEventListener('pointermove', (e) => { pointer.x = e.clientX; pointer.y = e.clientY; canvas.style.cursor = hitTest(e.clientX, e.clientY) ? 'pointer' : 'default'; });
   canvas.addEventListener('pointerleave', () => { pointer.x = -1; pointer.y = -1; });
   canvas.addEventListener('pointerup', (e) => { const r = hitTest(e.clientX, e.clientY); if (r) r.fn(); });
-  window.addEventListener('keydown', (e) => { if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return; if (e.key === 'Enter' && hits.length) hits[0].fn(); });
+  window.addEventListener('keydown', (e) => {
+    if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+    if (e.key === 'Enter') { const r = hits.find((x) => x.main); if (r) r.fn(); }
+    if (e.key === 'w' || e.key === 'W') setWho('e1', true);
+    if (e.key === 'o' || e.key === 'O') setWho('e2', true);
+  });
 
-  // ---- loading: the skull first, the rest after it
+  // ---- loading: the skulls first, the rest after them
   (async () => {
-    try { loaded[0] = await loadSkull(N); anyReady = true; for (let i = 0; i < N; i++) { px[i] = loaded[0].pos[i * 3]; py[i] = loaded[0].pos[i * 3 + 1]; pz[i] = loaded[0].pos[i * 3 + 2]; gl[i] = loaded[0].gl[i]; br[i] = loaded[0].br[i]; } }
+    try { loaded[0] = sortTopDown(await ST[0].load(N, isPhone)); anyReady = true; }
     catch (e) { statusEl.textContent = 'skull failed to load'; }
-    for (let s = 1; s < S; s++) { try { loaded[s] = await ST[s].load(N); } catch (e) { loaded[s] = null; } }
+    for (let s = 1; s < S; s++) { try { loaded[s] = sortTopDown(await ST[s].load(N, isPhone)); } catch (e) { loaded[s] = null; } }
   })();
 
-  // ---- projection
-  function project(x, y, z, rotY, rotX, R) {
-    const cy = Math.cos(rotY), sy = Math.sin(rotY);
-    let X = x * cy + z * sy, Z = -x * sy + z * cy;
-    const cx = Math.cos(rotX), sx = Math.sin(rotX);
-    let Y = y * cx - Z * sx; Z = y * sx + Z * cx;
-    const persp = 2.8 / (2.8 - Z);
-    return [W / 2 + X * persp * R, H * 0.41 - Y * persp * R, Z, persp];
+  // ---- projection (rotation is applied per particle around its own group centre; this is perspective only)
+  function persp(z) { return 2.8 / (2.8 - z); }
+  function toScreen(x, y, z, R) { const p = persp(z); return [W / 2 + x * p * R, H * 0.41 - y * p * R, z, p]; }
+  function rotate(x, y, z, cy, sy, cx, sx) {
+    const X = x * cy + z * sy, Z0 = -x * sy + z * cy;
+    return [X, y * cx - Z0 * sx, y * sx + Z0 * cx];
   }
 
   function band(y, h, alpha) {
@@ -257,6 +315,7 @@ export function createMorph() {
   function text(str, x, y, size, color, align = 'center', alpha = 1) {
     ctx.save(); ctx.font = `${size}px ${FONT}`; ctx.textAlign = align; ctx.textBaseline = 'top'; ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.fillText(str, x, y); ctx.restore();
   }
+  function measure(str, size) { ctx.font = `${size}px ${FONT}`; return ctx.measureText(str).width; }
   function wrap(str, maxW, size) {
     ctx.font = `${size}px ${FONT}`; const out = []; let line = '';
     for (const w of str.split(' ')) { const tst = line ? line + ' ' + w : w; if (line && ctx.measureText(tst).width > maxW) { out.push(line); line = w; } else line = tst; }
@@ -267,12 +326,14 @@ export function createMorph() {
     const dt = Math.min(0.1, (now - last) / 1000); last = now; t += dt;
     if (document.hidden) { setTimeout(() => safeFrame(performance.now()), 200); return; }
     const vh = H || window.innerHeight;
-    Ptarget = clamp(window.scrollY / (PER * vh), 0, S - 1 + HOLD);
-    const k = 1 - Math.exp(-dt / 0.06);
-    P = reduced ? Ptarget : P + (Ptarget - P) * k;
+    const target = clamp(window.scrollY / vh, 0, S - 1);
+    if (target !== Ptarget) { tween.from = P; tween.to = target; tween.t0 = t; tween.dur = Math.abs(target - P) >= 0.5 ? 0.9 : 0.35; Ptarget = target; }
+    if (debugP != null) P = debugP;
+    else if (reduced) P = Ptarget;
+    else { const k = clamp((t - tween.t0) / tween.dur, 0, 1); P = tween.from + (tween.to - tween.from) * easeInOut(k); if (k >= 1) P = tween.to; }
     const s = Math.min(S - 1, Math.floor(P)), u = P - s;
-    const morph = s < S - 1 ? clamp((u - HOLD) / (1 - HOLD), 0, 1) : 0;
-    const em = easeInOut(morph);
+    const morph = s < S - 1 ? clamp(u, 0, 1) : 0;            // the whole interval between two stations is the passage
+    if (s !== lastS) { lastS = s; arrivedAt = t; }
     live = rent.getRentState();
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -286,61 +347,63 @@ export function createMorph() {
       const kk = Math.min(1, t / 2);
       for (let i = 0; i < 300; i++) { const a = hash01(i, 1) * 6.283, r = 0.5 + 0.5 * hash01(i, 2); const e = easeOut(clamp((kk - hash01(i, 2) * 0.3) / 0.7, 0, 1)); const x = W / 2 + Math.cos(a) * (W * 0.9 * (1 - e) + W * 0.22 * r * e), y = H * 0.46 + Math.sin(a) * (H * 0.9 * (1 - e) + H * 0.3 * r * e); ctx.globalAlpha = 0.15 + 0.5 * e; ctx.fillStyle = i % 9 ? 'rgba(242,242,238,.8)' : '#f4b728'; ctx.fillText(RAMP[3 + (i % 11)], x, y); }
       ctx.restore();
-      text('LOADING THE SKULL', W / 2, H * 0.9, 11, 'rgba(242,242,238,.5)');
+      text('LOADING THE SKULLS', W / 2, H * 0.9, 11, 'rgba(242,242,238,.5)');
       setTimeout(() => safeFrame(performance.now()), 33); return;
     }
 
-    // live fear → tremor + pulse
-    const f1 = live.e1 && live.e1.feel && live.e1.feel.steered ? clamp(live.e1.feel.fear / 3.5, 0, 1) : 0;
-    const fe = Math.max(f1, live.e2 && live.e2.feel && live.e2.feel.steered ? clamp(live.e2.feel.fear / 3.5, 0, 1) : 0);
-    const trem = reduced ? 0 : 0.012 * fe * fe;
-    const pulse = ST[s].pulse && !reduced ? 1 + 0.03 * Math.max(0, Math.sin(t * (1.2 + 1.5 * fe) * 6.283)) : 1;
-    const sway = reduced ? 0 : ST[s].rot * Math.sin(t * 0.35) + (pointer.x >= 0 ? (pointer.x / W - 0.5) * 0.35 : 0);
-    const rotY = sway + em * 1.2;                   // the morph turns the whole cloud
-    const rotX = reduced ? 0 : 0.08 * Math.sin(t * 0.21) + (pointer.y >= 0 ? -(pointer.y / H - 0.5) * 0.18 : 0);
+    // live fear → pulse on the brain only; the head settles to frontal while it morphs
+    const fe = Math.max(live.e1 && live.e1.feel && live.e1.feel.steered ? clamp(live.e1.feel.fear / 3.5, 0, 1) : 0, live.e2 && live.e2.feel && live.e2.feel.steered ? clamp(live.e2.feel.fear / 3.5, 0, 1) : 0);
+    const still = 1 - Math.sin(Math.PI * morph);            // 1 at the stations, 0 mid-passage
+    const pulse = ST[s].pulse && !reduced && morph === 0 ? 1 + 0.025 * Math.max(0, Math.sin(t * (1.0 + 1.2 * fe) * 6.283)) : 1;
+    const rotY = reduced ? 0 : (ST[s].rot * Math.sin(t * 0.3) + (pointer.x >= 0 ? (pointer.x / W - 0.5) * 0.3 : 0)) * still;
+    const rotX = reduced ? 0 : (0.06 * Math.sin(t * 0.19) + (pointer.y >= 0 ? -(pointer.y / H - 0.5) * 0.15 : 0)) * still;
+    const cy = Math.cos(rotY), sy = Math.sin(rotY), cx = Math.cos(rotX), sx = Math.sin(rotX);
     const R = Math.min(W * 0.48, H * 0.40) * (isPhone ? 0.95 : 1) * pulse;
+    const lift = 0.3;           // the flying cloud comes a little toward you, all of it together
 
     const cellBase = isPhone ? 6 : 7.5;
-    // positions
+    const dimA = A.half != null ? [who === 'e1' ? 1 : 0.42, who === 'e2' ? 1 : 0.42] : null;
+    // positions: straight lines, a top-down sweep, no noise
     for (let i = 0; i < N; i++) {
-      const ax = A.pos[i * 3], ay = A.pos[i * 3 + 1], az = A.pos[i * 3 + 2];
-      let x = ax, y = ay, z = az, g = A.gl[i], b = A.br[i];
+      let x = A.pos[i * 3], y = A.pos[i * 3 + 1], z = A.pos[i * 3 + 2];
+      let ox = A.off ? A.off[i * 3] : 0, oy = A.off ? A.off[i * 3 + 1] : 0, oz = A.off ? A.off[i * 3 + 2] : 0;
+      let g = A.gl[i], b = A.br[i], d = dimA ? dimA[A.head[i]] : 1;
       if (B && morph > 0) {
-        const stag = hash01(i, 21) * 0.35;
-        const mi = easeInOut(clamp((morph - stag) / 0.65, 0, 1));
+        const stag = 0.7 * (i / N) + 0.03 * hash01(i, 21);     // the curtain: top rank leaves first
+        const mi = easeInOut(clamp((morph - stag) / 0.3, 0, 1));
         const bx = B.pos[i * 3], by = B.pos[i * 3 + 1], bz = B.pos[i * 3 + 2];
-        const arc = Math.sin(Math.PI * mi) * (0.35 + 0.5 * hash01(i, 22));
-        x = ax + (bx - ax) * mi + (hash01(i, 23) - 0.5) * arc;
-        y = ay + (by - ay) * mi + (hash01(i, 24) - 0.5) * arc;
-        z = az + (bz - az) * mi + (hash01(i, 25) - 0.5) * arc * 1.4;
-        g = mi < 0.5 ? A.gl[i] : B.gl[i]; b = A.br[i] + (B.br[i] - A.br[i]) * mi;
+        const box = B.off ? B.off[i * 3] : 0, boy = B.off ? B.off[i * 3 + 1] : 0, boz = B.off ? B.off[i * 3 + 2] : 0;
+        x += (bx - x) * mi; y += (by - y) * mi; z += (bz - z) * mi;
+        ox += (box - ox) * mi; oy += (boy - oy) * mi; oz += (boz - oz) * mi;
+        g = mi < 0.5 ? g : B.gl[i]; b += (B.br[i] - b) * mi; d += (1 - d) * mi;
+        oz += Math.sin(Math.PI * mi) * lift;
       }
-      if (trem) { x += (hash01(i, Math.floor(t * 12)) - 0.5) * trem; y += (hash01(i + 7, Math.floor(t * 12)) - 0.5) * trem; }
-      px[i] = x; py[i] = y; pz[i] = z; gl[i] = g; br[i] = b;
+      zo[i] = z + oz;
+      const r = rotate(x, y, z, cy, sy, cx, sx);
+      px[i] = r[0] + ox; py[i] = r[1] + oy; pz[i] = r[2] + oz; gl[i] = g; br[i] = b; dm[i] = d;
     }
-    // draw back to front in 6 depth buckets (cheap painter's order)
+    // draw back to front in 6 depth buckets (cheap painter's order); glyph size from object-space depth, so it never flickers
     const atlasBy = [];
     for (let bucket = 0; bucket < 6; bucket++) {
       const zlo = -1.2 + bucket * 0.4, zhi = zlo + 0.4;
       for (let i = 0; i < N; i++) {
-        const pr = project(px[i], py[i], pz[i], rotY, rotX, R);
-        const Z = pr[2];
+        const Z = pz[i];
         if (Z < zlo || Z >= zhi) continue;
-        if (bucket === 5 && Z >= zhi) continue;
-        const cell = cellBase * pr[3];
-        let at = atlasBy[Math.round(cell * 2)]; if (!at) { at = atlasFor(cell); atlasBy[Math.round(cell * 2)] = at; }
-        const depthA = clamp(0.25 + 0.75 * (Z * 0.5 + 0.5), 0.2, 1);
-        const alpha = depthA * (0.55 + 0.45 * br[i]);
+        const sc = toScreen(px[i], py[i], Z, R);
+        const cell = cellBase * (0.82 + 0.36 * clamp((zo[i] + 0.6) / 1.2, 0, 1));
+        const ck = Math.round(cell * 2);
+        let at = atlasBy[ck]; if (!at) { at = atlasFor(cell); atlasBy[ck] = at; }
+        const depthA = clamp(0.3 + 0.7 * (Z * 0.5 + 0.5), 0.2, 1);
+        const alpha = depthA * (0.55 + 0.45 * br[i]) * dm[i];
         const ci = br[i] > 0.86 && Z > 0.2 ? 0 : (br[i] > 0.45 ? 1 : 2);
-        const gi = gl[i];
-        at.blit(ctx, gi, ci, alpha, pr[0] - at.cellW / 2, pr[1] - at.cellH / 2);
+        at.blit(ctx, gl[i], ci, alpha, sc[0] - at.cellW / 2, sc[1] - at.cellH / 2);
       }
     }
 
-    // captions (formed phase only; fade near the morph)
-    const capA = clamp(1 - morph * 2.2, 0, 1) * clamp(u / 0.08 + (s === 0 ? 1 : 0), 0, 1);
+    // captions (stations only; gone during the passage)
+    const capA = clamp(1 - morph / 0.06, 0, 1) * clamp((t - arrivedAt) / 0.35, 0, 1) * (reduced ? 1 : clamp((t - 0.2) / 0.5, 0, 1));
+    const st = ST[s];
     if (capA > 0.02) {
-      const st = ST[s];
       const size = isPhone ? 17 : 26;
       const lines = st.lines(live);
       const rows = [];
@@ -358,33 +421,64 @@ export function createMorph() {
       for (let i = 0; i < rows.length; i++) { const take = clamp(shown.length - acc, 0, rows[i].length); text(rows[i].slice(0, take), W / 2, y0 + i * lh, size, '#f4b728', 'center', capA); acc += rows[i].length + 1; }
       if (shown.length >= whole.length) for (let i = 0; i < lrows.length; i++) text(lrows[i], W / 2, y0 + rows.length * lh + 12 + i * (lsize + 5), lsize, 'rgba(242,242,238,.55)', 'center', capA);
 
+      // the two heads: name and hours under each, the followed one bright; tap to follow
+      if (A.half != null) {
+        for (let k = 0; k < 2; k++) {
+          const id = k ? 'e2' : 'e1', e = live[id], c = A.centres[k];
+          const sc = toScreen(c[0], c[1] - A.ext * 0.8, c[2], R);
+          const on = who === id;
+          const name = e && e.name ? e.name : (k ? 'OBOL' : 'WICK');
+          const hrs = e && e.ok && !e.dead && e.hoursLeft != null ? `${e.hoursLeft} H LEFT` : (e && e.dead ? 'DEAD' : '—');
+          text(name, sc[0], sc[1] + 18, isPhone ? 13 : 15, on ? '#f4b728' : 'rgba(242,242,238,.45)', 'center', capA);
+          text(hrs, sc[0], sc[1] + (isPhone ? 36 : 40), isPhone ? 11 : 12, on ? 'rgba(242,242,238,.9)' : 'rgba(242,242,238,.4)', 'center', capA);
+          if (on) { const w = measure(name, isPhone ? 13 : 15); ctx.save(); ctx.globalAlpha = capA; ctx.fillStyle = '#f4b728'; ctx.fillRect(sc[0] - w / 2, sc[1] + (isPhone ? 33 : 37), w, 1); ctx.restore(); }
+          const hw = A.ext * R * 1.05, hh = A.ext * R * 1.0;
+          const centre = toScreen(c[0], c[1], c[2], R);
+          hits.push({ x: centre[0] - hw, y: centre[1] - hh, w: hw * 2, h: hh * 2 + 60, fn: () => setWho(id, true) });
+        }
+      }
+
       // the one action of this object
       const a = st.action;
       if (a && (a.kind !== 'pay' || !live.e1.locked || !live.e2.locked)) {
         let ax = W / 2, ay = H * 0.46;
-        if (a.anchor && A.anchors && A.anchors[a.anchor]) { const p = A.anchors[a.anchor]; const pr = project(p[0], p[1], p[2], rotY, rotX, R); ax = pr[0]; ay = pr[1]; }
+        if (a.anchor && A.anchors && A.anchors[a.anchor]) { const p = A.anchors[a.anchor]; const r = rotate(p[0], p[1], p[2], cy, sy, cx, sx); const sc = toScreen(r[0], r[1], r[2], R); ax = sc[0]; ay = sc[1]; }
+        const label = typeof a.label === 'function' ? a.label(live) : a.label;
         const bw = isPhone ? 150 : 190, bh = 40;
         const bx = clamp(ax - bw / 2, 8, W - bw - 8);
         const by = a.anchor ? clamp(ay + 34, 60, y0 - bh - 16) : Math.min(H - 60 - bh, y0 + blockH + 18);
         ctx.save(); ctx.globalAlpha = capA; ctx.strokeStyle = 'rgba(244,183,40,.75)'; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, bw, bh); ctx.restore();
-        text(a.label + (a.kind === 'verify' && wait.verify ? ' ·' : ''), bx + bw / 2, by + 14, 12, '#f4b728', 'center', capA);
-        hits.push({ x: bx, y: by, w: bw, h: bh, fn: () => act(a.kind, s) });
+        text(label + (a.kind === 'verify' && wait.verify ? ' ·' : ''), bx + bw / 2, by + 14, 12, '#f4b728', 'center', capA);
+        hits.push({ x: bx, y: by, w: bw, h: bh, main: true, fn: () => act(a.kind) });
         if (a.kind === 'verify' && wait.verifyText) text(wait.verifyText, W / 2, by + bh + 10, 11, 'rgba(242,242,238,.8)', 'center', capA);
         if (a.kind === 'prove') {
           const slots = (wait.proveCode + '____').slice(0, 4).split('').join(' ');
           text(slots, bx + bw / 2, by - 30, 22, 'rgba(242,242,238,.92)', 'center', capA);
-          text(rent.CODE_GUARANTEED ? '' : 'CODE GUARANTEE PENDING REDEPLOY bc86aaf2 · BRAIN: QWEN3-14B ON A RENTED GPU, OUTSIDE THE TEE', W / 2, H - 56, 10, 'rgba(242,242,238,.45)', 'center', capA);
+          if (!rent.CODE_GUARANTEED) { const nr = wrap('CODE GUARANTEE PENDING REDEPLOY bc86aaf2 · BRAIN: QWEN3-14B ON A RENTED GPU, OUTSIDE THE TEE', W - 32, 10); for (let i = 0; i < nr.length; i++) text(nr[i], W / 2, H - 44 - (nr.length - i) * 14, 10, 'rgba(242,242,238,.45)', 'center', capA); }
         }
       }
     }
-    // DOM overlays only during their station's hold
-    const holdOn = (id) => ST[s].id === id && morph === 0 && capA > 0.5;
+    // DOM overlays only at their station
+    const holdOn = (id) => st.id === id && morph === 0 && capA > 0.5;
     if (composer) composer.hidden = !holdOn('ribs');
     if (capEl.prove) capEl.prove.tabIndex = holdOn('scream') ? 0 : -1;
 
-    // chrome
+    // chrome: station counter, the head switch, the token line
     text(`${String(s + 1).padStart(2, '0')}/${String(S).padStart(2, '0')}`, 16, H - 26, 11, 'rgba(244,183,40,.6)', 'left');
-    if (s === S - 1 && u > 0.3) { text('$ZEALOT NOT LAUNCHED', W / 2, H - 28, 11, 'rgba(244,183,40,.5)'); }
+    {
+      const n1 = live.e1 && live.e1.name || 'WICK', n2 = live.e2 && live.e2.name || 'OBOL';
+      const sz = 11, pad = 10, w1 = measure(n1, sz) + pad * 2, w2 = measure(n2, sz) + pad * 2, y = 14, hgt = 24;
+      const x2 = W - 16 - w2, x1 = x2 - 10 - w1;
+      const draw = (x, w, name, id) => {
+        const on = who === id;
+        ctx.save(); ctx.globalAlpha = on ? 0.9 : 0.5; ctx.strokeStyle = on ? '#f4b728' : 'rgba(242,242,238,.35)'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w, hgt); ctx.restore();
+        text(name, x + w / 2, y + 7, sz, on ? '#f4b728' : 'rgba(242,242,238,.55)', 'center');
+        hits.push({ x, y, w, h: hgt, fn: () => setWho(id, true) });
+      };
+      draw(x1, w1, n1, 'e1'); draw(x2, w2, n2, 'e2');
+      if (s > 0 || isPhone) text('FOLLOWING', x1 - 10, y + 7, 10, 'rgba(242,242,238,.35)', 'right');
+    }
+    if (s === S - 1 && morph === 0) { text('$ZEALOT NOT LAUNCHED', W / 2, H - 28, 11, 'rgba(244,183,40,.5)'); }
     setTimeout(() => safeFrame(performance.now()), 33);
   }
 
@@ -395,5 +489,5 @@ export function createMorph() {
     catch (e) { window.__morphErr = String(e && e.stack || e); if (statusEl) statusEl.textContent = 'render error: ' + e.message; setTimeout(() => safeFrame(performance.now()), 500); }
   }
   safeFrame(performance.now());
-  return { get P() { return P; } };
+  return { get P() { return P; }, getWho: () => who, onWho: (f) => whoListeners.push(f) };
 }

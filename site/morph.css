@@ -1,9 +1,11 @@
 :root { --void:#060606; --yellow:#f4b728; --hot:#ffd76a; --bone:rgba(242,242,238,.92); --bone-dim:rgba(242,242,238,.5); --dead:#555; --dim-yellow:rgba(244,183,40,.28); }
 *, *::before, *::after { box-sizing: border-box; margin: 0; }
 html, body { background: var(--void); color: var(--bone); font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; overflow-x: clip; }
-html { scroll-behavior: auto; }
+html { scroll-behavior: auto; scroll-snap-type: y mandatory; }
+@media (prefers-reduced-motion: reduce) { html { scroll-snap-type: y proximity; } }
 #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; z-index: 1; image-rendering: pixelated; touch-action: pan-y; }
-#rail { position: relative; width: 100%; height: 900vh; pointer-events: none; }
+#rail { position: relative; width: 100%; height: 600vh; pointer-events: none; }
+#rail .snap { position: absolute; left: 0; width: 1px; height: 100vh; scroll-snap-align: start; scroll-snap-stop: always; }
 .skip { position: absolute; left: -9999px; top: 0; z-index: 100; background: var(--void); color: var(--yellow); padding: 8px 12px; border: 1px solid var(--dim-yellow); text-decoration: none; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
 .skip:focus { left: 12px; top: 12px; outline: 2px solid var(--yellow); outline-offset: 2px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
