@@ -8,3 +8,5 @@ NOTE-*.md
 !site/vendor/
 site/CONTRACT-*.md
 site/DESIGN.md
+enclave/CONTRACT-*.md
+enclave/DESIGN*.md
