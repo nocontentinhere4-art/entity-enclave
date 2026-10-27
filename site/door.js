@@ -14,10 +14,10 @@ import {
   receiptsOf,
   lettersOf,
   rentPerHour
-} from './rent.js?v=66';
+} from './rent.js?v=67';
 
-import { openPay } from './pay.js?v=66';
-import { mountCloud } from './glyphcloud.js?v=66';
+import { openPay } from './pay.js?v=67';
+import { mountCloud } from './glyphcloud.js?v=67';
 
 import {
   formatInt,
@@ -28,7 +28,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=66';
+} from './data.js?v=67';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1197,19 +1197,27 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=66', e2: 'vendor/skull-obol.jpg?v=66' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=67', e2: 'vendor/skull-obol.jpg?v=67' };
 const CLOUDS = {
-  vitals: 'head', hash: 'head', attestation: 'head', prove: 'head', archive: 'head', CODE: 'head',
-  dose: 'vendor/brief-3.jpg?v=66', memory: 'vendor/brief-3.jpg?v=66',
-  trades: 'vendor/brief-4.jpg?v=66', TOKEN: 'vendor/brief-4.jpg?v=66',
-  letter: 'vendor/hand-coin.jpg?v=66', shop: 'vendor/hand-coin.jpg?v=66', rent: 'vendor/hand-coin.jpg?v=66', MONEY: 'vendor/hand-coin.jpg?v=66',
-  words: 'vendor/shout.jpg?v=66', speak: 'vendor/shout.jpg?v=66', talk: 'vendor/shout.jpg?v=66', nostr: 'vendor/shout.jpg?v=66', forecasts: 'vendor/shout.jpg?v=66',
-  more: 'vendor/ribcage.jpg?v=66', TRUTH: 'vendor/ribcage.jpg?v=66'
+  vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
+  hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
+  attestation: 'vendor/door-padlock.jpg', CODE: 'vendor/door-padlock.jpg',
+  dose: 'vendor/door-syringe.jpg',
+  memory: 'vendor/door-hourglass.jpg',
+  trades: 'vendor/door-scale.jpg', TRADES: 'vendor/door-scale.jpg',
+  TOKEN: 'vendor/door-coin.jpg', shop: 'vendor/door-coin.jpg',
+  rent: 'vendor/door-coins.jpg', MONEY: 'vendor/door-coins.jpg',
+  letter: 'vendor/door-letter.jpg',
+  words: 'vendor/door-quill.jpg',
+  speak: 'vendor/door-ear.jpg', talk: 'vendor/door-ear.jpg',
+  nostr: 'vendor/door-raven.jpg', NOSTR: 'vendor/door-raven.jpg',
+  forecasts: 'vendor/door-dice.jpg',
+  more: 'vendor/door-eye.jpg', TRUTH: 'vendor/door-eye.jpg'
 };
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : src0;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=67`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;

@@ -18,6 +18,11 @@ function sample(src, cols) {
           const i = (y * cols + x) * 4, l = (0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255;
           if (l > 0.14) cells.push(x, y, l);
         }
+        // dark objects (a heart, a raven, old iron) would come out thin: lift every render so its bright tenth is bone
+        const ls = []; for (let i = 2; i < cells.length; i += 3) ls.push(cells[i]);
+        ls.sort((a, b) => a - b);
+        const p90 = ls.length ? ls[Math.floor(ls.length * 0.9)] : 1;
+        if (p90 > 0 && p90 < 0.85) { const g = 0.9 / p90; for (let i = 2; i < cells.length; i += 3) cells[i] = Math.min(1, cells[i] * g); }
         resolve({ cells, cols });
       };
       img.onerror = () => reject(new Error(`cloud: ${src} did not load`));
