@@ -10,7 +10,7 @@ attestation of the code it runs. At zero the program shreds its keys.
 - WICK: https://ca42622c7ae63906602b873703a0efa769079dfa-8080.dstack-pha-prod9.phala.network/
 - OBOL: https://7691be60aeab32e3a9f901237236579a96c9f3b9-8080.dstack-pha-prod9.phala.network/
 
-There is no token. Anyone selling a ZEALOT token is not us.
+The $ZEALOT token launched 2026-10-27 22:01 UTC on pump.fun, paired with ZEC. CA `A9bTKETPAfDHVx6ReV1TtgeYV4VDTWpHrfhzyNXzpump`. Only this CA is ours. Details and every burn txid: https://zealotzec.com/proof.html
 
 ## What is in this repository
 
