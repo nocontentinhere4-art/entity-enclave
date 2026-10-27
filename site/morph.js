@@ -142,6 +142,7 @@ export function createMorph() {
   const rail = document.getElementById('rail');
   const statusEl = document.getElementById('status');
   const capEl = { composer: document.getElementById('composer'), prove: document.getElementById('prove-input') };
+  const caEl = document.getElementById('ca');
   let W = 0, H = 0, dpr = 1;
   let atlasCache = new Map();
   const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -571,6 +572,12 @@ export function createMorph() {
       };
       draw(x1, w1, n1, 'e1'); draw(x2, w2, n2, 'e2');
       if (cs > 0 || isPhone) text('FOLLOWING', x1 - 10, y + 7, 10, 'rgba(242,242,238,.35)', 'right');
+      if (caEl) {   // the contract address sits left of the switch; on a narrow row it goes to the top left
+        const fw = (cs > 0 || isPhone) ? measure('FOLLOWING', 10) + 10 : 0;
+        const room = x1 - fw - 16;
+        if (room >= caEl.offsetWidth + 20) { caEl.style.right = `${W - (x1 - fw) + 12}px`; caEl.style.left = 'auto'; }
+        else { caEl.style.left = '16px'; caEl.style.right = 'auto'; }
+      }
     }
     if (cs === S - 1 && mdist === 0) { text('$ZEALOT · PUMP.FUN · ZEC PAIR', W - 16, chromeY, 11, 'rgba(244,183,40,.5)', 'right'); }
     setTimeout(() => safeFrame(performance.now()), 33);
