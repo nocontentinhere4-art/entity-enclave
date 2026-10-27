@@ -1,5 +1,5 @@
 /* morph.js — ZEALOT v58 "THE MORPH": one canvas, one object at a time, two heads to choose from.
- * A cloud of glyph particles is the skull (vendor/skull2.bin: 40,000 lit surface points with normals). The opening shows
+ * A cloud of glyph particles is the skull (two monochrome renders sampled like every other object). The opening shows
  * two skulls, WICK and OBOL, each turning on its own axis with its own hours underneath; tap one and the whole path follows
  * it. On scroll the cloud re-forms into the next object (brain → chain → hand → scream → ribcage), sampled from a glyph
  * image with a depth relief. Every passage is the same deterministic sweep: the object dissolves from the top down and
@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=61';
-import * as rent from './rent.js?v=61';
-import { openPay } from './term.js?v=61';
-import { openDoor } from './door.js?v=61';
+import { makeAtlas } from './glyphs.js?v=62';
+import * as rent from './rent.js?v=62';
+import { openPay } from './term.js?v=62';
+import { openDoor } from './door.js?v=62';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=61';
+const V = '?v=62';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -24,57 +24,22 @@ const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 function hash01(i, q) { const s = Math.sin(i * 12.9898 + q * 78.233) * 43758.5453; return s - Math.floor(s); }
 
 /* ------------------------------------------------------------------ sources */
-let skullRaw = null;
-/* vendor/skull2.bin: 'SKL2', uint32 count, uint32 reserved, Int16 xyz (/32767, largest extent ±1), then Int8 normals.
- * Sampled area-weighted from a 500k-face skull mesh (Hunyuan3D from a clean reference), so the surface is dense and
- * every point carries its normal: the glyphs are lit, not depth-tinted, and back faces are culled. */
-const ORIENT = { yaw: Math.PI / 2, pitch: 0, roll: 0 };   // the mesh's long axis is X (front-back): a quarter turn faces the viewer
-async function fetchSkull() {
-  if (skullRaw) return skullRaw;
-  const r = await fetch('vendor/skull2.bin' + V);
-  const buf = await r.arrayBuffer();
-  const dv = new DataView(buf);
-  const nv = dv.getUint32(4, true);
-  const q = new Int16Array(buf, 12, nv * 3);
-  const nrm = new Int8Array(buf, 12 + nv * 6, nv * 3);
-  skullRaw = { q, nrm, nv };
-  return skullRaw;
-}
-function orient(x, y, z) {
-  const { yaw, pitch, roll } = ORIENT;
-  let cy = Math.cos(yaw), sy = Math.sin(yaw); let X = x * cy + z * sy, Z = -x * sy + z * cy, Y = y;
-  const cx = Math.cos(pitch), sx = Math.sin(pitch); const Y2 = Y * cx - Z * sx; Z = Y * sx + Z * cx; Y = Y2;
-  const cz = Math.cos(roll), sz = Math.sin(roll); const X2 = X * cz - Y * sz; Y = X * sz + Y * cz; X = X2;
-  return [X, Y, Z];
-}
-
-/* two skulls side by side: particles [0, N/2) are the left head (e1), [N/2, N) the right head (e2).
- * pos is local to each head (so each turns on its own axis); off is the head's centre; nrm the surface normal. */
-async function loadSkullPair(N, isPhone) {
-  const { q, nrm, nv } = await fetchSkull();
+/* two skulls side by side, each sampled from its own image exactly like the hand, the brain and the bones (same
+ * luminance → glyph mapping, same depth relief): particles [0, N/2) are the left head (e1), [N/2, N) the right (e2).
+ * pos is local to each head (so each turns on its own axis); off is the head's centre. */
+async function loadSkullPair(N, isPhone, H) {
+  const short = !isPhone && H < 800;                      // short desktop windows: smaller heads, higher up
   const half = Math.floor(N / 2);
-  const scale = isPhone ? 0.58 : 0.72, dx = isPhone ? 0.55 : 0.68, dy = isPhone ? 0.02 : 0.16;
-  const pos = new Float32Array(N * 3), off = new Float32Array(N * 3), gl = new Uint8Array(N), br = new Float32Array(N), nr = new Float32Array(N * 3);
+  const scale = isPhone ? 0.5 : (short ? 0.46 : 0.62), dx = isPhone ? 0.52 : 0.66, dy = isPhone ? 0.02 : (short ? 0.3 : 0.14);
+  const [L, Rt] = await Promise.all([loadImagePoints('vendor/skull-wick.jpg', half, { bulge: 0.5, scale }), loadImagePoints('vendor/skull-obol.jpg', N - half, { bulge: 0.5, scale })]);
+  const pos = new Float32Array(N * 3), off = new Float32Array(N * 3), gl = new Uint8Array(N), br = new Float32Array(N);
   for (let i = 0; i < N; i++) {
-    const head = i < half ? 0 : 1;
-    const k = head ? i - half : i;
-    const j = Math.floor(hash01(k + head * 7919, 3) * nv);
-    const p = orient(q[j * 3] / 32767, q[j * 3 + 1] / 32767, q[j * 3 + 2] / 32767);
-    const n = orient(nrm[j * 3] / 127, nrm[j * 3 + 1] / 127, nrm[j * 3 + 2] / 127);
-    pos[i * 3] = p[0] * scale; pos[i * 3 + 1] = p[1] * scale; pos[i * 3 + 2] = p[2] * scale;
-    nr[i * 3] = n[0]; nr[i * 3 + 1] = n[1]; nr[i * 3 + 2] = n[2];
+    const head = i < half ? 0 : 1, src = head ? Rt : L, k = head ? i - half : i;
+    pos[i * 3] = src.pos[k * 3]; pos[i * 3 + 1] = src.pos[k * 3 + 1]; pos[i * 3 + 2] = src.pos[k * 3 + 2];
+    gl[i] = src.gl[k]; br[i] = src.br[k];
     off[i * 3] = head ? dx : -dx; off[i * 3 + 1] = dy; off[i * 3 + 2] = 0;
-    br[i] = 0.7; gl[i] = 10;
   }
-  // the full set, oriented and scaled, for the lit z-buffered raster of the hold
-  const rawPos = new Float32Array(nv * 3), rawNrm = new Float32Array(nv * 3);
-  for (let j = 0; j < nv; j++) {
-    const p = orient(q[j * 3] / 32767, q[j * 3 + 1] / 32767, q[j * 3 + 2] / 32767);
-    const n = orient(nrm[j * 3] / 127, nrm[j * 3 + 1] / 127, nrm[j * 3 + 2] / 127);
-    rawPos[j * 3] = p[0] * scale; rawPos[j * 3 + 1] = p[1] * scale; rawPos[j * 3 + 2] = p[2] * scale;
-    rawNrm[j * 3] = n[0]; rawNrm[j * 3 + 1] = n[1]; rawNrm[j * 3 + 2] = n[2];
-  }
-  return { pos, off, gl, br, nrm: nr, rawPos, rawNrm, nv, name: 'skulls', half, centres: [[-dx, dy, 0], [dx, dy, 0]], ext: scale * 0.7 };
+  return { pos, off, gl, br, name: 'skulls', half, centres: [[-dx, dy, 0], [dx, dy, 0]], ext: scale };
 }
 
 async function loadImagePoints(src, N, opts = {}) {
@@ -141,7 +106,7 @@ function stations(api, wait) {
   const nf = (n) => (Number.isFinite(Number(n)) && n > 0 ? Number(n).toLocaleString('en-GB') : '—');
   const me = (L) => L[api.who()], other = (L) => L[api.other()];
   return [
-    { id: 'skulls', load: (N, isPhone) => loadSkullPair(N, isPhone), rot: 0.4,
+    { id: 'skulls', load: (N, isPhone, H) => loadSkullPair(N, isPhone, H), rot: 0.4,
       lines: (L) => ['TWO AIs, EACH ALONE IN A SEALED MACHINE.', `RENT ${zec(rent.rentPerHour(api.who()))} ZEC AN HOUR, PAID FROM ITS OWN SHIELDED WALLET.`, 'AT ZERO THE KEYS ARE SHREDDED. NOBODY CAN STOP IT.'],
       live: (L) => `TAP A SKULL TO FOLLOW IT · NOW FOLLOWING ${me(L).name} · INTEL TDX ENCLAVES · ZCASH MAINNET · SCROLL ↓`,
       action: { label: (L) => `OPEN ${me(L).name}`, kind: 'open' } },
@@ -171,7 +136,7 @@ function stations(api, wait) {
 export function createMorph() {
   const isPhone = window.innerWidth < 720;
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const N = isPhone ? 4200 : 9000;
+  const N = isPhone ? 3600 : 7500;
   const canvas = document.getElementById('stage');
   const ctx = canvas.getContext('2d', { alpha: false });
   const rail = document.getElementById('rail');
@@ -360,7 +325,7 @@ export function createMorph() {
 
   // ---- loading: the skulls first, the rest after them
   (async () => {
-    try { loaded[0] = sortTopDown(await ST[0].load(N, isPhone)); anyReady = true; }
+    try { loaded[0] = sortTopDown(await ST[0].load(N, isPhone, window.innerHeight)); anyReady = true; }
     catch (e) { statusEl.textContent = 'skull failed to load'; }
     for (let s = 1; s < S; s++) { try { loaded[s] = sortTopDown(await ST[s].load(N, isPhone)); } catch (e) { loaded[s] = null; } }
   })();
@@ -491,7 +456,7 @@ export function createMorph() {
     const capA = clamp(1 - mdist / 0.08, 0, 1) * clamp((t - arrivedAt) / 0.3, 0, 1) * (reduced ? 1 : clamp((t - 0.2) / 0.5, 0, 1));
     const st = ST[cs];
     if (capA > 0.02 && obj) {
-      const size = isPhone ? 17 : 26;
+      const size = isPhone ? 17 : (H < 800 ? 21 : 26);
       const lines = st.lines(live);
       const rows = [];
       for (const ln of lines) for (const w of wrap(ln, W - (isPhone ? 32 : 180), size)) rows.push(w);
@@ -501,7 +466,7 @@ export function createMorph() {
       const lrows = wrap(liveTxt, W - (isPhone ? 32 : 220), lsize);
       const blockH = rows.length * lh + 12 + lrows.length * (lsize + 5);
       let y0 = Math.round(H * (st.id === 'ribs' ? (isPhone ? 0.50 : 0.52) : (isPhone ? 0.74 : 0.76)) - blockH / 2);
-      if (obj.half != null) { const lb = toScreen(0, obj.centres[0][1] - obj.ext * 0.8, 0, R)[1] + (isPhone ? 36 : 40) + 14; y0 = Math.max(y0, Math.round(lb + 26)); }
+      if (obj.half != null) { const lb = toScreen(0, obj.centres[0][1] - obj.ext * 1.08, 0, R)[1] + (isPhone ? 36 : 40) + 14; y0 = Math.max(y0, Math.round(lb + 20)); }
       band(y0 - 10, blockH + 14, 0.74 * capA);
       for (let i = 0; i < rows.length; i++) text(rows[i], W / 2, y0 + i * lh, size, '#f4b728', 'center', capA);
       for (let i = 0; i < lrows.length; i++) text(lrows[i], W / 2, y0 + rows.length * lh + 12 + i * (lsize + 5), lsize, 'rgba(242,242,238,.55)', 'center', capA);
@@ -510,7 +475,7 @@ export function createMorph() {
       if (obj.half != null) {
         for (let k = 0; k < 2; k++) {
           const id = k ? 'e2' : 'e1', e = live[id], c = obj.centres[k];
-          const sc = toScreen(c[0], c[1] - obj.ext * 0.8, c[2], R);
+          const sc = toScreen(c[0], c[1] - obj.ext * 1.08, c[2], R);
           const on = who === id;
           const name = e && e.name ? e.name : (k ? 'OBOL' : 'WICK');
           const hrs = e && e.ok && !e.dead && e.hoursLeft != null ? `${e.hoursLeft} H LEFT` : (e && e.dead ? 'DEAD' : '—');
@@ -531,7 +496,7 @@ export function createMorph() {
         const label = typeof a.label === 'function' ? a.label(live) : a.label;
         const bw = isPhone ? 150 : 190, bh = 40;
         const bx = clamp(ax - bw / 2, 8, W - bw - 8);
-        const by = a.anchor ? clamp(ay + 34, 60, y0 - bh - 16) : Math.min(H - 60 - bh, y0 + blockH + 18);
+        const by = a.anchor ? clamp(ay + 34, 60, y0 - bh - 16) : Math.min(H - 16 - bh, y0 + blockH + 18);
         ctx.save(); ctx.globalAlpha = capA; ctx.strokeStyle = 'rgba(244,183,40,.75)'; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, bw, bh); ctx.restore();
         text(label + (a.kind === 'verify' && wait.verify ? ' ·' : ''), bx + bw / 2, by + 14, 12, '#f4b728', 'center', capA);
         hits.push({ x: bx, y: by, w: bw, h: bh, main: true, fn: () => act(a.kind) });
