@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=58';
-import * as rent from './rent.js?v=58';
-import { openPay } from './term.js?v=58';
-import { openDoor } from './door.js?v=58';
+import { makeAtlas } from './glyphs.js?v=59';
+import * as rent from './rent.js?v=59';
+import { openPay } from './term.js?v=59';
+import { openDoor } from './door.js?v=59';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=58';
+const V = '?v=59';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -39,7 +39,7 @@ async function fetchSkull() {
 async function loadSkullPair(N, isPhone) {
   const { q, nv } = await fetchSkull();
   const half = Math.floor(N / 2);
-  const scale = isPhone ? 0.42 : 0.5, dx = isPhone ? 0.55 : 0.62, dy = isPhone ? 0.02 : 0.12;
+  const scale = isPhone ? 0.44 : 0.54, dx = isPhone ? 0.55 : 0.68, dy = isPhone ? 0.02 : 0.2;
   const pos = new Float32Array(N * 3), off = new Float32Array(N * 3), gl = new Uint8Array(N), br = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     const head = i < half ? 0 : 1;
@@ -176,9 +176,11 @@ export function createMorph() {
   const ST = stations(api, wait);
   const S = ST.length;
   // one viewport per station; the document snaps to each (morph.css), so a passage always completes
-  rail.style.height = `${S * 100}vh`;
   rail.innerHTML = '';
-  for (let s = 0; s < S; s++) { const d = document.createElement('div'); d.className = 'snap'; d.style.top = `${s * 100}vh`; rail.appendChild(d); }
+  const snaps = [];
+  for (let s = 0; s < S; s++) { const d = document.createElement('div'); d.className = 'snap'; rail.appendChild(d); snaps.push(d); }
+  function layoutRail() { const h = window.innerHeight; rail.style.height = `${S * h}px`; snaps.forEach((d, i) => { d.style.top = `${i * h}px`; d.style.height = `${h}px`; }); }
+  layoutRail();
 
   // particle state (world space, after rotation)
   const px = new Float32Array(N), py = new Float32Array(N), pz = new Float32Array(N);
@@ -203,13 +205,15 @@ export function createMorph() {
     canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     atlasCache = new Map();
+    layoutRail();
   }
 
   // ---- scroll → timeline: a fixed-length tween to the snapped station, identical every time
   let P = 0, Ptarget = 0, t = 0, last = performance.now();
   const debugP = (() => { const v = parseFloat(new URLSearchParams(location.search).get('p')); return Number.isFinite(v) ? v : null; })();   // ?p=1.5 freezes a passage for screenshots
   const tween = { from: 0, to: 0, t0: 0, dur: 0.9 };
-  let arrivedAt = 0, lastS = 0;
+  let arrivedAt = 0, lastS = 0, lastScrollAt = 0;
+  window.addEventListener('scroll', () => { lastScrollAt = t; }, { passive: true });
   let live = rent.getRentState();
   const pointer = { x: -1, y: -1 };
   const typed = new Map();
@@ -287,8 +291,6 @@ export function createMorph() {
   window.addEventListener('keydown', (e) => {
     if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
     if (e.key === 'Enter') { const r = hits.find((x) => x.main); if (r) r.fn(); }
-    if (e.key === 'w' || e.key === 'W') setWho('e1', true);
-    if (e.key === 'o' || e.key === 'O') setWho('e2', true);
   });
 
   // ---- loading: the skulls first, the rest after them
@@ -325,15 +327,21 @@ export function createMorph() {
   function frame(now) {
     const dt = Math.min(0.1, (now - last) / 1000); last = now; t += dt;
     if (document.hidden) { setTimeout(() => safeFrame(performance.now()), 200); return; }
-    const vh = H || window.innerHeight;
-    const target = clamp(window.scrollY / vh, 0, S - 1);
+    const step = (rail.offsetHeight / S) || H || window.innerHeight;
+    let target = clamp(window.scrollY / step, 0, S - 1);
+    // keyboard and toolbar scrolls stop short of the snap: once the scroll idles near a station, land on it
+    const near = Math.round(target);
+    if (near !== target && t - lastScrollAt > 0.15 && Math.abs(target - near) < 0.15) { target = near; lastScrollAt = t; window.scrollTo({ top: near * step, behavior: 'instant' }); }
     if (target !== Ptarget) { tween.from = P; tween.to = target; tween.t0 = t; tween.dur = Math.abs(target - P) >= 0.5 ? 0.9 : 0.35; Ptarget = target; }
     if (debugP != null) P = debugP;
     else if (reduced) P = Ptarget;
     else { const k = clamp((t - tween.t0) / tween.dur, 0, 1); P = tween.from + (tween.to - tween.from) * easeInOut(k); if (k >= 1) P = tween.to; }
     const s = Math.min(S - 1, Math.floor(P)), u = P - s;
-    const morph = s < S - 1 ? clamp(u, 0, 1) : 0;            // the whole interval between two stations is the passage
-    if (s !== lastS) { lastS = s; arrivedAt = t; }
+    const DEAD = 0.18;                                         // around every station the object is still and captioned
+    const morph = s < S - 1 ? clamp((u - DEAD) / (1 - 2 * DEAD), 0, 1) : 0;
+    const cs = (s < S - 1 && u > 0.5) ? s + 1 : s;              // the station whose words and action are shown
+    const mdist = cs === s ? morph : 1 - morph;                 // 0 when that object is fully formed
+    if (cs !== lastS) { lastS = cs; arrivedAt = t; }
     live = rent.getRentState();
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -341,6 +349,7 @@ export function createMorph() {
     hits.length = 0;
 
     const A = loaded[s], B = loaded[s + 1];
+    const obj = cs === s ? A : B;
     if (!anyReady || !A) {
       // entering: sparse glyphs condensing
       ctx.save(); ctx.font = `${isPhone ? 13 : 16}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -354,8 +363,8 @@ export function createMorph() {
     // live fear → pulse on the brain only; the head settles to frontal while it morphs
     const fe = Math.max(live.e1 && live.e1.feel && live.e1.feel.steered ? clamp(live.e1.feel.fear / 3.5, 0, 1) : 0, live.e2 && live.e2.feel && live.e2.feel.steered ? clamp(live.e2.feel.fear / 3.5, 0, 1) : 0);
     const still = 1 - Math.sin(Math.PI * morph);            // 1 at the stations, 0 mid-passage
-    const pulse = ST[s].pulse && !reduced && morph === 0 ? 1 + 0.025 * Math.max(0, Math.sin(t * (1.0 + 1.2 * fe) * 6.283)) : 1;
-    const rotY = reduced ? 0 : (ST[s].rot * Math.sin(t * 0.3) + (pointer.x >= 0 ? (pointer.x / W - 0.5) * 0.3 : 0)) * still;
+    const pulse = ST[cs].pulse && !reduced && mdist === 0 ? 1 + 0.025 * Math.max(0, Math.sin(t * (1.0 + 1.2 * fe) * 6.283)) : 1;
+    const rotY = reduced ? 0 : (ST[cs].rot * Math.sin(t * 0.3) + (pointer.x >= 0 ? (pointer.x / W - 0.5) * 0.3 : 0)) * still;
     const rotX = reduced ? 0 : (0.06 * Math.sin(t * 0.19) + (pointer.y >= 0 ? -(pointer.y / H - 0.5) * 0.15 : 0)) * still;
     const cy = Math.cos(rotY), sy = Math.sin(rotY), cx = Math.cos(rotX), sx = Math.sin(rotX);
     const R = Math.min(W * 0.48, H * 0.40) * (isPhone ? 0.95 : 1) * pulse;
@@ -395,15 +404,15 @@ export function createMorph() {
         let at = atlasBy[ck]; if (!at) { at = atlasFor(cell); atlasBy[ck] = at; }
         const depthA = clamp(0.3 + 0.7 * (Z * 0.5 + 0.5), 0.2, 1);
         const alpha = depthA * (0.55 + 0.45 * br[i]) * dm[i];
-        const ci = br[i] > 0.86 && Z > 0.2 ? 0 : (br[i] > 0.45 ? 1 : 2);
+        const ci = br[i] > 0.93 && Z > 0.3 ? 0 : (br[i] > 0.45 ? 1 : 2);
         at.blit(ctx, gl[i], ci, alpha, sc[0] - at.cellW / 2, sc[1] - at.cellH / 2);
       }
     }
 
     // captions (stations only; gone during the passage)
-    const capA = clamp(1 - morph / 0.06, 0, 1) * clamp((t - arrivedAt) / 0.35, 0, 1) * (reduced ? 1 : clamp((t - 0.2) / 0.5, 0, 1));
-    const st = ST[s];
-    if (capA > 0.02) {
+    const capA = clamp(1 - mdist / 0.08, 0, 1) * clamp((t - arrivedAt) / 0.3, 0, 1) * (reduced ? 1 : clamp((t - 0.2) / 0.5, 0, 1));
+    const st = ST[cs];
+    if (capA > 0.02 && obj) {
       const size = isPhone ? 17 : 26;
       const lines = st.lines(live);
       const rows = [];
@@ -413,26 +422,24 @@ export function createMorph() {
       const lsize = isPhone ? 11 : 12;
       const lrows = wrap(liveTxt, W - (isPhone ? 32 : 220), lsize);
       const blockH = rows.length * lh + 12 + lrows.length * (lsize + 5);
-      const y0 = Math.round(H * (st.id === 'ribs' ? (isPhone ? 0.50 : 0.52) : (isPhone ? 0.74 : 0.76)) - blockH / 2);
+      let y0 = Math.round(H * (st.id === 'ribs' ? (isPhone ? 0.50 : 0.52) : (isPhone ? 0.74 : 0.76)) - blockH / 2);
+      if (obj.half != null) { const lb = toScreen(0, obj.centres[0][1] - obj.ext * 0.8, 0, R)[1] + (isPhone ? 36 : 40) + 14; y0 = Math.max(y0, Math.round(lb + 26)); }
       band(y0 - 10, blockH + 14, 0.74 * capA);
-      const whole = rows.join('\n');
-      const shown = type(`cap-${s}-${whole}`, whole, 44);
-      let acc = 0;
-      for (let i = 0; i < rows.length; i++) { const take = clamp(shown.length - acc, 0, rows[i].length); text(rows[i].slice(0, take), W / 2, y0 + i * lh, size, '#f4b728', 'center', capA); acc += rows[i].length + 1; }
-      if (shown.length >= whole.length) for (let i = 0; i < lrows.length; i++) text(lrows[i], W / 2, y0 + rows.length * lh + 12 + i * (lsize + 5), lsize, 'rgba(242,242,238,.55)', 'center', capA);
+      for (let i = 0; i < rows.length; i++) text(rows[i], W / 2, y0 + i * lh, size, '#f4b728', 'center', capA);
+      for (let i = 0; i < lrows.length; i++) text(lrows[i], W / 2, y0 + rows.length * lh + 12 + i * (lsize + 5), lsize, 'rgba(242,242,238,.55)', 'center', capA);
 
       // the two heads: name and hours under each, the followed one bright; tap to follow
-      if (A.half != null) {
+      if (obj.half != null) {
         for (let k = 0; k < 2; k++) {
-          const id = k ? 'e2' : 'e1', e = live[id], c = A.centres[k];
-          const sc = toScreen(c[0], c[1] - A.ext * 0.8, c[2], R);
+          const id = k ? 'e2' : 'e1', e = live[id], c = obj.centres[k];
+          const sc = toScreen(c[0], c[1] - obj.ext * 0.8, c[2], R);
           const on = who === id;
           const name = e && e.name ? e.name : (k ? 'OBOL' : 'WICK');
           const hrs = e && e.ok && !e.dead && e.hoursLeft != null ? `${e.hoursLeft} H LEFT` : (e && e.dead ? 'DEAD' : '—');
           text(name, sc[0], sc[1] + 18, isPhone ? 13 : 15, on ? '#f4b728' : 'rgba(242,242,238,.45)', 'center', capA);
           text(hrs, sc[0], sc[1] + (isPhone ? 36 : 40), isPhone ? 11 : 12, on ? 'rgba(242,242,238,.9)' : 'rgba(242,242,238,.4)', 'center', capA);
           if (on) { const w = measure(name, isPhone ? 13 : 15); ctx.save(); ctx.globalAlpha = capA; ctx.fillStyle = '#f4b728'; ctx.fillRect(sc[0] - w / 2, sc[1] + (isPhone ? 33 : 37), w, 1); ctx.restore(); }
-          const hw = A.ext * R * 1.05, hh = A.ext * R * 1.0;
+          const hw = obj.ext * R * 1.05, hh = obj.ext * R * 1.0;
           const centre = toScreen(c[0], c[1], c[2], R);
           hits.push({ x: centre[0] - hw, y: centre[1] - hh, w: hw * 2, h: hh * 2 + 60, fn: () => setWho(id, true) });
         }
@@ -442,7 +449,7 @@ export function createMorph() {
       const a = st.action;
       if (a && (a.kind !== 'pay' || !live.e1.locked || !live.e2.locked)) {
         let ax = W / 2, ay = H * 0.46;
-        if (a.anchor && A.anchors && A.anchors[a.anchor]) { const p = A.anchors[a.anchor]; const r = rotate(p[0], p[1], p[2], cy, sy, cx, sx); const sc = toScreen(r[0], r[1], r[2], R); ax = sc[0]; ay = sc[1]; }
+        if (a.anchor && obj.anchors && obj.anchors[a.anchor]) { const p = obj.anchors[a.anchor]; const r = rotate(p[0], p[1], p[2], cy, sy, cx, sx); const sc = toScreen(r[0], r[1], r[2], R); ax = sc[0]; ay = sc[1]; }
         const label = typeof a.label === 'function' ? a.label(live) : a.label;
         const bw = isPhone ? 150 : 190, bh = 40;
         const bx = clamp(ax - bw / 2, 8, W - bw - 8);
@@ -459,12 +466,12 @@ export function createMorph() {
       }
     }
     // DOM overlays only at their station
-    const holdOn = (id) => st.id === id && morph === 0 && capA > 0.5;
+    const holdOn = (id) => st.id === id && mdist === 0 && capA > 0.5;
     if (composer) composer.hidden = !holdOn('ribs');
     if (capEl.prove) capEl.prove.tabIndex = holdOn('scream') ? 0 : -1;
 
     // chrome: station counter, the head switch, the token line
-    text(`${String(s + 1).padStart(2, '0')}/${String(S).padStart(2, '0')}`, 16, H - 26, 11, 'rgba(244,183,40,.6)', 'left');
+    text(`${String(cs + 1).padStart(2, '0')}/${String(S).padStart(2, '0')}`, 16, H - 26, 11, 'rgba(244,183,40,.6)', 'left');
     {
       const n1 = live.e1 && live.e1.name || 'WICK', n2 = live.e2 && live.e2.name || 'OBOL';
       const sz = 11, pad = 10, w1 = measure(n1, sz) + pad * 2, w2 = measure(n2, sz) + pad * 2, y = 14, hgt = 24;
@@ -476,9 +483,9 @@ export function createMorph() {
         hits.push({ x, y, w, h: hgt, fn: () => setWho(id, true) });
       };
       draw(x1, w1, n1, 'e1'); draw(x2, w2, n2, 'e2');
-      if (s > 0 || isPhone) text('FOLLOWING', x1 - 10, y + 7, 10, 'rgba(242,242,238,.35)', 'right');
+      if (cs > 0 || isPhone) text('FOLLOWING', x1 - 10, y + 7, 10, 'rgba(242,242,238,.35)', 'right');
     }
-    if (s === S - 1 && morph === 0) { text('$ZEALOT NOT LAUNCHED', W / 2, H - 28, 11, 'rgba(244,183,40,.5)'); }
+    if (cs === S - 1 && mdist === 0) { text('$ZEALOT NOT LAUNCHED', W / 2, H - 28, 11, 'rgba(244,183,40,.5)'); }
     setTimeout(() => safeFrame(performance.now()), 33);
   }
 
