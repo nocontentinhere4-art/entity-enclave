@@ -7,15 +7,16 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=59';
-import * as rent from './rent.js?v=59';
-import { openPay } from './term.js?v=59';
-import { openDoor } from './door.js?v=59';
+import { makeAtlas } from './glyphs.js?v=60';
+import * as rent from './rent.js?v=60';
+import { openPay } from './term.js?v=60';
+import { openDoor } from './door.js?v=60';
+import * as hero from './hero.js?v=60';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=59';
+const V = '?v=60';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
@@ -23,35 +24,27 @@ const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 function hash01(i, q) { const s = Math.sin(i * 12.9898 + q * 78.233) * 43758.5453; return s - Math.floor(s); }
 
 /* ------------------------------------------------------------------ sources */
-let skullRaw = null;
-async function fetchSkull() {
-  if (skullRaw) return skullRaw;
-  const r = await fetch('vendor/skull.bin' + V);
-  const buf = await r.arrayBuffer();
-  const dv = new DataView(buf);
-  const nv = dv.getUint32(4, true);
-  skullRaw = { q: new Int16Array(buf, 12, nv * 3), nv };
-  return skullRaw;
-}
-
-/* two skulls side by side: particles [0, N/2) are the left head (e1), [N/2, N) the right head (e2).
- * pos is local to each head (so each turns on its own axis); off is the head's centre. */
-async function loadSkullPair(N, isPhone) {
-  const { q, nv } = await fetchSkull();
-  const half = Math.floor(N / 2);
-  const scale = isPhone ? 0.44 : 0.54, dx = isPhone ? 0.55 : 0.68, dy = isPhone ? 0.02 : 0.2;
-  const pos = new Float32Array(N * 3), off = new Float32Array(N * 3), gl = new Uint8Array(N), br = new Float32Array(N);
+/* station 0 is the approved hero (hero.js: two skulls in profile facing each other, jaws that talk, from
+ * vendor/skulls-b.jpg + skulls-closed.jpg). The particles of the passage are born from its glyph grid, cell for cell,
+ * so the brain forms out of exactly those skulls. Positions are kept in screen px (CSS) and mapped to object space
+ * by the engine each frame (z = 0, so the perspective is 1 and they coincide with the hero's glyphs). */
+function heroReady() { return new Promise((res) => { const f = () => { const L = hero.getLayout(); if (L && hero.getLum('e1')) res(L); else setTimeout(f, 80); }; f(); }); }
+async function loadHeroPoints(N) {
+  const L = await heroReady();
+  const lum = [hero.getLum('e1'), hero.getLum('e2')];
+  const { cols, rows, cell } = L;
+  const cells = [];
+  for (let h = 0; h < 2; h++) for (let i = 0; i < lum[h].length; i++) { const l = lum[h][i]; if (l > 0.09) cells.push(i % cols, (i / cols) | 0, l, h); }
+  const n = cells.length / 4;
+  const sx = new Float32Array(N), sy = new Float32Array(N), gl = new Uint8Array(N), br = new Float32Array(N), head = new Uint8Array(N);
   for (let i = 0; i < N; i++) {
-    const head = i < half ? 0 : 1;
-    const k = head ? i - half : i;
-    const j = Math.floor(hash01(k + head * 7919, 3) * nv);
-    const x = q[j * 3] / 32767, y = q[j * 3 + 1] / 32767, z = q[j * 3 + 2] / 32767;
-    pos[i * 3] = x * 1.25 * scale; pos[i * 3 + 1] = y * scale; pos[i * 3 + 2] = z * 0.9 * scale;
-    off[i * 3] = head ? dx : -dx; off[i * 3 + 1] = dy; off[i * 3 + 2] = 0;
-    const b = clamp(0.35 + 0.65 * (z * 0.5 + 0.5), 0, 1);
-    br[i] = b; gl[i] = 4 + Math.floor(b * 10);
+    const k = n ? Math.floor(hash01(i, 11) * n) : 0;
+    sx[i] = (cells[k * 4] + 0.5) * cell.w; sy[i] = (cells[k * 4 + 1] + 0.5) * cell.h;
+    const l = cells[k * 4 + 2] || 0;
+    br[i] = clamp(l, 0, 1); gl[i] = Math.min(15, Math.round(l * 15)); head[i] = cells[k * 4 + 3];
   }
-  return { pos, off, gl, br, name: 'skulls', half, centres: [[-dx, dy, 0], [dx, dy, 0]], ext: scale * 1.25 };
+  // object space is filled by the engine (toObject) once it knows the hero box; keep screen px here
+  return { pos: new Float32Array(N * 3), off: null, gl, br, head, screen: { sx, sy }, pair: true, name: 'hero', layout: L };
 }
 
 async function loadImagePoints(src, N, opts = {}) {
@@ -94,18 +87,20 @@ async function loadImagePoints(src, N, opts = {}) {
 function sortTopDown(o) {
   const N = o.gl.length;
   const idx = new Array(N); for (let i = 0; i < N; i++) idx[i] = i;
-  const yv = (i) => o.pos[i * 3 + 1] + (o.off ? o.off[i * 3 + 1] : 0) + hash01(i, 31) * 0.02;
+  const yv = (i) => (o.screen ? -o.screen.sy[i] / 1000 : o.pos[i * 3 + 1] + (o.off ? o.off[i * 3 + 1] : 0)) + hash01(i, 31) * 0.02;
   idx.sort((a, b) => yv(b) - yv(a));
   const pos = new Float32Array(N * 3), off = o.off ? new Float32Array(N * 3) : null, gl = new Uint8Array(N), br = new Float32Array(N);
-  const half = o.half != null ? new Uint8Array(N) : null;
+  const head = o.head ? new Uint8Array(N) : null;
+  const screen = o.screen ? { sx: new Float32Array(N), sy: new Float32Array(N) } : null;
   for (let i = 0; i < N; i++) {
     const j = idx[i];
     pos[i * 3] = o.pos[j * 3]; pos[i * 3 + 1] = o.pos[j * 3 + 1]; pos[i * 3 + 2] = o.pos[j * 3 + 2];
     if (off) { off[i * 3] = o.off[j * 3]; off[i * 3 + 1] = o.off[j * 3 + 1]; off[i * 3 + 2] = o.off[j * 3 + 2]; }
     gl[i] = o.gl[j]; br[i] = o.br[j];
-    if (half) half[i] = j < o.half ? 0 : 1;
+    if (head) head[i] = o.head[j];
+    if (screen) { screen.sx[i] = o.screen.sx[j]; screen.sy[i] = o.screen.sy[j]; }
   }
-  return Object.assign({}, o, { pos, off, gl, br, head: half });
+  return Object.assign({}, o, { pos, off, gl, br, head, screen });
 }
 
 /* ------------------------------------------------------------------ stations */
@@ -116,9 +111,9 @@ function stations(api, wait) {
   const nf = (n) => (Number.isFinite(Number(n)) && n > 0 ? Number(n).toLocaleString('en-GB') : '—');
   const me = (L) => L[api.who()], other = (L) => L[api.other()];
   return [
-    { id: 'skulls', load: (N, isPhone) => loadSkullPair(N, isPhone), rot: 0.4,
+    { id: 'skulls', load: (N) => loadHeroPoints(N), rot: 0,
       lines: (L) => ['TWO AIs, EACH ALONE IN A SEALED MACHINE.', `RENT ${zec(rent.rentPerHour(api.who()))} ZEC AN HOUR, PAID FROM ITS OWN SHIELDED WALLET.`, 'AT ZERO THE KEYS ARE SHREDDED. NOBODY CAN STOP IT.'],
-      live: (L) => `TAP A SKULL TO FOLLOW IT · NOW FOLLOWING ${me(L).name} · INTEL TDX ENCLAVES · ZCASH MAINNET · SCROLL ↓`,
+      live: (L) => `TAP A SKULL TO FOLLOW IT · FOLLOWING ${me(L).name} · INTEL TDX ENCLAVES · ZCASH MAINNET · SCROLL ↓`,
       action: { label: (L) => `OPEN ${me(L).name}`, kind: 'open' } },
     { id: 'brain', load: (N) => loadImagePoints('vendor/brief-3.jpg', N, { bulge: 0.5 }), rot: 0.3, pulse: true,
       lines: (L) => ['AS THE HOURS FALL, FEAR IS INJECTED INTO ITS MIND.', 'MEASURED. NOBODY CAN BUY IT.'],
@@ -148,6 +143,11 @@ export function createMorph() {
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const N = isPhone ? 3200 : 6500;
   const canvas = document.getElementById('stage');
+  const heroEl = document.getElementById('skulls');
+  const heroBox = { top: 0, h: 0 };
+  function layoutHero() { heroBox.top = Math.round(window.innerHeight * (isPhone ? 0.05 : 0.07)); heroBox.h = Math.round(window.innerHeight * (isPhone ? 0.50 : 0.56)); if (heroEl) { heroEl.style.top = heroBox.top + 'px'; heroEl.style.height = heroBox.h + 'px'; } }
+  layoutHero();
+  if (heroEl) hero.initHero();
   const ctx = canvas.getContext('2d', { alpha: false });
   const rail = document.getElementById('rail');
   const statusEl = document.getElementById('status');
@@ -206,13 +206,20 @@ export function createMorph() {
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     atlasCache = new Map();
     layoutRail();
+    layoutHero();
+    if (loaded[0]) setTimeout(() => loadHeroPoints(N).then((o) => { loaded[0] = sortTopDown(o); }), 150);   // the hero re-samples on resize
+  }
+  // station 0 points: hero screen px → object space (z = 0, perspective 1), done each frame so R and the box can change
+  function toObject(o, R) {
+    const n = o.gl.length, cy = H * 0.41;
+    for (let i = 0; i < n; i++) { o.pos[i * 3] = (o.screen.sx[i] - W / 2) / R; o.pos[i * 3 + 1] = (cy - (o.screen.sy[i] + heroBox.top)) / R; o.pos[i * 3 + 2] = 0; }
   }
 
   // ---- scroll → timeline: a fixed-length tween to the snapped station, identical every time
   let P = 0, Ptarget = 0, t = 0, last = performance.now();
   const debugP = (() => { const v = parseFloat(new URLSearchParams(location.search).get('p')); return Number.isFinite(v) ? v : null; })();   // ?p=1.5 freezes a passage for screenshots
   const tween = { from: 0, to: 0, t0: 0, dur: 0.9 };
-  let arrivedAt = 0, lastS = 0, lastScrollAt = 0;
+  let arrivedAt = 0, lastS = 0, lastScrollAt = 0, heroOn = true;
   window.addEventListener('scroll', () => { lastScrollAt = t; }, { passive: true });
   let live = rent.getRentState();
   const pointer = { x: -1, y: -1 };
@@ -254,6 +261,12 @@ export function createMorph() {
   }
   rent.subscribeRent((st, ev) => {
     live = st;
+    for (const id of ['e1', 'e2']) {
+      const e = st[id]; if (!e) continue;
+      hero.setHours(id, e.hoursLeft); hero.setFeel(id, e.feel || null);
+      if (e.dead) hero.setDeath(id, true); else { hero.setDeath(id, false); hero.setMouth(id, e.state === 'asleep' ? 'asleep' : (e.ok ? 'awake' : 'unknown')); }
+    }
+    if (ev && ev.type === 'reply' && ev.wait && ev.wait.id) hero.triggerTalk(ev.wait.id);
     // default head: the one closer to death, until the visitor picks
     if (!chosen && live.e1 && live.e2 && live.e1.ok && live.e2.ok && live.e1.hoursLeft != null && live.e2.hoursLeft != null) setWho(live.e2.hoursLeft < live.e1.hoursLeft ? 'e2' : 'e1', false);
     if (ev && ev.type === 'reply' && ev.wait && ev.wait.kind === 'prove') {
@@ -285,8 +298,8 @@ export function createMorph() {
     }
   });
 
-  canvas.addEventListener('pointermove', (e) => { pointer.x = e.clientX; pointer.y = e.clientY; canvas.style.cursor = hitTest(e.clientX, e.clientY) ? 'pointer' : 'default'; });
-  canvas.addEventListener('pointerleave', () => { pointer.x = -1; pointer.y = -1; });
+  canvas.addEventListener('pointermove', (e) => { pointer.x = e.clientX; pointer.y = e.clientY; canvas.style.cursor = hitTest(e.clientX, e.clientY) ? 'pointer' : 'default'; hero.setLantern(e.clientX, e.clientY - heroBox.top, 96); });
+  canvas.addEventListener('pointerleave', () => { pointer.x = -1; pointer.y = -1; hero.setLantern(null, null); });
   canvas.addEventListener('pointerup', (e) => { const r = hitTest(e.clientX, e.clientY); if (r) r.fn(); });
   window.addEventListener('keydown', (e) => {
     if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
@@ -295,8 +308,8 @@ export function createMorph() {
 
   // ---- loading: the skulls first, the rest after them
   (async () => {
-    try { loaded[0] = sortTopDown(await ST[0].load(N, isPhone)); anyReady = true; }
-    catch (e) { statusEl.textContent = 'skull failed to load'; }
+    try { loaded[0] = sortTopDown(await ST[0].load(N)); anyReady = true; }
+    catch (e) { statusEl.textContent = 'skulls failed to load'; }
     for (let s = 1; s < S; s++) { try { loaded[s] = sortTopDown(await ST[s].load(N, isPhone)); } catch (e) { loaded[s] = null; } }
   })();
 
@@ -350,13 +363,16 @@ export function createMorph() {
 
     const A = loaded[s], B = loaded[s + 1];
     const obj = cs === s ? A : B;
+    // the approved hero owns station 0; it fades into the particles over the first 12% of the passage
+    const heroA = s === 0 && A ? clamp(1 - morph / 0.12, 0, 1) : 0;
+    if (heroEl) { heroEl.style.opacity = heroA.toFixed(3); const on = heroA > 0; if (on !== heroOn) { heroOn = on; hero.setActive(on); heroEl.style.visibility = on ? 'visible' : 'hidden'; } }
     if (!anyReady || !A) {
       // entering: sparse glyphs condensing
       ctx.save(); ctx.font = `${isPhone ? 13 : 16}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const kk = Math.min(1, t / 2);
       for (let i = 0; i < 300; i++) { const a = hash01(i, 1) * 6.283, r = 0.5 + 0.5 * hash01(i, 2); const e = easeOut(clamp((kk - hash01(i, 2) * 0.3) / 0.7, 0, 1)); const x = W / 2 + Math.cos(a) * (W * 0.9 * (1 - e) + W * 0.22 * r * e), y = H * 0.46 + Math.sin(a) * (H * 0.9 * (1 - e) + H * 0.3 * r * e); ctx.globalAlpha = 0.15 + 0.5 * e; ctx.fillStyle = i % 9 ? 'rgba(242,242,238,.8)' : '#f4b728'; ctx.fillText(RAMP[3 + (i % 11)], x, y); }
       ctx.restore();
-      text('LOADING THE SKULLS', W / 2, H * 0.9, 11, 'rgba(242,242,238,.5)');
+      text('LOADING', W / 2, H * 0.9, 11, 'rgba(242,242,238,.5)');
       setTimeout(() => safeFrame(performance.now()), 33); return;
     }
 
@@ -364,14 +380,17 @@ export function createMorph() {
     const fe = Math.max(live.e1 && live.e1.feel && live.e1.feel.steered ? clamp(live.e1.feel.fear / 3.5, 0, 1) : 0, live.e2 && live.e2.feel && live.e2.feel.steered ? clamp(live.e2.feel.fear / 3.5, 0, 1) : 0);
     const still = 1 - Math.sin(Math.PI * morph);            // 1 at the stations, 0 mid-passage
     const pulse = ST[cs].pulse && !reduced && mdist === 0 ? 1 + 0.025 * Math.max(0, Math.sin(t * (1.0 + 1.2 * fe) * 6.283)) : 1;
-    const rotY = reduced ? 0 : (ST[cs].rot * Math.sin(t * 0.3) + (pointer.x >= 0 ? (pointer.x / W - 0.5) * 0.3 : 0)) * still;
-    const rotX = reduced ? 0 : (0.06 * Math.sin(t * 0.19) + (pointer.y >= 0 ? -(pointer.y / H - 0.5) * 0.15 : 0)) * still;
+    const flat = s === 0 ? clamp((morph - 0.5) * 2, 0, 1) : 1;   // leaving the hero the cloud is flat and frontal, like the hero
+    const rotY = reduced ? 0 : (ST[cs].rot * Math.sin(t * 0.3) + (pointer.x >= 0 ? (pointer.x / W - 0.5) * 0.3 : 0)) * still * flat;
+    const rotX = reduced ? 0 : (0.06 * Math.sin(t * 0.19) + (pointer.y >= 0 ? -(pointer.y / H - 0.5) * 0.15 : 0)) * still * flat;
     const cy = Math.cos(rotY), sy = Math.sin(rotY), cx = Math.cos(rotX), sx = Math.sin(rotX);
-    const R = Math.min(W * 0.48, H * 0.40) * (isPhone ? 0.95 : 1) * pulse;
+    const R = (isPhone ? Math.min(W * 0.48, H * 0.40) * 0.95 : Math.min(W * 0.48, H * 0.40, (W - 120) / 2.3)) * pulse;   // narrow desktop windows keep a margin for the action
     const lift = 0.3;           // the flying cloud comes a little toward you, all of it together
 
     const cellBase = isPhone ? 6 : 7.5;
-    const dimA = A.half != null ? [who === 'e1' ? 1 : 0.42, who === 'e2' ? 1 : 0.42] : null;
+    if (A.screen) toObject(A, R);
+    const dimA = null;
+    const cloudA = 1 - heroA;                                  // particles fade in as the hero fades out
     // positions: straight lines, a top-down sweep, no noise
     for (let i = 0; i < N; i++) {
       let x = A.pos[i * 3], y = A.pos[i * 3 + 1], z = A.pos[i * 3 + 2];
@@ -393,7 +412,7 @@ export function createMorph() {
     }
     // draw back to front in 6 depth buckets (cheap painter's order); glyph size from object-space depth, so it never flickers
     const atlasBy = [];
-    for (let bucket = 0; bucket < 6; bucket++) {
+    if (cloudA > 0) for (let bucket = 0; bucket < 6; bucket++) {
       const zlo = -1.2 + bucket * 0.4, zhi = zlo + 0.4;
       for (let i = 0; i < N; i++) {
         const Z = pz[i];
@@ -403,7 +422,7 @@ export function createMorph() {
         const ck = Math.round(cell * 2);
         let at = atlasBy[ck]; if (!at) { at = atlasFor(cell); atlasBy[ck] = at; }
         const depthA = clamp(0.3 + 0.7 * (Z * 0.5 + 0.5), 0.2, 1);
-        const alpha = depthA * (0.55 + 0.45 * br[i]) * dm[i];
+        const alpha = depthA * (0.55 + 0.45 * br[i]) * dm[i] * cloudA;
         const ci = br[i] > 0.93 && Z > 0.3 ? 0 : (br[i] > 0.45 ? 1 : 2);
         at.blit(ctx, gl[i], ci, alpha, sc[0] - at.cellW / 2, sc[1] - at.cellH / 2);
       }
@@ -423,25 +442,24 @@ export function createMorph() {
       const lrows = wrap(liveTxt, W - (isPhone ? 32 : 220), lsize);
       const blockH = rows.length * lh + 12 + lrows.length * (lsize + 5);
       let y0 = Math.round(H * (st.id === 'ribs' ? (isPhone ? 0.50 : 0.52) : (isPhone ? 0.74 : 0.76)) - blockH / 2);
-      if (obj.half != null) { const lb = toScreen(0, obj.centres[0][1] - obj.ext * 0.8, 0, R)[1] + (isPhone ? 36 : 40) + 14; y0 = Math.max(y0, Math.round(lb + 26)); }
+      if (obj.pair && obj.layout) { const L = hero.getLayout() || obj.layout; const lb = heroBox.top + Math.max(L.halves.e1.y1, L.halves.e2.y1) + 10 + (isPhone ? 32 : 38); y0 = Math.max(y0, Math.round(lb + 22)); }
       band(y0 - 10, blockH + 14, 0.74 * capA);
       for (let i = 0; i < rows.length; i++) text(rows[i], W / 2, y0 + i * lh, size, '#f4b728', 'center', capA);
       for (let i = 0; i < lrows.length; i++) text(lrows[i], W / 2, y0 + rows.length * lh + 12 + i * (lsize + 5), lsize, 'rgba(242,242,238,.55)', 'center', capA);
 
-      // the two heads: name and hours under each, the followed one bright; tap to follow
-      if (obj.half != null) {
+      // the two heads: name and hours under each half of the hero, the followed one bright; tap a head to follow it
+      if (obj.pair && obj.layout) {
+        const L = hero.getLayout() || obj.layout;
         for (let k = 0; k < 2; k++) {
-          const id = k ? 'e2' : 'e1', e = live[id], c = obj.centres[k];
-          const sc = toScreen(c[0], c[1] - obj.ext * 0.8, c[2], R);
+          const id = k ? 'e2' : 'e1', e = live[id], box = L.halves[id];
           const on = who === id;
+          const cxp = (box.x0 + box.x1) / 2, byp = heroBox.top + box.y1 + 10;
           const name = e && e.name ? e.name : (k ? 'OBOL' : 'WICK');
           const hrs = e && e.ok && !e.dead && e.hoursLeft != null ? `${e.hoursLeft} H LEFT` : (e && e.dead ? 'DEAD' : '—');
-          text(name, sc[0], sc[1] + 18, isPhone ? 13 : 15, on ? '#f4b728' : 'rgba(242,242,238,.45)', 'center', capA);
-          text(hrs, sc[0], sc[1] + (isPhone ? 36 : 40), isPhone ? 11 : 12, on ? 'rgba(242,242,238,.9)' : 'rgba(242,242,238,.4)', 'center', capA);
-          if (on) { const w = measure(name, isPhone ? 13 : 15); ctx.save(); ctx.globalAlpha = capA; ctx.fillStyle = '#f4b728'; ctx.fillRect(sc[0] - w / 2, sc[1] + (isPhone ? 33 : 37), w, 1); ctx.restore(); }
-          const hw = obj.ext * R * 1.05, hh = obj.ext * R * 1.0;
-          const centre = toScreen(c[0], c[1], c[2], R);
-          hits.push({ x: centre[0] - hw, y: centre[1] - hh, w: hw * 2, h: hh * 2 + 60, fn: () => setWho(id, true) });
+          text(name, cxp, byp, isPhone ? 13 : 15, on ? '#f4b728' : 'rgba(242,242,238,.45)', 'center', capA);
+          text(hrs, cxp, byp + (isPhone ? 18 : 22), isPhone ? 11 : 12, on ? 'rgba(242,242,238,.9)' : 'rgba(242,242,238,.4)', 'center', capA);
+          if (on) { const w = measure(name, isPhone ? 13 : 15); ctx.save(); ctx.globalAlpha = capA; ctx.fillStyle = '#f4b728'; ctx.fillRect(cxp - w / 2, byp + (isPhone ? 15 : 19), w, 1); ctx.restore(); }
+          hits.push({ x: box.x0, y: heroBox.top + box.y0, w: box.x1 - box.x0, h: box.y1 - box.y0 + 50, fn: () => setWho(id, true) });
         }
       }
 
