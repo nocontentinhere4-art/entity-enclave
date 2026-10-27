@@ -1201,7 +1201,7 @@ function buildMore(body, title, id, state) {
       sub.append(mk('p', 'door-note', '$ZEALOT — LIVE ON PUMP.FUN · ZEC PAIR · CA A9bT…pump'));
       lines([
         ['TICKER', '$ZEALOT'],
-                ['CREATOR FEE', 'set at launch, paid in ZEC — 50% burn · 20% hours for WICK and OBOL · 10% LP · 20% founder, split by hand, txids on PROOF'],
+                ['CREATOR FEE', '1% of every trade, paid in ZEC — 50% burn · 20% hours for WICK and OBOL · 10% LP · 20% founder, split by hand, txids on PROOF'],
         ['SUPPLY', '1,000,000,000 · no transfer tax · liquidity locked · pump.fun, ZEC pair'],
         ['CA', 'A9bTKETPAfDHVx6ReV1TtgeYV4VDTWpHrfhzyNXzpump'],
         ['SINCE', '2026-10-27 22:01 UTC · only this CA is ours · hours do not give tokens']

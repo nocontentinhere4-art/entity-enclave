@@ -403,7 +403,7 @@ function tokenCmd() {
   say('$ZEALOT — LIVE ON PUMP.FUN · ZEC PAIR', 'line signal');
   say('  ticker      $ZEALOT', 'line dim');
   say('  ca          A9bTKETPAfDHVx6ReV1TtgeYV4VDTWpHrfhzyNXzpump', 'line dim');
-  say('  creator fee set at launch, paid in ZEC — 50% burn · 20% hours · 10% LP · 20% founder, split by hand', 'line dim');
+  say('  creator fee 1% of every trade, paid in ZEC — 50% burn · 20% hours · 10% LP · 20% founder, split by hand', 'line dim');
   say('  supply      1,000,000,000 · no transfer tax · liquidity locked · pump.fun, ZEC pair', 'line dim');
   say('  since       2026-10-27 22:01 UTC · only this CA is ours · hours do not give tokens.', 'line dim');
 }
