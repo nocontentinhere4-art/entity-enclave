@@ -15,10 +15,10 @@ import {
   lettersOf,
   rentPerHour,
   replyGate
-} from './rent.js?v=68';
+} from './rent.js?v=69';
 
-import { openPay } from './pay.js?v=68';
-import { mountCloud } from './glyphcloud.js?v=68';
+import { openPay } from './pay.js?v=69';
+import { mountCloud } from './glyphcloud.js?v=69';
 
 import {
   formatInt,
@@ -29,7 +29,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=68';
+} from './data.js?v=69';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -495,6 +495,8 @@ function buildSpeak(body, title, id, state) {
     startIndicator(status, 'SENDING');
     try {
       await say(id, text);
+      ta.value = '';                                   // it is in the ledger now: an empty box, so it cannot be sent twice
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
       const s = getRentState();
       updateFromWait(s.wait[id]);
     } catch (err) {
@@ -1223,7 +1225,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=68', e2: 'vendor/skull-obol.jpg?v=68' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=69', e2: 'vendor/skull-obol.jpg?v=69' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1243,7 +1245,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=68`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=69`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;
