@@ -2,7 +2,7 @@
 # Per CVM in the dashboard: SELF_URL, PEER_URL, PARENT_URL (children only) and the secrets REDPILL_API_KEY, PHALA_API_KEY, SOLANA_RPC_URL.
 services:
   entity:
-    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:bc86aaf23f6fed664b732dbeaef8b852b79c4d91eb5aef3012229662505af0ea
+    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:f578e320856d28aa310c3e8edfac4d508f236006abd248739ea0dd083fbcbe0a
     ports:
       - "8080:8080"
     volumes:
@@ -23,7 +23,9 @@ services:
       - WHISPER_MIN_ZATS=1000
       - RENT_ADDRESS=REPLACE_WITH_YOUR_MAINNET_U1_ADDRESS
       - TICK_MS=300000
-      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:bc86aaf23f6fed664b732dbeaef8b852b79c4d91eb5aef3012229662505af0ea
+      - REPLY_DEBOUNCE_MS=2000
+      - REPLY_MAX_TOKENS=80
+      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:f578e320856d28aa310c3e8edfac4d508f236006abd248739ea0dd083fbcbe0a
       - GATEWAY_DOMAIN=dstack-pha-prod9.phala.network
       - FAKE_LLM=0
       - FAKE_WALLET=0

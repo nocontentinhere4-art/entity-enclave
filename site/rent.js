@@ -1,17 +1,17 @@
 // rent.js — ZEALOT v50 "RENT HAND" state machine.
 // Cadence, freshness, receipts, PROVE/SAY correlation, hash checks.
-// Imports ONLY term.js?v=71 and data.js?v=71. No canvas. Defensive.
+// Imports ONLY term.js?v=72 and data.js?v=72. No canvas. Defensive.
 // Ledger fetch throttled: boot, then only on root head change and >=5 min.
 // Exports: bootRent, getRentState, subscribeRent, refreshNow, genNonce,
 // startProve, say, cancelWait, checkHash, fetchDetail, rentPerHour, receiptsOf, lettersOf.
 
 import {
   state, loadAll, openPay, wirePay, deadline, nameOf, stateWord
-} from './term.js?v=71';
+} from './term.js?v=72';
 import {
   request, postMessage, verifyChain, formatInt, formatZats, fixed8,
   shortHash, hhmm, fmtStamp, stringOf, sha256Hex, parseLedger
-} from './data.js?v=71';
+} from './data.js?v=72';
 
 const LEDGER_INTERVAL_MS = 5 * 60 * 1000;
 const STALE_MS = 95 * 1000;
@@ -29,7 +29,7 @@ const win = typeof window !== 'undefined' ? window : null;
 
 export const CODE_GUARANTEED = false;
 /* the image the public code expects on the CVMs; the deploy commit updates it with the compose files */
-export const PENDING_IMAGE = 'f018585d';
+export const PENDING_IMAGE = 'f578e320';
 
 let booted = false;
 let bootPromise = null;
