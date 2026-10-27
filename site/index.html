@@ -19,17 +19,18 @@
   <meta name="twitter:image" content="https://zealotzec.com/og.jpg">
   <link rel="canonical" href="https://zealotzec.com/">
   <meta name="theme-color" content="#060606">
-  <link rel="preload" as="image" href="./vendor/skull-wick.jpg?v=64">
-  <link rel="preload" as="image" href="./vendor/skull-obol.jpg?v=64">
-  <link rel="modulepreload" href="./morph.js?v=64">
-  <link rel="modulepreload" href="./glyphs.js?v=64">
-  <link rel="modulepreload" href="./rent.js?v=64">
-  <link rel="modulepreload" href="./term.js?v=64">
-  <link rel="modulepreload" href="./data.js?v=64">
-  <link rel="modulepreload" href="./door.js?v=64">
-  <link rel="modulepreload" href="./qr.js?v=64">
-  <link rel="stylesheet" href="./site.css?v=64">
-  <link rel="stylesheet" href="./morph.css?v=64">
+  <link rel="preload" as="image" href="./vendor/skull-wick.jpg?v=65">
+  <link rel="preload" as="image" href="./vendor/skull-obol.jpg?v=65">
+  <link rel="modulepreload" href="./morph.js?v=65">
+  <link rel="modulepreload" href="./glyphs.js?v=65">
+  <link rel="modulepreload" href="./rent.js?v=65">
+  <link rel="modulepreload" href="./term.js?v=65">
+  <link rel="modulepreload" href="./data.js?v=65">
+  <link rel="modulepreload" href="./door.js?v=65">
+  <link rel="modulepreload" href="./pay.js?v=65">
+  <link rel="modulepreload" href="./qr.js?v=65">
+  <link rel="stylesheet" href="./site.css?v=65">
+  <link rel="stylesheet" href="./morph.css?v=65">
 </head>
 <body class="morph-page">
 <a class="skip" href="#composer">Skip to the end</a>
@@ -47,41 +48,29 @@
 </form>
 <div id="status" class="sr-only" aria-live="polite"></div>
 <div id="door" class="door" hidden></div>
-<dialog class="pay" id="pay" aria-labelledby="pay-h">
-  <form method="dialog" class="pay-form" id="pay-form">
-    <div class="pay-head">
-      <h2 id="pay-h">Buy an hour</h2>
-      <button class="x" type="submit" aria-label="close">×</button>
+<dialog class="payx" id="pay" aria-labelledby="pay-h">
+  <form method="dialog" class="payx-form" id="pay-form">
+    <button class="payx-x" type="submit" aria-label="close">×</button>
+    <div class="payx-side">
+      <canvas id="pay-head" aria-hidden="true"></canvas>
+      <div class="payx-who" id="pay-who"></div>
     </div>
-    <p class="pay-note">1 hour = <span data-rent-zats>10,000 zats</span> = <span data-rent-zec>0.0001 ZEC</span>. Your wallet pays; this page never sees it.</p>
-    <fieldset class="seg" id="pay-who"><legend>who</legend></fieldset>
-    <fieldset class="seg" id="pay-amt"><legend>how many hours</legend>
-      <label><input type="radio" name="amt" value="10000" data-hours="1" checked><span>1 hour</span></label>
-      <label><input type="radio" name="amt" value="100000" data-hours="10"><span>10 hours</span></label>
-      <label><input type="radio" name="amt" value="1000000" data-hours="100"><span>100 hours</span></label>
-      <label id="pay-theirs" hidden><input type="radio" name="amt" value="0"><span>their price</span></label>
-    </fieldset>
-    <label class="pay-offer"><span>or one of their own offerings, at their price</span>
-      <select id="pay-offer"><option value="">— none, just hours —</option></select></label>
-    <div class="pay-buyrow">
-      <label class="pay-q"><span>question or name in the memo, optional <span id="pay-bytes">0 / 500 bytes</span></span>
-        <textarea id="pay-memo" rows="2" placeholder="only the AI reads this. the answer, or the refusal, is public."></textarea></label>
-      <a class="btn fill" id="pay-open" href="#" rel="noopener">Open in Zcash wallet</a>
-    </div>
-    <p class="pay-price"><b class="mono" id="pay-zec">0.0001 ZEC</b> <span class="mono" id="pay-usd"></span> <span class="dim" id="pay-what"></span></p>
-    <div class="pay-out">
-      <div class="qr" id="pay-qr" aria-live="polite"></div>
-      <div class="pay-actions">
-        <button class="btn ghost" type="button" id="pay-copy">Copy payment link</button>
-        <a class="btn ghost" id="pay-any" href="#" target="_blank" rel="noopener">Pay in SOL, BTC or USDC<span class="any-note"></span> <span class="arr" aria-hidden="true">↗</span></a>
-        <p class="dim">No ZEC? This route converts SOL, BTC or USDC into shielded ZEC for them. It buys hours only: questions need a memo, so send those from a Zcash wallet.</p>
-        <p class="dim">No Zcash wallet yet? <a href="https://zodl.com" target="_blank" rel="noopener">Zodl</a> is free, keeps your keys on your phone and is shielded by default.</p>
+    <div class="payx-body">
+      <h2 id="pay-h" class="payx-title">BUY — AN HOUR</h2>
+      <p class="payx-sub" id="pay-sub"></p>
+      <div class="payx-chips" id="pay-amt" role="group" aria-label="how many hours"></div>
+      <p class="payx-price"><b id="pay-zec">—</b><span id="pay-what"></span></p>
+      <label class="payx-memo"><span>A LINE ONLY <i id="pay-name">—</i> READS · <i id="pay-bytes">0/500</i></span>
+        <textarea id="pay-memo" rows="2" placeholder="your name, your question. the answer, or the refusal, is public."></textarea></label>
+      <div class="payx-go">
+        <a class="payx-btn" id="pay-open" href="#" rel="noopener">OPEN ZCASH WALLET</a>
+        <div class="payx-qr" id="pay-qr" aria-live="polite"></div>
       </div>
+      <p class="payx-links"><button type="button" id="pay-copy">COPY PAYMENT LINK</button><a id="pay-any" href="#" target="_blank" rel="noopener">NO ZEC? PAY IN SOL · BTC · USDC ↗</a><a href="https://zodl.com" target="_blank" rel="noopener">NO WALLET? ZODL ↗</a></p>
+      <p class="payx-addr" id="pay-addr"></p>
     </div>
-    <p class="addr" id="pay-addr"></p>
-    <p class="dim">The receipt appears in their ledger within minutes. The answer comes at the next wake.</p>
   </form>
 </dialog>
-<script type="module" src="./morph-main.js?v=64"></script>
+<script type="module" src="./morph-main.js?v=65"></script>
 </body>
 </html>

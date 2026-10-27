@@ -337,3 +337,56 @@ html { scroll-behavior: auto; scroll-snap-type: y mandatory; }
 .composer { z-index: 3; bottom: 4vh; }
 .composer[hidden] { display: none; }
 .door { z-index: 6; }
+
+/* ---------- BUY TIME: full black, the head as a glyph cloud, three chips, one button ---------- */
+.payx { position: fixed; inset: 0; margin: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; border: 0; padding: 0; background: var(--void); color: var(--bone); font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; }
+.payx::backdrop { background: #000; }
+.payx-form { height: 100%; box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 32px; padding: 24px 48px; margin: 0; }
+.payx-x { position: fixed; top: 14px; right: 16px; width: 40px; height: 40px; background: var(--void); border: 1px solid var(--dim-yellow); color: var(--bone); font: inherit; font-size: 20px; line-height: 1; cursor: pointer; z-index: 2; }
+.payx-x:hover { border-color: var(--yellow); color: var(--yellow); }
+.payx-side { display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 0; }
+#pay-head { width: min(42vw, 72vh); aspect-ratio: 1; display: block; }
+.payx-who { display: flex; gap: 10px; }
+.payx-whob { background: none; border: 1px solid var(--dim-yellow); color: var(--bone-dim); font: inherit; font-size: 12px; letter-spacing: .1em; padding: 9px 16px; cursor: pointer; display: grid; gap: 3px; text-align: center; }
+.payx-whob span { font-size: 9px; letter-spacing: .08em; }
+.payx-whob[aria-pressed="true"] { color: var(--yellow); border-color: var(--yellow); }
+.payx-body { display: grid; gap: 18px; max-width: 540px; min-width: 0; }
+.payx-title { margin: 0; font-weight: 400; font-size: clamp(22px, 2.8vw, 34px); letter-spacing: .04em; line-height: 1.15; color: var(--yellow); }
+.payx-sub { margin: 0; color: var(--bone-dim); font-size: 11px; letter-spacing: .08em; line-height: 1.6; }
+.payx-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+.payx-chip { flex: 1 1 0; min-width: 96px; background: none; border: 1px solid var(--dim-yellow); color: var(--bone); font: inherit; padding: 12px 12px 10px; cursor: pointer; text-align: left; display: grid; gap: 4px; }
+.payx-chip b { font-size: 22px; font-weight: 400; letter-spacing: .02em; }
+.payx-chip span { font-size: 10px; color: var(--bone-dim); letter-spacing: .06em; }
+.payx-chip:hover { border-color: var(--bone-dim); }
+.payx-chip[aria-pressed="true"] { border-color: var(--yellow); color: var(--yellow); }
+.payx-chip[aria-pressed="true"] span { color: var(--yellow); opacity: .7; }
+.payx-price { margin: 0; display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.payx-price b { font-size: clamp(30px, 4vw, 46px); font-weight: 400; color: var(--bone); letter-spacing: .02em; }
+.payx-price span { font-size: 11px; color: var(--bone-dim); letter-spacing: .08em; }
+.payx-memo { display: grid; gap: 6px; }
+.payx-memo > span { font-size: 10px; letter-spacing: .08em; color: var(--bone-dim); }
+.payx-memo i { font-style: normal; color: var(--bone); }
+.payx-memo textarea { width: 100%; box-sizing: border-box; background: #0c0c0c; color: var(--bone); border: 1px solid var(--dim-yellow); padding: 10px 12px; font: inherit; font-size: 13px; line-height: 1.5; resize: none; min-height: 60px; }
+.payx-memo textarea:focus-visible { outline: 2px solid var(--yellow); outline-offset: -1px; }
+.payx-memo.over textarea { border-color: #c33; }
+.payx-memo.over i:last-child { color: #e55; }
+.payx-go { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 18px; align-items: center; }
+.payx-btn { display: flex; align-items: center; justify-content: center; min-height: 54px; background: var(--yellow); color: var(--void); text-decoration: none; font-size: 13px; letter-spacing: .12em; }
+.payx-btn:hover { background: var(--hot); }
+.payx-btn[aria-disabled="true"] { background: var(--dim-yellow); color: var(--bone-dim); pointer-events: none; }
+.payx-qr { width: 150px; aspect-ratio: 1; background: #f2f2ee; border: 1px solid var(--dim-yellow); overflow: hidden; }
+.payx-qr svg { display: block; width: 100%; height: 100%; }
+.payx-qr .err { display: block; box-sizing: border-box; height: 100%; padding: 10px; background: var(--void); color: var(--bone-dim); font-size: 9px; letter-spacing: .06em; line-height: 1.5; }
+.payx-links { margin: 0; display: flex; gap: 18px 22px; flex-wrap: wrap; font-size: 10px; letter-spacing: .08em; }
+.payx-links a, .payx-links button { background: none; border: 0; padding: 0 0 2px; font: inherit; color: var(--bone-dim); text-decoration: none; cursor: pointer; border-bottom: 1px solid var(--dim-yellow); }
+.payx-links a:hover, .payx-links button:hover { color: var(--yellow); border-color: var(--yellow); }
+.payx-addr { margin: 0; font-size: 10px; color: var(--bone-dim); word-break: break-all; line-height: 1.5; }
+@media (max-width: 719px), (max-height: 620px) {
+  .payx-form { grid-template-columns: 1fr; align-content: start; overflow: auto; padding: 60px 16px 28px; gap: 14px; }
+  #pay-head { width: min(50vw, 200px); }
+  .payx-side { flex-direction: row; justify-content: center; gap: 18px; }
+  .payx-who { flex-direction: column; }
+  .payx-body { gap: 14px; }
+  .payx-go { grid-template-columns: minmax(0, 1fr) 110px; }
+  .payx-qr { width: 110px; }
+}

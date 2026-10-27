@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=64';
-import * as rent from './rent.js?v=64';
-import { openPay } from './term.js?v=64';
-import { openDoor } from './door.js?v=64';
+import { makeAtlas } from './glyphs.js?v=65';
+import * as rent from './rent.js?v=65';
+import { openPay } from './pay.js?v=65';
+import { openDoor } from './door.js?v=65';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=64';
+const V = '?v=65';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -250,7 +250,7 @@ export function createMorph() {
   const stepPx = () => (rail.offsetHeight / S) || window.innerHeight;
   const station = () => Math.round(Ptarget);
   function go(n) { n = clamp(Math.round(n), 0, S - 1); window.scrollTo({ top: n * stepPx(), behavior: 'instant' }); }
-  const owned = (el) => !(el && el.closest && el.closest('.door, input, textarea, select, button, a, label'));
+  const owned = (el) => !(el && el.closest && el.closest('.door, dialog, input, textarea, select, button, a, label'));
   let lockUntil = 0, wLast = 0, wPrevMag = 0, wArmed = true, wAcc = 0;
   window.addEventListener('wheel', (e) => {
     if (!owned(e.target)) return;
