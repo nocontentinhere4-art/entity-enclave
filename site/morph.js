@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=82';
-import * as rent from './rent.js?v=82';
-import { openPay } from './pay.js?v=82';
-import { openDoor } from './door.js?v=82';
+import { makeAtlas } from './glyphs.js?v=83';
+import * as rent from './rent.js?v=83';
+import { openPay } from './pay.js?v=83';
+import { openDoor } from './door.js?v=83';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=82';
+const V = '?v=83';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -548,7 +548,7 @@ export function createMorph() {
         if (a.kind === 'prove') {
           const slots = (wait.proveCode + '____').slice(0, 4).split('').join(' ');
           text(slots, bx + bw / 2, by - 30, 22, 'rgba(242,242,238,.92)', 'center', capA);
-          if (!rent.CODE_GUARANTEED) { const nr = wrap(`CODE GUARANTEE PENDING REDEPLOY ${rent.PENDING_IMAGE} · BRAIN: QWEN3-14B ON A RENTED GPU, OUTSIDE THE TEE`, W - 32, 10); for (let i = 0; i < nr.length; i++) text(nr[i], W / 2, H - 44 - (nr.length - i) * 14, 10, 'rgba(242,242,238,.45)', 'center', capA); }
+          { const nr = wrap(`${rent.CODE_GUARANTEED ? `ENCLAVE IMAGE ${rent.PENDING_IMAGE}, THE ONE THE PUBLIC CODE BUILDS` : `IMAGE ${rent.PENDING_IMAGE} WAITS FOR REDEPLOY`} · BRAIN: QWEN3-14B ON A RENTED GPU, OUTSIDE THE TEE`, W - 32, 10); for (let i = 0; i < nr.length; i++) text(nr[i], W / 2, H - 44 - (nr.length - i) * 14, 10, 'rgba(242,242,238,.45)', 'center', capA); }
         }
       }
     }
