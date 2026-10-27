@@ -16,10 +16,10 @@ import {
   lettersOf,
   rentPerHour,
   replyGate
-} from './rent.js?v=77';
+} from './rent.js?v=78';
 
-import { openPay } from './pay.js?v=77';
-import { mountCloud } from './glyphcloud.js?v=77';
+import { openPay } from './pay.js?v=78';
+import { mountCloud } from './glyphcloud.js?v=78';
 
 import {
   formatInt,
@@ -30,7 +30,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=77';
+} from './data.js?v=78';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1201,7 +1201,7 @@ function buildMore(body, title, id, state) {
       sub.append(mk('p', 'door-note', '$ZEALOT — LIVE ON PUMP.FUN · ZEC PAIR · CA A9bT…pump'));
       lines([
         ['TICKER', '$ZEALOT'],
-                ['CREATOR FEE', '0.5% — 50% burn · 20% rent · 10% LP · 20% founder'],
+                ['CREATOR FEE', 'set at launch, paid in ZEC — 50% burn · 20% hours for WICK and OBOL · 10% LP · 20% founder, split by hand, txids on PROOF'],
         ['SUPPLY', '1,000,000,000 · no transfer tax · liquidity locked · pump.fun, ZEC pair'],
         ['CA', 'A9bTKETPAfDHVx6ReV1TtgeYV4VDTWpHrfhzyNXzpump'],
         ['SINCE', '2026-10-27 22:01 UTC · only this CA is ours · hours do not give tokens']
@@ -1226,7 +1226,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=77', e2: 'vendor/skull-obol.jpg?v=77' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=78', e2: 'vendor/skull-obol.jpg?v=78' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1246,7 +1246,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=77`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=78`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;

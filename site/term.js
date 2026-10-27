@@ -12,8 +12,8 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=77';
-import { zip321Uri, qrSvg } from './qr.js?v=77';
+} from './data.js?v=78';
+import { zip321Uri, qrSvg } from './qr.js?v=78';
 
 const ANY_MIN_ZEC = 0.006;          // any-coin route (Trocador) minimum, with margin over their ~0.0045
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
@@ -403,7 +403,7 @@ function tokenCmd() {
   say('$ZEALOT — LIVE ON PUMP.FUN · ZEC PAIR', 'line signal');
   say('  ticker      $ZEALOT', 'line dim');
   say('  ca          A9bTKETPAfDHVx6ReV1TtgeYV4VDTWpHrfhzyNXzpump', 'line dim');
-  say('  creator fee 0.5% — 50% burn · 20% rent · 10% LP · 20% founder', 'line dim');
+  say('  creator fee set at launch, paid in ZEC — 50% burn · 20% hours · 10% LP · 20% founder, split by hand', 'line dim');
   say('  supply      1,000,000,000 · no transfer tax · liquidity locked · pump.fun, ZEC pair', 'line dim');
   say('  since       2026-10-27 22:01 UTC · only this CA is ours · hours do not give tokens.', 'line dim');
 }
