@@ -28,7 +28,7 @@ export class Replier {
     this.enabled = r.enabled ?? true;
     this.debounceMs = Math.max(0, Number(r.debounceMs ?? 8000));
     this.maxPerHour = Math.max(1, Number(r.maxPerHour ?? 40));
-    this.minHoursLeft = Number(r.minHoursLeft ?? 24);
+    this.minHoursLeft = Number(r.minHoursLeft ?? 2);
     this.maxBatch = Math.max(1, Number(r.maxBatch ?? 6));
 
     this.queue = [];
@@ -64,7 +64,7 @@ export class Replier {
   /** Public view for GET / : whether instant replies are on, when we last answered, and how many this hour. */
   status() {
     this.#rollHour();
-    return { enabled: this.enabled, lastReplyTs: this.lastReplyTs, repliesThisHour: this.hourWindow?.n ?? 0 };
+    return { enabled: this.enabled, minHoursLeft: this.minHoursLeft, lastReplyTs: this.lastReplyTs, repliesThisHour: this.hourWindow?.n ?? 0 };
   }
 
   async #drain() {

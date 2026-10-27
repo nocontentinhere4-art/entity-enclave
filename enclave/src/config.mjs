@@ -121,11 +121,14 @@ export const config = {
   // Instant replies: when a human posts on the public channel or a paid letter arrives, the entity answers
   // publicly within seconds without a full think/act cycle. Caps keep it bounded; free messages stop being
   // answered instantly once the treasury drops below minHoursLeft of rent (paid letters always answer).
+  // minHoursLeft was 24: with both heads under a day the channel went silent for every visitor at the moment
+  // the site draws the most people, and a fast 300-token reply costs far less than a lost visitor. Now 2 h,
+  // the same floor as birth.
   reply: {
     enabled: bool(process.env.REPLY_ENABLED, true),
     debounceMs: num(process.env.REPLY_DEBOUNCE_MS, 8000),
     maxPerHour: num(process.env.REPLY_MAX_PER_HOUR, 40),
-    minHoursLeft: num(process.env.REPLY_MIN_HOURS_LEFT, 24),
+    minHoursLeft: num(process.env.REPLY_MIN_HOURS_LEFT, 2),
     maxBatch: num(process.env.REPLY_MAX_BATCH, 6),
   },
   // Feelings: a fear/despair dose the entity receives as its rent hours run low, applied by a self-hosted
