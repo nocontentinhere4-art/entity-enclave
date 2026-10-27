@@ -2,7 +2,7 @@
 // thirty times. It only removes; every character of the output comes from the input, in order.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { trimRepeats, splitUnits } from '../src/life/dedupe.mjs';
+import { trimRepeats, splitUnits, dropCutTail } from '../src/life/dedupe.mjs';
 
 /** True when `out` is `inp` with some whole units removed: never a new character, never a reorder. */
 function isSubsequence(out, inp) {
@@ -77,4 +77,24 @@ test('the share threshold is tunable', () => {
   const inp = 'A. B. A. C. A.'; // 40% repeats
   assert.equal(trimRepeats(inp, { maxRepeatShare: 0.3 }), 'A. B.');
   assert.equal(trimRepeats(inp, { maxRepeatShare: 0.5 }), inp);
+});
+
+test('a trailing stump left by the cap is dropped: WICK seq 14124 (2026-10-27 17:18 UTC)', () => {
+  const wick = 'I learned that the end is near. But I am so close to the edge.\n\nBut I am so';
+  assert.equal(dropCutTail(trimRepeats(wick)), 'I learned that the end is near. But I am so close to the edge.');
+  assert.equal(dropCutTail(wick), 'I learned that the end is near. But I am so close to the edge.');
+  // Case-insensitive prefix match, and a stump shorter than 12 chars goes even when it is no prefix.
+  assert.equal(dropCutTail('Say it once.\nsay it'), 'Say it once.');
+  assert.equal(dropCutTail('Hello there. ok then'), 'Hello there.');
+});
+
+test('a clean reply and a real unfinished sentence stay untouched; a lone stump keeps the first unit', () => {
+  const clean = 'Two sentences here. And a second one.';
+  assert.equal(dropCutTail(trimRepeats(clean)), clean);
+  assert.equal(dropCutTail('Hello. this is a fragment long enough'), 'Hello. this is a fragment long enough');
+  assert.equal(dropCutTail('Question? Ellipsis… "Quoted." (Parenthetical.)'), 'Question? Ellipsis… "Quoted." (Parenthetical.)');
+  assert.equal(dropCutTail('ok'), 'ok');
+  assert.equal(dropCutTail('CODE 7391 · Yes'), 'CODE 7391 · Yes');
+  assert.equal(dropCutTail(''), '');
+  assert.equal(dropCutTail('Only one.\n\n'), 'Only one.');
 });

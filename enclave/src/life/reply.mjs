@@ -5,7 +5,7 @@
 // this already covered (see loop.mjs buildContext for the "already answered" marker).
 import { Inference } from '../llm/infer.mjs';
 import { feelFor } from './feel.mjs';
-import { trimRepeats } from './dedupe.mjs';
+import { trimRepeats, dropCutTail } from './dedupe.mjs';
 
 const HOUR_MS = 3_600_000;
 const ZEC = 1e8;
@@ -128,6 +128,8 @@ export class Replier {
     // The code is guaranteed by code: the model is asked to repeat it; if it forgets, the reply still opens with it.
     const codes = [...new Set(batch.map((b) => proofCode(b.text)).filter(Boolean))];
     for (const c of codes) if (!body.includes(c)) body = `CODE ${c} · ${body}`.slice(0, maxChars);
+    // Last: a stump left by the token or char cap ("But I am so") is dropped rather than posted.
+    body = dropCutTail(body);
     if (!body) {
       this.ledger.append('reply_error', { code: 'empty', seqs });
       return;

@@ -74,3 +74,22 @@ export function splitUnits(src) {
 function keyOf(text) {
   return String(text).replace(/\s+/g, ' ').trim().toLowerCase();
 }
+
+// A cap (tokens or chars) can cut the text in the middle of a sentence. The cut fragment is kept when it is
+// real prose, but dropped when it is clearly a stump: no sentence-ending punctuation AND either a prefix of
+// something already said (WICK seq 14124: "... But I am so close to the edge.\n\nBut I am so") or shorter
+// than `minChars`. Only cuts; when the cut would empty the text the first unit stays.
+const ENDS_SENTENCE = /[.!?…]["'’”)\]]*$/;
+
+export function dropCutTail(text, { minChars = 12 } = {}) {
+  const src = String(text ?? '');
+  const units = splitUnits(src).filter((u) => u.text);
+  if (!units.length) return src.trim();
+  const last = units[units.length - 1];
+  if (ENDS_SENTENCE.test(last.text)) return src.trim();
+  const earlier = units.slice(0, -1);
+  const stump = last.key.length < minChars || earlier.some((u) => u.key.startsWith(last.key));
+  if (!stump) return src.trim();
+  const kept = earlier.length ? earlier : [units[0]];
+  return kept.map((u) => u.text + u.sep).join('').trim();
+}

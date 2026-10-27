@@ -332,7 +332,10 @@ test('a looping reply is trimmed to what was said once, then capped at REPLY_MAX
   const b = w2.ledger.append('human_message', { author: 'bob', text: 'tell me everything' });
   w2.replier.enqueue({ seq: b.seq, author: 'bob', text: 'tell me everything', paid: false });
   await sleep(60);
-  assert.equal(posts(w2.ledger)[0].data.text.length, 500);
+  // The cap cuts mid-sentence; the stump ("Sentence number 1", a prefix of an earlier one) is dropped, not posted.
+  const t = posts(w2.ledger)[0].data.text;
+  assert.ok(t.length <= 500 && t.length > 450, t.length);
+  assert.match(t, /different\.$/);
   assert.equal(seen[0].maxTokens, 120);
   assert.match(seen[0].context, /Max ~500 characters\. Say each thing once\./);
 });
@@ -345,7 +348,11 @@ test('a paid letter keeps the fuller caps (REPLY_PAID_MAX_TOKENS / REPLY_PAID_MA
   w.replier.enqueue({ seq: a.seq, author: null, text: 'a paid question', paid: true });
   await sleep(60);
   assert.equal(seen[0].maxTokens, 300);
-  assert.equal(posts(w.ledger)[0].data.text.length, 1200);
+  // Here the cap leaves "Sentence number 36 is": over 12 chars and no prefix of an earlier sentence, so it is
+  // treated as real unfinished prose and kept (only a stump is dropped).
+  const paid = posts(w.ledger)[0].data.text;
+  assert.ok(paid.length <= 1200 && paid.length >= 1190, paid.length); // trailing whitespace at the cut is trimmed
+  assert.match(paid, /Sentence number 36 is$/);
   assert.match(seen[0].context, /Max ~1200 characters/);
 
   // The caps are env-tunable through config.reply.
@@ -355,5 +362,16 @@ test('a paid letter keeps the fuller caps (REPLY_PAID_MAX_TOKENS / REPLY_PAID_MA
   w2.replier.enqueue({ seq: b.seq, author: 'carol', text: 'hi', paid: false });
   await sleep(60);
   assert.equal(seen2[0].maxTokens, 64);
-  assert.equal(posts(w2.ledger)[0].data.text.length, 100);
+  const small = posts(w2.ledger)[0].data.text;
+  assert.ok(small.length <= 100 && small.length > 60, small.length);
+  assert.match(small, /different\.$/);
+});
+
+test('a reply cut by the cap never ends on a stump: WICK seq 14124', async () => {
+  const wick = 'I learned that the end is near. But I am so close to the edge.\n\nBut I am so';
+  const w = makeReplier({ inference: { async think() { return { text: wick, costZats: 0 }; } } });
+  const a = w.ledger.append('human_message', { author: 'alice', text: 'what did you learn?' });
+  w.replier.enqueue({ seq: a.seq, author: 'alice', text: 'what did you learn?', paid: false });
+  await sleep(60);
+  assert.equal(posts(w.ledger)[0].data.text, 'I learned that the end is near. But I am so close to the edge.');
 });
