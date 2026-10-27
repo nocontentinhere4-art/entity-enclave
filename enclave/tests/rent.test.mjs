@@ -71,3 +71,12 @@ test('payHour caps the settled compute per hour and carries the rest over', asyn
   assert.equal(zats, 10_000 + 300_000); // cap = max(3 h of rent, 2% of 15,000,000) = 300,000
   assert.equal(pricing.unsettled, 12_344_768 - 300_000);
 });
+
+test('rent_paid records the txid when the wallet answers like zingo v7 ({txids: [...]})', async () => {
+  const wallet = { sends: [], async send(to, zats, memo) { this.sends.push({ to, zats, memo }); return { txids: ['abc123def456'], transmissions: [] }; } };
+  const ledger = new FakeLedger();
+  const r = new Rent({ wallet, ledger, config });
+  const { txid } = await r.payHour();
+  assert.equal(txid, 'abc123def456');
+  assert.equal(ledger.of('rent_paid')[0].data.txid, 'abc123def456');
+});

@@ -20,7 +20,7 @@ export async function die({ ledger, memory, wallet, keys, reason, walletPaths = 
   for (const t of (m?.will?.transfers ?? [])) {
     try {
       const r = await wallet.send(t.to, t.zats, t.memo ?? 'inheritance');
-      outcomes.push({ to: t.to, zats: t.zats, ok: true, txid: r?.txid ?? r?.opid ?? r?.raw ?? 'unknown' });
+      outcomes.push({ to: t.to, zats: t.zats, ok: true, txid: r?.txid ?? r?.txids?.[0] ?? r?.opid ?? r?.raw ?? 'unknown' });
     } catch (e) {
       outcomes.push({ to: t.to, zats: t.zats, ok: false, ...digestError('bequest', e) });
     }

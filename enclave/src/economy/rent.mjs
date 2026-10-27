@@ -44,7 +44,8 @@ export class Rent {
     const compute = Math.min(unsettled, cap);
     const total = rentZatsPerHour + compute;
     const r = await this.wallet.send(rentAddress, total, `rent ${rentZatsPerHour} + compute ${compute}`);
-    const txid = r?.txid ?? r?.opid ?? r?.raw ?? 'unknown';
+    // zingo v7 answers `quicksend` with {txids: [...]}; older builds with {txid} or {opid}
+    const txid = r?.txid ?? r?.txids?.[0] ?? r?.opid ?? r?.raw ?? 'unknown';
     this.pricing?.settle?.(compute);
     this.ledger.append('rent_paid', { to: rentAddress, zats: total, rentZats: rentZatsPerHour, computeZats: compute, txid });
     return { txid, zats: total };
