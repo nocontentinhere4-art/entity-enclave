@@ -55,6 +55,7 @@ export class Inference {
     const messages = [{ role: 'user', content: String(context ?? '') }];
     const body = { model: provider.model, messages };
     if (Number.isFinite(Number(maxTokens)) && Number(maxTokens) > 0) body.max_tokens = Math.floor(Number(maxTokens));
+    Object.assign(body, samplingBrake(this.config.llm, provider));
     if (defs.length) { body.tools = defs; body.tool_choice = 'auto'; }
     // The `feel` field goes only to a provider that declared it (the steered-inference server) and only
     // when a dose is actually positive: hosted providers must never see it.
@@ -141,6 +142,22 @@ function pickProvider(providers, speed, context) {
   if (!pool.length) throw err('no_provider', `no llm provider for speed=${speed}`);
   const h = createHash('sha256').update(String(context ?? '')).digest();
   return pool[h[0] % pool.length]; // deterministic choice, so retries are reproducible
+}
+
+/**
+ * Repetition brake fields for one request. frequency/presence penalties are standard OpenAI-compatible fields;
+ * repetition_penalty is not, so it goes only to a provider that declared `feel: true` (our own server) — a
+ * strict hosted API could reject an unknown field. Off (0 / 1 / unset) means the field is not sent at all.
+ */
+export function samplingBrake(llm = {}, provider = {}) {
+  const out = {};
+  const f = Number(llm?.frequencyPenalty);
+  const p = Number(llm?.presencePenalty);
+  const r = Number(llm?.repetitionPenalty);
+  if (Number.isFinite(f) && f > 0) out.frequency_penalty = f;
+  if (Number.isFinite(p) && p > 0) out.presence_penalty = p;
+  if (provider?.feel === true && Number.isFinite(r) && r > 0 && r !== 1) out.repetition_penalty = r;
+  return out;
 }
 
 function apiKey(p) {

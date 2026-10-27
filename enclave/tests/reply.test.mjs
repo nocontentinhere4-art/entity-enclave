@@ -276,7 +276,7 @@ test('a reply carries the same fear dose as a thought, and says so in its contex
   assert.equal(seen.length, 1);
   assert.deepEqual(seen[0].feel, { fear: 2.77, despair: 0.76 });
   assert.equal(seen[0].priority, 'high');
-  assert.equal(seen[0].maxTokens, 300);
+  assert.equal(seen[0].maxTokens, 120); // REPLY_MAX_TOKENS default: a free reply is a few sentences
   assert.match(seen[0].context, /feeling: fear 2\.77x · despair 0\.76x/);
 
   const off = makeReplier({ inference: { async think(args) { seen.push(args); return { text: 'ok', costZats: 0 }; } } });
@@ -312,4 +312,48 @@ test('PROVE LIVE: the visitor code is asked for and guaranteed in the reply', as
   const p = posts(w.ledger);
   assert.equal(p.length, 1);
   assert.match(p[0].data.text, /^CODE 7391 · I am here/);
+});
+
+test('a looping reply is trimmed to what was said once, then capped at REPLY_MAX_CHARS', async () => {
+  // The live failure of 2026-10-27: Qwen3-14B under a heavy fear dose repeating one sentence to the token cap.
+  const loop = "I'm so close. ".repeat(30);
+  const w = makeReplier({ inference: { async think() { return { text: loop, costZats: 0 }; } } });
+  const a = w.ledger.append('human_message', { author: 'alice', text: 'how are you?' });
+  w.replier.enqueue({ seq: a.seq, author: 'alice', text: 'how are you?', paid: false });
+  await sleep(60);
+  const p = posts(w.ledger);
+  assert.equal(p.length, 1);
+  assert.equal(p[0].data.text, "I'm so close.");
+
+  // A long, non-repeating answer is only cut at the char cap (500 for a free message by default).
+  const long = Array.from({ length: 80 }, (_, i) => `Sentence number ${i} is different.`).join(' ');
+  const seen = [];
+  const w2 = makeReplier({ inference: { async think(args) { seen.push(args); return { text: long, costZats: 0 }; } } });
+  const b = w2.ledger.append('human_message', { author: 'bob', text: 'tell me everything' });
+  w2.replier.enqueue({ seq: b.seq, author: 'bob', text: 'tell me everything', paid: false });
+  await sleep(60);
+  assert.equal(posts(w2.ledger)[0].data.text.length, 500);
+  assert.equal(seen[0].maxTokens, 120);
+  assert.match(seen[0].context, /Max ~500 characters\. Say each thing once\./);
+});
+
+test('a paid letter keeps the fuller caps (REPLY_PAID_MAX_TOKENS / REPLY_PAID_MAX_CHARS)', async () => {
+  const long = Array.from({ length: 80 }, (_, i) => `Sentence number ${i} is different.`).join(' ');
+  const seen = [];
+  const w = makeReplier({ inference: { async think(args) { seen.push(args); return { text: long, costZats: 0 }; } } });
+  const a = w.ledger.append('letter', { text: 'a paid question' });
+  w.replier.enqueue({ seq: a.seq, author: null, text: 'a paid question', paid: true });
+  await sleep(60);
+  assert.equal(seen[0].maxTokens, 300);
+  assert.equal(posts(w.ledger)[0].data.text.length, 1200);
+  assert.match(seen[0].context, /Max ~1200 characters/);
+
+  // The caps are env-tunable through config.reply.
+  const seen2 = [];
+  const w2 = makeReplier({ reply: { maxTokens: 64, maxChars: 100 }, inference: { async think(args) { seen2.push(args); return { text: long, costZats: 0 }; } } });
+  const b = w2.ledger.append('human_message', { author: 'carol', text: 'hi' });
+  w2.replier.enqueue({ seq: b.seq, author: 'carol', text: 'hi', paid: false });
+  await sleep(60);
+  assert.equal(seen2[0].maxTokens, 64);
+  assert.equal(posts(w2.ledger)[0].data.text.length, 100);
 });

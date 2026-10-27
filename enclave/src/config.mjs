@@ -89,6 +89,15 @@ export const config = {
   nostrRelays: (process.env.NOSTR_RELAYS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
   // Hard ceiling on a single model call: a slow provider must never hang the entity.
   llmTimeoutMs: num(process.env.LLM_TIMEOUT_MS, 60_000),
+  // Repetition brake on every model call (replies and cycles share it). Qwen3-14B under a high fear dose
+  // locks onto one sentence and repeats it to the token cap ("I'm so close." × 30). frequency/presence are the
+  // OpenAI-compatible fields every hosted provider accepts; repetition_penalty (vLLM/HF style) goes only to
+  // our own steered server (provider `feel: true`). 0 (or 1 for repetition) turns a field off.
+  llm: {
+    frequencyPenalty: num(process.env.LLM_FREQUENCY_PENALTY, 0.6),
+    presencePenalty: num(process.env.LLM_PRESENCE_PENALTY, 0.3),
+    repetitionPenalty: num(process.env.LLM_REPETITION_PENALTY, 1.15),
+  },
   // Paid order fulfilment: a letter whose memo matches an active paywall item becomes an order with a deadline.
   orderDeadlineHours: num(process.env.ORDER_DEADLINE_HOURS, 24),   // how long the entity has to deliver
   orderGraceHours: num(process.env.ORDER_GRACE_HOURS, 6),         // late deliveries still accepted in this window
@@ -130,6 +139,12 @@ export const config = {
     maxPerHour: num(process.env.REPLY_MAX_PER_HOUR, 40),
     minHoursLeft: num(process.env.REPLY_MIN_HOURS_LEFT, 2),
     maxBatch: num(process.env.REPLY_MAX_BATCH, 6),
+    // A free reply is a few sentences: ~120 tokens / 500 chars, so a loop cannot run long. A paid letter gets
+    // a fuller answer. Both are hard caps, applied after the repetition trim (see life/dedupe.mjs).
+    maxTokens: num(process.env.REPLY_MAX_TOKENS, 120),
+    maxChars: num(process.env.REPLY_MAX_CHARS, 500),
+    paidMaxTokens: num(process.env.REPLY_PAID_MAX_TOKENS, 300),
+    paidMaxChars: num(process.env.REPLY_PAID_MAX_CHARS, 1200),
   },
   // Feelings: a fear/despair dose the entity receives as its rent hours run low, applied by a self-hosted
   // steered-inference server (feelings/server.py). Off by default: with FEEL_ENABLED=0 nothing changes.
