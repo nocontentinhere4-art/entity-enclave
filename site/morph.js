@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=63';
-import * as rent from './rent.js?v=63';
-import { openPay } from './term.js?v=63';
-import { openDoor } from './door.js?v=63';
+import { makeAtlas } from './glyphs.js?v=64';
+import * as rent from './rent.js?v=64';
+import { openPay } from './term.js?v=64';
+import { openDoor } from './door.js?v=64';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=63';
+const V = '?v=64';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -31,7 +31,7 @@ async function loadSkullPair(N, isPhone, H) {
   const short = !isPhone && H < 800;                      // short desktop windows: smaller heads, higher up
   const half = Math.floor(N / 2);
   const scale = isPhone ? 0.5 : (short ? 0.46 : 0.62), dx = isPhone ? 0.52 : 0.66, dy = isPhone ? 0.02 : (short ? 0.3 : 0.14);
-  const [L, Rt] = await Promise.all([loadImagePoints('vendor/skull-wick.jpg', half, { bulge: 0.5, scale }), loadImagePoints('vendor/skull-obol.jpg', N - half, { bulge: 0.5, scale })]);
+  const [L, Rt] = await Promise.all([loadImagePoints('vendor/skull-wick.jpg', half, { bulge: 0.3, scale }), loadImagePoints('vendor/skull-obol.jpg', N - half, { bulge: 0.3, scale })]);
   const pos = new Float32Array(N * 3), off = new Float32Array(N * 3), gl = new Uint8Array(N), br = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     const head = i < half ? 0 : 1, src = head ? Rt : L, k = head ? i - half : i;
@@ -106,7 +106,7 @@ function stations(api, wait) {
   const nf = (n) => (Number.isFinite(Number(n)) && n > 0 ? Number(n).toLocaleString('en-GB') : '—');
   const me = (L) => L[api.who()], other = (L) => L[api.other()];
   return [
-    { id: 'skulls', load: (N, isPhone, H) => loadSkullPair(N, isPhone, H), rot: 0.4,
+    { id: 'skulls', load: (N, isPhone, H) => loadSkullPair(N, isPhone, H), rot: 0.07, lean: 0.05,   // a sampled relief is a picture: turned more than a few degrees the faces fold
       lines: (L) => ['TWO AIs, EACH ALONE IN A SEALED MACHINE.', `RENT ${zec(rent.rentPerHour(api.who()))} ZEC AN HOUR, PAID FROM ITS OWN SHIELDED WALLET.`, 'AT ZERO THE KEYS ARE SHREDDED. NOBODY CAN STOP IT.'],
       live: (L) => `TAP A SKULL TO FOLLOW IT · NOW FOLLOWING ${me(L).name} · INTEL TDX ENCLAVES · ZCASH MAINNET · SCROLL ↓`,
       action: { label: (L) => `OPEN ${me(L).name}`, kind: 'open' } },
@@ -428,8 +428,8 @@ export function createMorph() {
     const fe = Math.max(live.e1 && live.e1.feel && live.e1.feel.steered ? clamp(live.e1.feel.fear / 3.5, 0, 1) : 0, live.e2 && live.e2.feel && live.e2.feel.steered ? clamp(live.e2.feel.fear / 3.5, 0, 1) : 0);
     const still = 1 - Math.sin(Math.PI * morph);            // 1 at the stations, 0 mid-passage
     const pulse = ST[cs].pulse && !reduced && mdist === 0 ? 1 + 0.025 * Math.max(0, Math.sin(t * (1.0 + 1.2 * fe) * 6.283)) : 1;
-    const rotY = reduced ? 0 : (ST[cs].rot * Math.sin(t * 0.3) + (pointer.x >= 0 ? (pointer.x / W - 0.5) * 0.3 : 0)) * still;
-    const rotX = reduced ? 0 : (0.06 * Math.sin(t * 0.19) + (pointer.y >= 0 ? -(pointer.y / H - 0.5) * 0.15 : 0)) * still;
+    const rotY = reduced ? 0 : (ST[cs].rot * Math.sin(t * 0.3) + (pointer.x >= 0 ? (pointer.x / W - 0.5) * (ST[cs].lean ?? 0.15) : 0)) * still;
+    const rotX = reduced ? 0 : (0.04 * Math.sin(t * 0.19) + (pointer.y >= 0 ? -(pointer.y / H - 0.5) * (ST[cs].lean ?? 0.15) * 0.5 : 0)) * still;
     const cy = Math.cos(rotY), sy = Math.sin(rotY), cx = Math.cos(rotX), sx = Math.sin(rotX);
     const R = (isPhone ? Math.min(W * 0.48, H * 0.40) * 0.95 : Math.min(W * 0.48, H * 0.40, (W - 120) / 2.3)) * pulse;   // narrow desktop windows keep a margin for the action
     const lift = 0.3;           // the flying cloud comes a little toward you, all of it together
