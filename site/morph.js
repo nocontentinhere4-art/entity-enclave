@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=62';
-import * as rent from './rent.js?v=62';
-import { openPay } from './term.js?v=62';
-import { openDoor } from './door.js?v=62';
+import { makeAtlas } from './glyphs.js?v=63';
+import * as rent from './rent.js?v=63';
+import { openPay } from './term.js?v=63';
+import { openDoor } from './door.js?v=63';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=62';
+const V = '?v=63';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -238,12 +238,41 @@ export function createMorph() {
     layoutRail();
   }
 
-  // ---- scroll → timeline: a fixed-length tween to the snapped station, identical every time
+  // ---- scroll → timeline: one station per gesture, a fixed-length passage, identical every time
   let P = 0, Ptarget = 0, t = 0, last = performance.now();
   const debugP = (() => { const v = parseFloat(new URLSearchParams(location.search).get('p')); return Number.isFinite(v) ? v : null; })();   // ?p=1.5 freezes a passage for screenshots
-  const tween = { from: 0, to: 0, t0: 0, dur: 0.9 };
+  const PASS = 0.55;                                           // seconds for a full passage
+  const tween = { from: 0, to: 0, t0: 0, dur: PASS };
   let arrivedAt = 0, lastS = 0, lastScrollAt = 0;
   window.addEventListener('scroll', () => { lastScrollAt = t; }, { passive: true });
+  // a flick used to throw the document to the last station before any passage was seen: now a wheel turn, a swipe or a
+  // key is one station, the next gesture is taken only once the passage has played, and inertia never counts twice
+  const stepPx = () => (rail.offsetHeight / S) || window.innerHeight;
+  const station = () => Math.round(Ptarget);
+  function go(n) { n = clamp(Math.round(n), 0, S - 1); window.scrollTo({ top: n * stepPx(), behavior: 'instant' }); }
+  const owned = (el) => !(el && el.closest && el.closest('.door, input, textarea, select, button, a, label'));
+  let lockUntil = 0, wLast = 0, wPrevMag = 0, wArmed = true, wAcc = 0;
+  window.addEventListener('wheel', (e) => {
+    if (!owned(e.target)) return;
+    e.preventDefault();
+    const now = performance.now(), mag = Math.abs(e.deltaY);
+    if (now - wLast > 160) { wAcc = 0; wArmed = true; }                 // a pause: a new gesture
+    else if (mag > wPrevMag * 1.5 && mag > 10) wArmed = true;          // the finger pushed again inside the inertia tail
+    wLast = now; wPrevMag = mag;
+    if (!wArmed || now < lockUntil) return;
+    wAcc += e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? window.innerHeight : 1);
+    if (Math.abs(wAcc) < 30) return;
+    go(station() + Math.sign(wAcc)); wAcc = 0; wArmed = false; lockUntil = now + PASS * 1000 + 150;
+  }, { passive: false });
+  let tY = null, tStepped = false;
+  window.addEventListener('touchstart', (e) => { tY = owned(e.target) ? e.touches[0].clientY : null; tStepped = false; }, { passive: true });
+  window.addEventListener('touchmove', (e) => {
+    if (tY == null) return;
+    if (e.cancelable) e.preventDefault();
+    const dy = tY - e.touches[0].clientY, now = performance.now();
+    if (!tStepped && Math.abs(dy) > 36 && now >= lockUntil) { go(station() + Math.sign(dy)); tStepped = true; lockUntil = now + PASS * 1000 + 150; }
+  }, { passive: false });
+  window.addEventListener('touchend', () => { tY = null; }, { passive: true });
   let live = rent.getRentState();
   const pointer = { x: -1, y: -1 };
   const typed = new Map();
@@ -321,6 +350,11 @@ export function createMorph() {
   window.addEventListener('keydown', (e) => {
     if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
     if (e.key === 'Enter') { const r = hits.find((x) => x.main); if (r) r.fn(); }
+    const k = e.key;
+    const d = (k === 'ArrowDown' || k === 'PageDown' || k === ' ') ? 1 : (k === 'ArrowUp' || k === 'PageUp') ? -1 : 0;
+    if (d) { e.preventDefault(); if (performance.now() >= lockUntil) { go(station() + d); lockUntil = performance.now() + PASS * 1000 + 150; } }
+    else if (k === 'Home') { e.preventDefault(); go(0); }
+    else if (k === 'End') { e.preventDefault(); go(S - 1); }
   });
 
   // ---- loading: the skulls first, the rest after them
@@ -362,7 +396,7 @@ export function createMorph() {
     // keyboard and toolbar scrolls stop short of the snap: once the scroll idles near a station, land on it
     const near = Math.round(target);
     if (near !== target && t - lastScrollAt > 0.15 && Math.abs(target - near) < 0.15) { target = near; lastScrollAt = t; window.scrollTo({ top: near * step, behavior: 'instant' }); }
-    if (target !== Ptarget) { tween.from = P; tween.to = target; tween.t0 = t; tween.dur = Math.abs(target - P) >= 0.5 ? 0.9 : 0.35; Ptarget = target; }
+    if (target !== Ptarget) { tween.from = P; tween.to = target; tween.t0 = t; tween.dur = Math.abs(target - P) >= 0.5 ? PASS : 0.25; Ptarget = target; }
     if (debugP != null) P = debugP;
     else if (reduced) P = Ptarget;
     else { const k = clamp((t - tween.t0) / tween.dur, 0, 1); P = tween.from + (tween.to - tween.from) * easeInOut(k); if (k >= 1) P = tween.to; }
@@ -453,7 +487,7 @@ export function createMorph() {
     }
 
     // captions (stations only; gone during the passage)
-    const capA = clamp(1 - mdist / 0.08, 0, 1) * clamp((t - arrivedAt) / 0.3, 0, 1) * (reduced ? 1 : clamp((t - 0.2) / 0.5, 0, 1));
+    const capA = clamp(1 - mdist / 0.08, 0, 1) * clamp((t - arrivedAt) / 0.2, 0, 1) * (reduced ? 1 : clamp((t - 0.2) / 0.5, 0, 1));
     const st = ST[cs];
     if (capA > 0.02 && obj) {
       const size = isPhone ? 17 : (H < 800 ? 21 : 26);
