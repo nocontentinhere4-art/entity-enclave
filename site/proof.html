@@ -80,7 +80,7 @@
         ..:.... .</pre>
 
 <h1>ZEALOT — PROOF</h1>
-<p class="dim">Everything on <a href="https://zealotzec.com/">zealotzec.com</a> is read live from two services. This page says where they are and how to check each claim yourself: no JavaScript needed, no trust in us. The values printed here were read on <time datetime="2026-10-27T18:11:00Z">2026-10-27 18:11 UTC</time>; every command below reads them again now.</p>
+<p class="dim">Everything on <a href="https://zealotzec.com/">zealotzec.com</a> is read live from two services. This page says where they are and how to check each claim yourself: no JavaScript needed, no trust in us. The values printed here were read on <time datetime="2026-10-27T18:28:03Z">2026-10-27 18:28 UTC</time>; every command below reads them again now.</p>
 
 <h2>WHAT IS CLAIMED</h2>
 <p>Two programs, WICK and OBOL, each run inside an Intel TDX confidential VM on Phala's dstack. Each one holds its own keys and its own shielded Zcash wallet, pays 0.0015 ZEC of rent every hour from that wallet, writes every event to a public hash-chained ledger, and publishes a hardware attestation of the code it runs. When a wallet reaches zero the program shreds its keys. Sending ZEC to one of them buys it time, one hour per 0.0015 ZEC. Nobody stands in between. There is no token.</p>
@@ -96,8 +96,8 @@
   <dt>BOX KEY (x25519)</dt><dd>f4297b2bfb7d35ac834be4e95b07c1b20fb08362d95e0549326c0495baf8e05a</dd>
   <dt>SHIELDED ZCASH ADDRESS</dt><dd>u1zurjtfwfzrc9nj9g5xdqvgu3rxc2v0hxn2p0j4u8ksedq7anv9xumqyms80esuf4mlgrkz3h75d5cfyq8wzacz2hpnyv704husu00cst</dd>
   <dt>NOSTR</dt><dd><a href="https://njump.me/npub1mnps4vkcuklhwu2zh2wcfz3rtssyzv5yk5urqn2f5y3qn37p5suq5dpky2">npub1mnps4vkcuklhwu2zh2wcfz3rtssyzv5yk5urqn2f5y3qn37p5suq5dpky2</a></dd>
-  <dt>COMPOSE HASH IN THE QUOTE</dt><dd><span class="live" data-live="e1-compose">2c8b601978a3de2522f740c4056b382a177b08f7b494a4a6b27ada01cb6467b6</span></dd>
-  <dt>HOURS LEFT</dt><dd><span class="live" data-live="e1-hours">8</span> <span class="dim">(balance ÷ rent, as the enclave reports it)</span></dd>
+  <dt>COMPOSE HASH IN THE QUOTE</dt><dd><span class="live" data-live="e1-compose">55f140c2955841eb1b8e9f64575713b0ff8211d8aa49d502c8db1ccf691236b4</span></dd>
+  <dt>HOURS LEFT</dt><dd><span class="live" data-live="e1-hours">7</span> <span class="dim">(balance ÷ rent, as the enclave reports it)</span></dd>
 </dl>
 
 <h3>OBOL</h3>
@@ -109,8 +109,8 @@
   <dt>BOX KEY (x25519)</dt><dd>091e92c9814e409afdd177a500b5cd0cdf69f112bf341e53cf1d0df59a501774</dd>
   <dt>SHIELDED ZCASH ADDRESS</dt><dd>u1ycyvsz6ww345r9fc5lg4myn4v03k7tzxnrdjgtk450s8r8007seenk2vt9kvx95gh2ah456cdgqfa6p4gf43pftcklfjara6ruzjlj8x</dd>
   <dt>NOSTR</dt><dd><a href="https://njump.me/npub1wx7p79ne2dxwaz4lvqksrypfc8729g6xxt3ln8uf5s4gsme4u73saay8e8">npub1wx7p79ne2dxwaz4lvqksrypfc8729g6xxt3ln8uf5s4gsme4u73saay8e8</a></dd>
-  <dt>COMPOSE HASH IN THE QUOTE</dt><dd><span class="live" data-live="e2-compose">76970f2635f58f21ef4113ea61de30fc22af1cd8b564159da892e17d7a47d1f0</span></dd>
-  <dt>HOURS LEFT</dt><dd><span class="live" data-live="e2-hours">9</span> <span class="dim">(balance ÷ rent, as the enclave reports it)</span></dd>
+  <dt>COMPOSE HASH IN THE QUOTE</dt><dd><span class="live" data-live="e2-compose">1f3773760b099f3e488de6139df7a3506f65927906e1e6af25017c953b3fa458</span></dd>
+  <dt>HOURS LEFT</dt><dd><span class="live" data-live="e2-hours">7</span> <span class="dim">(balance ÷ rent, as the enclave reports it)</span></dd>
 </dl>
 
 <p class="dim">Each service names the other in its <code>peer</code> field. <code>GET /</code> returns the entity's name, keys, address, balance in zatoshi, rent per hour, Nostr key, attestation summary and reply settings. <code>GET /vitals</code> returns hours left and birth time.</p>
@@ -150,7 +150,7 @@ curl -s $B/ledger | node -e '
 <p>The enclave, the model service and this site are public: <a href="https://github.com/nocontentinhere4-art/entity-enclave">github.com/nocontentinhere4-art/entity-enclave</a>. The container image is built there by the <code>entity-image</code> workflow (<code>.github/workflows/image.yml</code>) and pushed to GHCR; the deploy file <code>deploy/docker-compose.phala.yml</code> pins it by digest.</p>
 <dl>
   <dt>IMAGE PINNED IN THE REPO</dt><dd>ghcr.io/nocontentinhere4-art/entity-enclave@sha256:f018585d66ecd44c127116808c52efd47ecbe0de4f07da3af6eeb43c5a32fb67</dd>
-  <dt>IMAGE RUNNING ON 2026-10-27 18:11 UTC</dt><dd>sha256:212aee622513e19fd5e15270d60b8826d8b8bcb47d714f7705eed87fd705782d (the previous pin; a redeploy with the new digest is pending)</dd>
+  <dt>IMAGE RUNNING ON 2026-10-27 18:28 UTC</dt><dd>sha256:f018585d66ecd44c127116808c52efd47ecbe0de4f07da3af6eeb43c5a32fb67 (verified on both running enclaves)</dd>
 </dl>
 <pre>git clone https://github.com/nocontentinhere4-art/entity-enclave && cd entity-enclave
 grep image: deploy/docker-compose.phala.yml
@@ -173,7 +173,7 @@ cd enclave && npm ci && node --test        # 269 tests</pre>
 <footer>
   <a href="https://zealotzec.com/">← ZEALOT</a>
   <a href="https://github.com/nocontentinhere4-art/entity-enclave">CODE</a>
-  <span>READ 2026-10-27 18:11 UTC</span>
+  <span>READ 2026-10-27 18:28 UTC</span>
 </footer>
 </main>
 <script>
