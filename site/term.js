@@ -12,8 +12,8 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=88';
-import { zip321Uri, qrSvg } from './qr.js?v=88';
+} from './data.js?v=89';
+import { zip321Uri, qrSvg } from './qr.js?v=89';
 
 const ANY_MIN_ZEC = 0.006;          // any-coin route (Trocador) minimum, with margin over their ~0.0045
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
@@ -200,7 +200,7 @@ async function loadAll(full) {
     const d1 = state.ais.e1;
     const peer = d1 && d1.ok ? peerUrlOf(d1.root.peer) : '';
     const e2 = AIS[1];
-    if (!e2.base && peer) e2.base = peer;
+    if (peer) e2.base = peer;   // the living peer's own word wins over the built-in address
     if (e2.base) await load(e2, full);
     state.order = AIS.filter((ai) => ai.base).map((ai) => ai.id);
     state.readAt = new Date();

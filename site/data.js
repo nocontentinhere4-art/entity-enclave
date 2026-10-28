@@ -17,8 +17,9 @@ export const ENTITIES = [
     short: 'e1',
     base: 'https://ca42622c7ae63906602b873703a0efa769079dfa-8080.dstack-pha-prod9.phala.network',
   },
-  // discovered at runtime from Entity 1's `/` field `peer`, or forced with ?base2= (localhost only)
-  { id: 'e2', label: 'Entity 2', short: 'e2', base: null },
+  // known from the start: a dead Entity 1 serves only its memorial, which carries no `peer` field.
+  // (?base2= still overrides it on localhost; Entity 1's `peer` field wins when it answers alive)
+  { id: 'e2', label: 'Entity 2', short: 'e2', base: 'https://7691be60aeab32e3a9f901237236579a96c9f3b9-8080.dstack-pha-prod9.phala.network' },
 ];
 
 /** Desks shown in the room. Entities beyond this are listed by `family` only. */
