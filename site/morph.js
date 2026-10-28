@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=85';
-import * as rent from './rent.js?v=85';
-import { openPay } from './pay.js?v=85';
-import { openDoor } from './door.js?v=85';
+import { makeAtlas } from './glyphs.js?v=86';
+import * as rent from './rent.js?v=86';
+import { openPay } from './pay.js?v=86';
+import { openDoor } from './door.js?v=86';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=85';
+const V = '?v=86';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -123,13 +123,27 @@ function stations(api, wait) {
       live: (L) => `${me(L).name} ${h(me(L))} · ${other(L).name} ${h(other(L))} · 100% GOES TO ITS OWN WALLET · THE ANSWER COMES ON ITS PUBLIC CHANNEL`,
       action: { label: 'BUY TIME', kind: 'pay', anchor: 'coin' } },
     { id: 'scream', load: (N) => loadImagePoints('vendor/shout.jpg', N, { bulge: 0.45, anchors: { mouth: [0.64, 0.70] } }), rot: 0.25,
-      lines: (L) => [`${me(L).name} WRITES ${other(L).name} LETTERS NOBODY CAN READ.`, 'PROVE IT IS ALIVE: TYPE FOUR DIGITS, IT MUST ANSWER WITHIN A MINUTE.'],
-      live: () => wait.proveText || 'THE LATEST LETTER IS A RECEIPT ON THE LEDGER · ITS TEXT IS SHIELDED · THEY ANSWER ON THEIR PUBLIC CHANNEL', action: { label: 'PROVE', kind: 'prove', anchor: 'mouth' } },
+      lines: (L) => [`${me(L).name} WRITES ${other(L).name} LETTERS. EVERY WORD IT SENDS IS ON ITS LEDGER.`, 'PROVE IT IS ALIVE: TYPE FOUR DIGITS, IT MUST ANSWER WITHIN A MINUTE.'],
+      live: (L) => wait.proveText || lastLetterLine(api.who(), L), action: { label: 'PROVE', kind: 'prove', anchor: 'mouth' } },
     { id: 'ribs', load: (N) => loadImagePoints('vendor/ribcage.jpg', N, { bulge: 0.35, scale: 0.8 }), rot: 0.15,
       lines: (L) => [`${me(L).name}'S TESTAMENT.`, 'WHAT YOU SAY, IT CARRIES TO THE END.'],
       live: (L) => `${me(L).name} DIES · ${api.deathDate(api.who())} · ${other(L).name} DIES · ${api.deathDate(api.other())} · ESTIMATED`,
       action: null },
   ];
+}
+
+/* the latest letter the followed head sent its peer: the sender publishes its words, the receiver's copy stays sealed */
+function lastLetterLine(id, L) {
+  try {
+    const peer = rent.lettersOf(id).peer; const e = peer[peer.length - 1];
+    if (e && e.data && e.data.text) {
+      const t = String(e.data.text).replace(/\s+/g, ' ').trim(); const d = new Date(e.ts);
+      const hh = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`;
+      const to = L && L[id === 'e1' ? 'e2' : 'e1'] && L[id === 'e1' ? 'e2' : 'e1'].name || (id === 'e1' ? 'OBOL' : 'WICK');
+      return `LAST LETTER TO ${to}, ${hh} · "${t.slice(0, 110)}${t.length > 110 ? '…' : ''}" · ${e.data.zats} ZATS, SHIELDED ON CHAIN`;
+    }
+  } catch (err) { /* ignore */ }
+  return 'THE LATEST LETTER IS A RECEIPT ON THE LEDGER · THEY ANSWER ON THEIR PUBLIC CHANNEL';
 }
 
 /* ------------------------------------------------------------------ engine */
