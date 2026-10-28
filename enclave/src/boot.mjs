@@ -5,6 +5,7 @@
 import http from 'node:http';
 import { existsSync, readFileSync } from 'node:fs';
 import { Ledger } from './ledger.mjs';
+import { sendBody, publicChannelView, ledgerBytes } from './http/public.mjs';
 
 /** Scan an append-only ledger for a 'death' entry. Torn/unparsable lines are skipped, never fatal. */
 export function deathState(ledgerPath) {
@@ -34,6 +35,13 @@ function readEntries(ledgerPath) {
  * Never resolves: the process lives purely as this HTTP view.
  */
 export function deadView({ port, ledgerPath, keys, attestation, death }) {
+  return new Promise(() => {
+    memorialServer({ ledgerPath, keys, attestation, death }).listen(port, () => console.log(`entity is dead; memorial only on :${port}`));
+  });
+}
+
+/** The memorial HTTP server, not yet listening (tests bind it to a free port). */
+export function memorialServer({ ledgerPath, keys, attestation, death }) {
   const entries = readEntries(ledgerPath);
   const deathEntry = death?.entry ?? entries.findLast((e) => e.type === 'death');
   const ticks = entries.filter((e) => e.type === 'tick');
@@ -58,13 +66,23 @@ export function deadView({ port, ledgerPath, keys, attestation, death }) {
     ledger: { entries: entries.length },
     attestation: { mode: attestation.mode, app: attestation.app, compose: attestation.compose },
   });
-  return new Promise(() => {
-    http.createServer(async (req, res) => {
-      const json = (code, body) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body, null, 1)); };
+  return http.createServer(async (req, res) => {
+      // The memorial is read by the same browsers as the living face: same CORS, same gzip, same query handling.
+      res.setHeader('access-control-allow-origin', '*');
+      res.setHeader('access-control-allow-methods', 'GET, OPTIONS');
+      res.setHeader('access-control-allow-headers', 'content-type');
+      const query = new URL(req.url, 'http://x').searchParams;
+      const url = (req.url.split('?')[0].replace(/\/{2,}/g, '/').replace(/(.)\/+$/, '$1')) || '/';
+      const json = (code, body) => sendBody(req, res, code, { 'content-type': 'application/json' }, JSON.stringify(body, null, 1));
       try {
-        // Only the five public views: the read-only face, raw ledger, verification, attestation and the memorial.
-        if (req.method === 'GET' && req.url === '/') return json(200, homepage());
-        if (req.method === 'GET' && req.url === '/memorial') {
+        if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+        if (req.method !== 'GET') return json(405, { error: 'method not allowed' });
+        // The public views a dead entity still serves: the face, vitals (dead), the channel it left, raw ledger,
+        // verification, attestation and the memorial. No wallet, no inference, no writes.
+        if (url === '/') return json(200, homepage());
+        if (url === '/vitals') return json(200, { state: 'dead', zatoshis: 0, hoursLeft: 0, diedAt, reason, wallet: { ok: false, fault: 'dead' }, brain: [], daysAlive: null, bornAt: entries.find((e) => e.type === 'birth')?.ts ?? null, sleepUntil: null });
+        if (url === '/public-channel') return json(200, publicChannelView(entries, query));
+        if (url === '/memorial') {
           return json(200, {
             diedAt,
             reason,
@@ -73,13 +91,12 @@ export function deadView({ port, ledgerPath, keys, attestation, death }) {
             lifeStats,
           });
         }
-        if (req.method === 'GET' && req.url === '/attestation') return json(200, attestation);
-        if (req.method === 'GET' && req.url === '/ledger') { res.writeHead(200, { 'content-type': 'application/x-ndjson' }); return res.end(existsSync(ledgerPath) ? readFileSync(ledgerPath) : ''); }
-        if (req.method === 'GET' && req.url === '/verify') return json(200, Ledger.verify(ledgerPath));
+        if (url === '/attestation') return json(200, attestation);
+        if (url === '/ledger') return sendBody(req, res, 200, { 'content-type': 'application/x-ndjson' }, ledgerBytes(ledgerPath, query));
+        if (url === '/verify') return json(200, Ledger.verify(ledgerPath));
         json(404, { error: 'not found' });
       } catch (e) {
         json(500, { error: String(e?.message ?? e).slice(0, 300) });
       }
-    }).listen(port, () => console.log(`entity is dead (died ${diedAt}); memorial only on :${port}`));
-  });
+    });
 }

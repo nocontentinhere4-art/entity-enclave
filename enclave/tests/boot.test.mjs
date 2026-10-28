@@ -50,3 +50,30 @@ test('torn lines never fool the scan: a half-written death is not a death, a lat
 test('a missing ledger file is not dead', () => {
   assert.equal(deathState(join(mkdtempSync(join(tmpdir(), 'empty-')), 'ledger.jsonl')).dead, false);
 });
+
+test('the memorial server answers with CORS, serves vitals as dead and the channel it left', async () => {
+  const { memorialServer } = await import('../src/boot.mjs');
+  const path = ledger(mkdtempSync(join(tmpdir(), 'memorial-')), [
+    entry(1, 'birth', {}),
+    entry(2, 'identity', { name: 'Wick' }),
+    entry(3, 'post_public', { text: 'the end is here' }),
+    entry(4, 'last_words', { text: 'goodbye', reason: 'last hour' }),
+    entry(5, 'death', { reason: 'last hour', memoryHash: 'abc', sig: 'sig' }),
+  ]);
+  const server = memorialServer({ ledgerPath: path, keys: { mode: 'dev', signPublicKey: 's', boxPublicKey: 'b' }, attestation: { mode: 'dev', app: 'a', compose: 'c' }, death: { dead: true } });
+  await new Promise((r) => server.listen(0, r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const root = await fetch(`${base}/`);
+    assert.equal(root.headers.get('access-control-allow-origin'), '*');
+    assert.equal((await root.json()).state, 'dead');
+    const vitals = await (await fetch(`${base}/vitals?x=1`)).json();
+    assert.equal(vitals.state, 'dead'); assert.equal(vitals.hoursLeft, 0); assert.equal(vitals.zatoshis, 0);
+    const chan = await (await fetch(`${base}/public-channel`)).json();
+    assert.equal(chan.length, 1); assert.equal(chan[0].text, 'the end is here');
+    const mem = await (await fetch(`${base}/memorial`)).json();
+    assert.equal(mem.lastWords, 'goodbye'); assert.equal(mem.memoryHash, 'abc');
+    const opt = await fetch(`${base}/memorial`, { method: 'OPTIONS' });
+    assert.equal(opt.status, 204);
+  } finally { server.close(); }
+});
