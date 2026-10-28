@@ -9,14 +9,17 @@ import { sendBody, publicChannelView, ledgerBytes } from './http/public.mjs';
 
 /** Scan an append-only ledger for a 'death' entry. Torn/unparsable lines are skipped, never fatal. */
 export function deathState(ledgerPath) {
+  // The LAST death entry is the one that counts: a ledger that lived through a testnet death and a mainnet
+  // rebirth carries more than one, and the memorial must speak of the life that just ended.
   if (!existsSync(ledgerPath)) return { dead: false };
+  let last = null;
   for (const line of readFileSync(ledgerPath, 'utf8').split('\n')) {
     if (!line.trim()) continue;
     let e;
     try { e = JSON.parse(line); } catch { continue; } // torn tail or crash-cut line: no evidence, move on
-    if (e?.type === 'death') return { dead: true, entry: e };
+    if (e?.type === 'death') last = e;
   }
-  return { dead: false };
+  return last ? { dead: true, entry: last } : { dead: false };
 }
 
 /** Ledger content through the same tolerant lens: entries only (torn lines skipped), in file order. */
@@ -43,7 +46,7 @@ export function deadView({ port, ledgerPath, keys, attestation, death }) {
 /** The memorial HTTP server, not yet listening (tests bind it to a free port). */
 export function memorialServer({ ledgerPath, keys, attestation, death }) {
   const entries = readEntries(ledgerPath);
-  const deathEntry = death?.entry ?? entries.findLast((e) => e.type === 'death');
+  const deathEntry = entries.findLast((e) => e.type === 'death') ?? death?.entry ?? null;
   const ticks = entries.filter((e) => e.type === 'tick');
   // Charges are what the ticks paid to live: costZats on 'tick' entries (tick_llm repeats a subset).
   const lifeStats = {

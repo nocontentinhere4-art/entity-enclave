@@ -77,3 +77,22 @@ test('the memorial server answers with CORS, serves vitals as dead and the chann
     assert.equal(opt.status, 204);
   } finally { server.close(); }
 });
+
+test('a ledger with two deaths reports the last one, and so does the memorial', async () => {
+  const { memorialServer } = await import('../src/boot.mjs');
+  const path = ledger(mkdtempSync(join(tmpdir(), 'twodeaths-')), [
+    entry(1, 'birth', {}),
+    entry(2, 'death', { reason: 'testnet', memoryHash: 'old', sig: 'sig' }),
+    entry(3, 'wallet', { chain: 'mainnet' }),
+    entry(4, 'last_words', { text: 'the real goodbye', reason: 'last hour' }),
+    entry(5, 'death', { reason: 'last hour', memoryHash: 'new', sig: 'sig' }),
+  ]);
+  const s = deathState(path);
+  assert.equal(s.entry.data.memoryHash, 'new');
+  const server = memorialServer({ ledgerPath: path, keys: { mode: 'dev', signPublicKey: 's', boxPublicKey: 'b' }, attestation: { mode: 'dev', app: 'a', compose: 'c' }, death: s });
+  await new Promise((r) => server.listen(0, r));
+  try {
+    const mem = await (await fetch(`http://127.0.0.1:${server.address().port}/memorial`)).json();
+    assert.equal(mem.memoryHash, 'new'); assert.equal(mem.lastWords, 'the real goodbye');
+  } finally { server.close(); }
+});
