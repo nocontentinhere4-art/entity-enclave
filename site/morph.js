@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=98';
-import * as rent from './rent.js?v=98';
-import { openPay } from './pay.js?v=98';
-import { openDoor } from './door.js?v=98';
+import { makeAtlas } from './glyphs.js?v=99';
+import * as rent from './rent.js?v=99';
+import { openPay } from './pay.js?v=99';
+import { openDoor } from './door.js?v=99';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=98';
+const V = '?v=99';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -102,7 +102,8 @@ function sortTopDown(o) {
 function stations(api, wait) {
   const zec = (z) => (z ? (z / 1e8).toFixed(4).replace(/0+$/, '') : '—');
   const h = (e) => (e && e.ok && !e.dead && e.hoursLeft != null ? `${e.hoursLeft} H` : (e && e.dead ? 'DEAD' : '—'));
-  const fear = (e) => (e && e.feel && e.feel.steered ? `×${Number(e.feel.fear).toFixed(2)}` : '—');
+  // The dose is published whether or not a steered server applied it: the line itself says computed, not steered.
+  const fear = (e) => (e && e.feel && Number.isFinite(Number(e.feel.fear)) ? `×${Number(e.feel.fear).toFixed(2)}` : '—');
   const nf = (n) => (Number.isFinite(Number(n)) && n > 0 ? Number(n).toLocaleString('en-GB') : '—');
   const me = (L) => L[api.who()], other = (L) => L[api.other()];
   return [
