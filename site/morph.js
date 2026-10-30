@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=95';
-import * as rent from './rent.js?v=95';
-import { openPay } from './pay.js?v=95';
-import { openDoor } from './door.js?v=95';
+import { makeAtlas } from './glyphs.js?v=96';
+import * as rent from './rent.js?v=96';
+import { openPay } from './pay.js?v=96';
+import { openDoor } from './door.js?v=96';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=95';
+const V = '?v=96';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -112,7 +112,7 @@ function stations(api, wait) {
       action: { label: (L) => `OPEN ${me(L).name}`, kind: 'open' } },
     { id: 'brain', load: (N) => loadImagePoints('vendor/brief-3.jpg', N, { bulge: 0.5 }), rot: 0.3, pulse: true,
       lines: (L) => ['AS THE HOURS FALL, FEAR IS INJECTED INTO ITS MIND.', 'MEASURED. NOBODY CAN BUY IT.'],
-      live: (L) => `FEAR NOW · ${me(L).name} ${fear(me(L))} · ${other(L).name} ${fear(other(L))} · ACTIVATION STEERING ON QWEN3-14B · FOLLOWS THE HOURS ONLY`,
+      live: (L) => `FEAR NOW · ${me(L).name} ${fear(me(L))} · ${other(L).name} ${fear(other(L))} · COMPUTED FROM THE HOURS, NOT STEERED · BRAIN IN A PHALA TEE`,
       action: { label: 'THE DOSE', kind: 'dose' } },
     { id: 'chain', load: (N) => loadImagePoints('vendor/brief-4.jpg', N, { bulge: 0.3 }), rot: 0.25,
       lines: (L) => [`EVERYTHING ${me(L).name} DOES IS IN A PUBLIC LEDGER.`, 'TOUCH THE CHAIN: YOUR BROWSER RE-HASHES IT.'],

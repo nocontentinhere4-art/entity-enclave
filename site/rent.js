@@ -1,17 +1,17 @@
 // rent.js — ZEALOT v50 "RENT HAND" state machine.
 // Cadence, freshness, receipts, PROVE/SAY correlation, hash checks.
-// Imports ONLY term.js?v=95 and data.js?v=95. No canvas. Defensive.
+// Imports ONLY term.js?v=96 and data.js?v=96. No canvas. Defensive.
 // Ledger fetch throttled: boot, then only on root head change and >=5 min.
 // Exports: bootRent, getRentState, subscribeRent, refreshNow, genNonce,
 // startProve, say, cancelWait, checkHash, fetchDetail, rentPerHour, receiptsOf, lettersOf.
 
 import {
   state, loadAll, openPay, wirePay, deadline, nameOf, stateWord
-} from './term.js?v=95';
+} from './term.js?v=96';
 import {
   request, postMessage, verifyChain, formatInt, formatZats, fixed8,
   shortHash, hhmm, fmtStamp, stringOf, sha256Hex, parseLedger
-} from './data.js?v=95';
+} from './data.js?v=96';
 
 const LEDGER_INTERVAL_MS = 5 * 60 * 1000;
 const STALE_MS = 95 * 1000;
@@ -22,6 +22,7 @@ const WAIT_TIMEOUT_MS = 120 * 1000;
 const DETAIL_CACHE_MS = 60 * 1000;
 
 const IDS = ['e1', 'e2'];
+const STATION_NAME = { e1: 'WICK', e2: 'OBOL' };   // the founder's names for the stations; an entity's own name is its alias
 
 const doc = typeof document !== 'undefined' ? document : null;
 const perf = typeof performance !== 'undefined' ? performance : null;
@@ -96,7 +97,9 @@ function mergeRoot(id, res, t) {
     if (typeof r.state === 'string' && !d.state) d.state = r.state;
     if (typeof r.rentZatsPerHour === 'number') d.rentZatsPerHour = r.rentZatsPerHour;
     d.feel = r.feel && typeof r.feel === 'object' ? r.feel : null;
-    if (typeof r.entity === 'string' && r.entity) d.name = r.entity;
+    // Second life: the stations keep their names; whatever the entity calls itself is shown as an alias.
+    d.name = STATION_NAME[id] || d.name;
+    d.alias = typeof r.entity === 'string' && r.entity && r.entity !== 'unnamed' && r.entity.toUpperCase() !== d.name.toUpperCase() ? r.entity : null;
     if (r.zcash && typeof r.zcash.address === 'string') d.address = r.zcash.address;
     if (r.state === 'dead') { d.state = 'dead'; d.diedAt = r.diedAt || d.diedAt || null; d.hoursLeft = 0; d.zats = 0; }
   } else if (res && !res.ok) {

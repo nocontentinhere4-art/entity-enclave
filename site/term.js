@@ -12,9 +12,9 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=95';
-import { zip321Uri, qrSvg } from './qr.js?v=95';
-import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=95';
+} from './data.js?v=96';
+import { zip321Uri, qrSvg } from './qr.js?v=96';
+import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=96';
 
 const ANY_MIN_ZEC = 0.006;          // any-coin route (Trocador) minimum, with margin over their ~0.0045
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
@@ -101,7 +101,9 @@ async function load(ai, full = true) {
   d.error = root.ok ? null : (root.error || 'unreachable');
   if (root.ok) {
     d.root = root.data;
-    d.name = stringOf(root.data.entity) || NAME_FALLBACK[ai.id] || ai.label;
+    d.name = NAME_FALLBACK[ai.id] || ai.label;   // the stations keep their names; the self-chosen one is an alias
+    const self = stringOf(root.data.entity);
+    d.alias = self && self !== 'unnamed' && self.toUpperCase() !== d.name.toUpperCase() ? self : null;
     d.address = (root.data.zcash && root.data.zcash.address) || '';
     d.npub = (root.data.nostr && root.data.nostr.npub) || '';
     d.app = (root.data.attestation && root.data.attestation.app) || '';
