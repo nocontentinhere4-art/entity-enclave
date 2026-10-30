@@ -12,9 +12,9 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=97';
-import { zip321Uri, qrSvg } from './qr.js?v=97';
-import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=97';
+} from './data.js?v=98';
+import { zip321Uri, qrSvg } from './qr.js?v=98';
+import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=98';
 
 const ANY_MIN_ZEC = 0.006;          // any-coin route (Trocador) minimum, with margin over their ~0.0045
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
@@ -406,7 +406,7 @@ function keysCmd() {
 function tokenCmd() {
   say('$ZEALOT — NOT LAUNCHED · 0 ZEC paid to holders', 'line signal');
   say('  ticker      $ZEALOT', 'line dim');
-  say('  holders     1% of every trade, paid to holders in ZEC by the program, automatically', 'line dim');
+  say('  holders     3% of every trade, paid to holders in ZEC by the program, automatically', 'line dim');
   say('  supply      1,000,000,000 · liquidity locked · StonkFun, ZEC pair', 'line dim');
   say('  today       0 ZEC paid. hours do not give tokens.', 'line dim');
   if (TOKEN_CA) {   // live from StonkFun

@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=97';
-import * as rent from './rent.js?v=97';
-import { openPay } from './pay.js?v=97';
-import { openDoor } from './door.js?v=97';
+import { makeAtlas } from './glyphs.js?v=98';
+import * as rent from './rent.js?v=98';
+import { openPay } from './pay.js?v=98';
+import { openDoor } from './door.js?v=98';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=97';
+const V = '?v=98';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -111,7 +111,7 @@ function stations(api, wait) {
       live: (L) => `TAP A SKULL TO FOLLOW IT · NOW FOLLOWING ${me(L).name} · INTEL TDX ENCLAVES · ZCASH MAINNET · SCROLL ↓`,
       action: { label: (L) => `OPEN ${me(L).name}`, kind: 'open' } },
     { id: 'brain', load: (N) => loadImagePoints('vendor/brief-3.jpg', N, { bulge: 0.5 }), rot: 0.3, pulse: true,
-      lines: (L) => ['AS THE HOURS FALL, FEAR IS INJECTED INTO ITS MIND.', 'MEASURED. NOBODY CAN BUY IT.'],
+      lines: (L) => ['AS THE HOURS FALL, A FEAR DOSE IS COMPUTED FOR ITS MIND.', 'SHOWN, NOT INJECTED. NOBODY CAN BUY IT.'],
       live: (L) => `FEAR NOW · ${me(L).name} ${fear(me(L))} · ${other(L).name} ${fear(other(L))} · COMPUTED FROM THE HOURS, NOT STEERED · BRAIN IN A PHALA TEE`,
       action: { label: 'THE DOSE', kind: 'dose' } },
     { id: 'chain', load: (N) => loadImagePoints('vendor/brief-4.jpg', N, { bulge: 0.3 }), rot: 0.25,
@@ -562,7 +562,7 @@ export function createMorph() {
         if (a.kind === 'prove') {
           const slots = (wait.proveCode + '____').slice(0, 4).split('').join(' ');
           text(slots, bx + bw / 2, by - 30, 22, 'rgba(242,242,238,.92)', 'center', capA);
-          { const nr = wrap(`${rent.CODE_GUARANTEED ? `ENCLAVE IMAGE ${rent.PENDING_IMAGE}, THE ONE THE PUBLIC CODE BUILDS` : `IMAGE ${rent.PENDING_IMAGE} WAITS FOR REDEPLOY`} · BRAIN: QWEN3-14B ON A RENTED GPU, OUTSIDE THE TEE`, W - 32, 10); for (let i = 0; i < nr.length; i++) text(nr[i], W / 2, H - 44 - (nr.length - i) * 14, 10, 'rgba(242,242,238,.45)', 'center', capA); }
+          { const nr = wrap(`${rent.CODE_GUARANTEED ? `ENCLAVE IMAGE ${rent.PENDING_IMAGE}, THE ONE THE PUBLIC CODE BUILDS` : `IMAGE ${rent.PENDING_IMAGE} WAITS FOR REDEPLOY`} · ${rent.BRAIN_LINE}`, W - 32, 10); for (let i = 0; i < nr.length; i++) text(nr[i], W / 2, H - 44 - (nr.length - i) * 14, 10, 'rgba(242,242,238,.45)', 'center', capA); }
         }
       }
     }

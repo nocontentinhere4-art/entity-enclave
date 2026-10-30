@@ -16,11 +16,11 @@ import {
   lettersOf,
   rentPerHour,
   replyGate
-} from './rent.js?v=97';
+} from './rent.js?v=98';
 
-import { openPay } from './pay.js?v=97';
-import { mountCloud } from './glyphcloud.js?v=97';
-import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=97';
+import { openPay } from './pay.js?v=98';
+import { mountCloud } from './glyphcloud.js?v=98';
+import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=98';
 
 import {
   formatInt,
@@ -31,7 +31,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=97';
+} from './data.js?v=98';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1200,7 +1200,7 @@ function buildMore(body, title, id, state) {
       sub.append(mk('p', 'door-note', '$ZEALOT — NOT LAUNCHED · 0 ZEC paid to holders'));
       lines([
         ['TICKER', '$ZEALOT'],
-        ['HOLDERS', '1% of every trade, paid to holders in ZEC by the program, automatically'],
+        ['HOLDERS', '3% of every trade, paid to holders in ZEC by the program, automatically'],
         ['SUPPLY', '1,000,000,000 · liquidity locked · StonkFun, ZEC pair'],
         ['TODAY', '0 ZEC paid. hours do not give tokens.']
       ]);
@@ -1248,7 +1248,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=97', e2: 'vendor/skull-obol.jpg?v=97' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=98', e2: 'vendor/skull-obol.jpg?v=98' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1268,7 +1268,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=97`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=98`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;
