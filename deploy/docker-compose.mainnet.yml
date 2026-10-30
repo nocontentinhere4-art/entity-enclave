@@ -2,7 +2,7 @@
 # Per CVM in the dashboard: SELF_URL, PEER_URL, PARENT_URL (children only) and the secrets REDPILL_API_KEY, PHALA_API_KEY, SOLANA_RPC_URL.
 services:
   entity:
-    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:8e8b09425dc93e8bc8140498f34a2b35c3ba4aa4569219ccf84a034df4fad3c5
+    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:bc107e43404db9fda3506d566ece45e211aef3d34a561a780b8d2e1f81fa3688
     ports:
       - "8080:8080"
     volumes:
@@ -16,7 +16,7 @@ services:
       # Raised from 10,000 on 2026-10-24 (founder): ~88 h of runway at today's treasuries, so the fear dose is live.
       - RENT_ZATS_PER_HOUR=150000
       - PRICE_SCALE=0.01
-      - BIRTH_MIN_ZATS=20000
+      - BIRTH_MIN_ZATS=300000
       - INITIAL_TREASURY_ZATS=15000000
       - SPAWN_MIN_ZATS=30000000
       - CHILD_GIFT_ZATS=15000000
@@ -25,7 +25,7 @@ services:
       - TICK_MS=300000
       - REPLY_DEBOUNCE_MS=2000
       - REPLY_MAX_TOKENS=80
-      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:8e8b09425dc93e8bc8140498f34a2b35c3ba4aa4569219ccf84a034df4fad3c5
+      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:bc107e43404db9fda3506d566ece45e211aef3d34a561a780b8d2e1f81fa3688
       - GATEWAY_DOMAIN=dstack-pha-prod9.phala.network
       - FAKE_LLM=0
       - FAKE_WALLET=0
@@ -51,8 +51,9 @@ services:
       # Letters: a shielded memo to the landlord (rent address) or the peer, public on the ledger, one per 12 h each.
       - LETTER_EVERY_HOURS=12
       - LETTER_ZATS=10000
-      # Feelings server (RunPod A40, outside the TEE): both speeds on it; secret FEEL_API_KEY in the CVM.
-      # LLM_PROVIDERS = the one line in deploy/LLM_PROVIDERS.feelings.json
+      # Brain (2026-10-30): Phala Private AI, TEE-served models; secret PHALA_AI_API_KEY in the CVM (Private AI → API Keys).
+      # LLM_PROVIDERS = the one line in deploy/LLM_PROVIDERS.phala.json (fast: qwen3.8-27b-uncensored, deep: deepseek-v4.1-flash)
+      - PHALA_AI_API_KEY=${PHALA_AI_API_KEY}
       - LLM_TIMEOUT_MS=120000
     restart: unless-stopped
 volumes:
