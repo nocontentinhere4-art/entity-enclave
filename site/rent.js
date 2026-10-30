@@ -1,17 +1,17 @@
 // rent.js — ZEALOT v50 "RENT HAND" state machine.
 // Cadence, freshness, receipts, PROVE/SAY correlation, hash checks.
-// Imports ONLY term.js?v=105 and data.js?v=105. No canvas. Defensive.
+// Imports ONLY term.js?v=106 and data.js?v=106. No canvas. Defensive.
 // Ledger fetch throttled: boot, then only on root head change and >=5 min.
 // Exports: bootRent, getRentState, subscribeRent, refreshNow, genNonce,
 // startProve, say, cancelWait, checkHash, fetchDetail, rentPerHour, receiptsOf, lettersOf.
 
 import {
   state, loadAll, openPay, wirePay, deadline, nameOf, stateWord
-} from './term.js?v=105';
+} from './term.js?v=106';
 import {
   request, postMessage, verifyChain, formatInt, formatZats, fixed8,
   shortHash, hhmm, fmtStamp, stringOf, sha256Hex, parseLedger
-} from './data.js?v=105';
+} from './data.js?v=106';
 
 const LEDGER_INTERVAL_MS = 5 * 60 * 1000;
 const STALE_MS = 95 * 1000;
@@ -768,6 +768,12 @@ export function entriesOf(id, n = 400) {
   const d = getEntity(id);
   const E = Array.isArray(d.entries) ? d.entries : [];
   return E.slice(-n);
+}
+
+/** The public channel as merged every 15 s: posts, human messages and screams (kind 'scream'). */
+export function postsOf(id) {
+  const d = getEntity(id);
+  return Array.isArray(d.posts) ? d.posts : [];
 }
 
 export function receiptsOf(id) {

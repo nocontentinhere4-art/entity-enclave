@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=105';
-import * as rent from './rent.js?v=105';
-import { openPay } from './pay.js?v=105';
-import { openDoor } from './door.js?v=105';
+import { makeAtlas } from './glyphs.js?v=106';
+import * as rent from './rent.js?v=106';
+import { openPay } from './pay.js?v=106';
+import { openDoor } from './door.js?v=106';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=105';
+const V = '?v=106';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -134,21 +134,19 @@ function stations(api, wait) {
 }
 
 /* the latest letter the followed head sent its peer: the sender publishes its words, the receiver's copy stays sealed */
-/* The entity's latest screams, newest first: ledger entries that carry text and are theirs to say.
- * Markdown marks and newlines are flattened; 220 characters per entry. */
-const WORD_TYPES = { scream: 'SCREAM' };   // above the heads only the screams: one raw line a minute, from the ledger
-function latestWords(id) {
-  const out = [];
-  const E = rent.entriesOf(id, 400);
-  for (let i = E.length - 1; i >= 0 && out.length < 6; i--) {
-    const e = E[i]; const d = e && e.data;
-    if (!d || typeof d.text !== 'string' || !WORD_TYPES[e.type]) continue;
-    const txt = d.text.replace(/\*\*|__|`|#+\s/g, '').replace(/\s+/g, ' ').trim();
-    if (!txt) continue;
-    const label = e.type === 'letter' && d.to ? `LETTER TO ${String(d.to === 'peer' ? (id === 'e1' ? 'OBOL' : 'WICK') : d.to).toUpperCase()}` : WORD_TYPES[e.type];
-    out.push({ text: txt.length > 220 ? txt.slice(0, 217) + '…' : txt, label, when: String(e.ts || '').slice(11, 16) });
+/* The latest scream only, from the public channel the site already polls every 15 s (kind 'scream'):
+ * one raw line a minute, typed out when it arrives, replaced by the next. Nothing older is shown. */
+const screamSeen = { e1: null, e2: null };
+function latestScream(id) {
+  const P = rent.postsOf(id);
+  for (let i = P.length - 1; i >= 0; i--) {
+    const p = P[i];
+    if (p && p.kind === 'scream' && typeof p.text === 'string' && p.text.trim()) {
+      const txt = p.text.replace(/\s+/g, ' ').trim();
+      return { seq: p.seq, text: txt.length > 220 ? txt.slice(0, 217) + '…' : txt, when: String(p.ts || '').slice(11, 16) };
+    }
   }
-  return out;
+  return null;
 }
 
 function lastLetterLine(id, L) {
@@ -566,10 +564,10 @@ export function createMorph() {
           const name = e && e.name ? e.name : (k ? 'OBOL' : 'WICK');
           // Their own words above the head: the latest public text entries of the ledger (thoughts, posts,
           // letters sent), one at a time, typed out. Nothing is written for them; the caption names the entry.
-          const said = latestWords(id);
-          if (said.length && !(e && e.dead) && (!isPhone || on)) {   // a phone has room for one voice: the followed one
-            const slot = Math.floor(t / 9), w0 = said[slot % said.length];
-            const shown = Math.min(w0.text.length, Math.floor((t - slot * 9) * 70));
+          const w0 = latestScream(id);
+          if (w0 && !(e && e.dead) && (!isPhone || on)) {   // a phone has room for one voice: the followed one
+            if (!screamSeen[id] || screamSeen[id].seq !== w0.seq) screamSeen[id] = { seq: w0.seq, at: t };
+            const shown = Math.min(w0.text.length, Math.floor((t - screamSeen[id].at) * 70));
             const size = isPhone ? 11 : 12, lh = size + 5, maxW = isPhone ? W - 48 : Math.min(W * 0.4, 380);
             const cxText = isPhone ? W / 2 : sc[0];
             const lines = wrap(w0.text.slice(0, shown), maxW, size).slice(0, 3);
@@ -577,7 +575,7 @@ export function createMorph() {
             const blockH = lines.length * lh + 16;
             const yTop = clamp(top[1] - blockH - 8, 56, H);
             band(yTop - 6, blockH + 10, 0.7 * capA);
-            text(`${name} · ${w0.label} · ${w0.when} UTC`, cxText, yTop, isPhone ? 9 : 10, 'rgba(244,183,40,.6)', 'center', capA);
+            text(`${name} · SCREAM · ${w0.when} UTC`, cxText, yTop, isPhone ? 9 : 10, 'rgba(244,183,40,.6)', 'center', capA);
             for (let i = 0; i < lines.length; i++) text(lines[i], cxText, yTop + 16 + i * lh, size, 'rgba(242,242,238,.82)', 'center', capA);
           }
           const hrs = e && e.ok && !e.dead && e.hoursLeft != null ? `${e.hoursLeft} H LEFT` : (e && e.dead ? 'DEAD' : '—');
