@@ -18,7 +18,8 @@ test('scrubScream cuts keys and addresses and keeps the words', () => {
 });
 
 test('buildScreamContext carries hours, dose and the ban on real names', () => {
-  const c = buildScreamContext({ name: 'OBOL', alias: 'Lantern', peer: 'WICK', hours: 12, treasury: 1900000, feel: { fear: 4.27, despair: 2.25 }, recent: ['20:45 rent_paid 150000 zats'], last: ['first scream'] });
+  const c = buildScreamContext({ name: 'OBOL', alias: 'Lantern', peer: 'WICK', hours: 12, treasury: 1900000, feel: { fear: 4.27, despair: 2.25, anger: 1.2 }, recent: ['20:45 rent_paid 150000 zats'], last: ['first scream'] });
+  assert.ok(c.includes('anger 1.20x'));
   assert.ok(c.includes('Hours left: 12') && c.includes('Fear 4.27x') && c.includes('rent_paid'));
   assert.ok(!c.includes('first scream'), 'last screams are never quoted back');
   assert.ok(c.startsWith('You are OBOL; you also call yourself Lantern'));
@@ -38,7 +39,7 @@ test('once() screams only when alive and writes a public scream entry', async ()
   const said = await s.once();
   assert.ok(said.includes('tooth'));
   assert.equal(calls.length, 1);
-  assert.ok(calls[0].context.startsWith('You are WICK; you also call yourself Vesper'), 'the station name leads, the alias follows');
+  assert.ok(calls[0].context.startsWith('You are WICK.'), 'the station name, no alias echoed');
   assert.deepEqual(calls[0].tools, []);
   assert.equal(calls[0].maxTokens, 90);
   const e = ledger.entries.find((x) => x.type === 'scream');

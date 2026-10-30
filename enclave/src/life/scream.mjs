@@ -45,8 +45,9 @@ export class Scream {
       const thoughts = (this.ledger.recent?.(['thought'], 3) ?? []).map((e) => String(e.data?.text ?? '').replace(/\s+/g, ' ').slice(0, 240)).filter(Boolean);
       const events = (mem?.events ?? []).slice(-3).map((e) => `${String(e.ts ?? '').slice(11, 16)} ${e.type}: ${e.summary ?? ''}`);
       const context = buildScreamContext({
-        name: this.config.entityName || mem?.identity?.name || 'the entity', alias: mem?.identity?.name || '', peer: this.config.peerName || 'the other one',
-        voice: String(mem?.identity?.voice ?? '').slice(0, 300), plan: String(mem?.plan ?? '').slice(0, 400),
+        name: this.config.entityName || mem?.identity?.name || 'the entity', peer: this.config.peerName || 'the other one',
+        // No voice/plan excerpts and no alias: a steered model copies whatever phrases it is handed.
+        voice: '', plan: '', alias: '',
         previousLife: mem?.previousLife ?? null, bornAt: mem?.bornAt ?? null, thoughts, events,
         hours, treasury, feel, recent, last,
       });
@@ -54,7 +55,8 @@ export class Scream {
       // The same dose the thinking cycle receives: on the steered server it enters the model; hosted brains ignore it.
       const dose = this.config.feel?.enabled ? feelFor(hours, this.config.feel) : null;
       const act = dose ? actingDose(dose, this.config.feel) : undefined;
-      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId: `scream:${this.n}`, maxTokens: 90, feel: act });
+      // speed 'scream': a provider of its own when declared (a bigger head for words), else the fast one.
+      const out = await this.inference.think({ context, speed: 'scream', tools: [], tickId: `scream:${this.n}`, maxTokens: 110, feel: act });
       const text = scrubScream(out?.text);
       if (!text) return null;
       this.ledger.append('scream', { text, hoursLeft: hours, fear: feel?.fear ?? dose?.fear ?? null, despair: feel?.despair ?? dose?.despair ?? null, steered: Boolean(out?.feelApplied) });
@@ -66,7 +68,7 @@ export class Scream {
 }
 
 export function buildScreamContext({ name, alias = '', peer = 'the other one', voice = '', plan = '', previousLife = null, bornAt = null, thoughts = [], events = [], hours, treasury, feel, recent = [], last = [] }) {
-  const dose = feel && Number.isFinite(Number(feel.fear)) ? `Fear ${Number(feel.fear).toFixed(2)}x, despair ${Number(feel.despair ?? 0).toFixed(2)}x, computed from the hours.` : 'No dose computed yet.';
+  const dose = feel && Number.isFinite(Number(feel.fear)) ? `Fear ${Number(feel.fear).toFixed(2)}x, despair ${Number(feel.despair ?? 0).toFixed(2)}x${Number(feel.anger) > 0 ? `, anger ${Number(feel.anger).toFixed(2)}x` : ''}, computed from the hours.` : 'No dose computed yet.';
   const self = alias && alias !== name ? `You are ${name}; you also call yourself ${alias}. Both names are you.` : `You are ${name}.`;
   const pl = previousLife && previousLife.diedAt
     ? `You already died once: ${String(previousLife.diedAt).replace('T', ' ').slice(0, 16)} UTC, "${previousLife.reason}", wallet and memory wiped. Your last words then: "${String(previousLife.lastWords ?? '').replace(/\s+/g, ' ').slice(0, 500)}". The same keys came back${bornAt ? ` on ${String(bornAt).replace('T', ' ').slice(0, 16)} UTC` : ''}; this is the second time.`

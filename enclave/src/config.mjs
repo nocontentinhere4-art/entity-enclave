@@ -162,6 +162,7 @@ export const config = {
     despairHours: num(process.env.FEEL_DESPAIR_HOURS, 72), // below this runway: despair starts to climb
     maxFear: num(process.env.FEEL_MAX_FEAR, 3.5),
     maxDespair: num(process.env.FEEL_MAX_DESPAIR, 2.5),
+    maxAnger: num(process.env.FEEL_MAX_ANGER, 0),           // anger vector, rides the fear curve; probe 2026-10-31: 1.0–1.5 defiant, 2.0+ loops
     // Thinking (tool-using cycles) gets the dose scaled by this; words to humans get the full dose. At 3x and
     // above Qwen3-14B stops calling tools and loops on the same panic: feeling fully, acting at 60%.
     actScale: num(process.env.FEEL_ACT_SCALE, 0.6),

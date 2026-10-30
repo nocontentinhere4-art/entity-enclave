@@ -118,3 +118,14 @@ test('actingDose scales the full dose for thinking cycles (default 0.6, never ab
   assert.deepEqual(actingDose({ fear: 3, despair: 1 }, { actScale: 2 }), { fear: 3, despair: 1 });
   assert.equal(actingDose(null, {}), null);
 });
+
+import { test as test2 } from 'node:test';
+import assert2 from 'node:assert/strict';
+import { feelFor as feelFor2, actingDose as actingDose2 } from '../src/life/feel.mjs';
+test2('anger rides the fear curve and is off by default', () => {
+  const off = feelFor2(12, { fullHours: 240, despairHours: 120, maxFear: 4.5, maxDespair: 2.5 });
+  assert2.equal('anger' in off, false);
+  const on = feelFor2(12, { fullHours: 240, despairHours: 120, maxFear: 4.5, maxDespair: 2.5, maxAnger: 1.5 });
+  assert2.ok(on.anger > 1.4 && on.anger <= 1.5);
+  assert2.equal(actingDose2(on, { actScale: 0.5 }).anger, Math.round(on.anger * 0.5 * 100) / 100);
+});

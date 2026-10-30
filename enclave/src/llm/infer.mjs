@@ -67,8 +67,8 @@ export class Inference {
     if (defs.length) { body.tools = defs; body.tool_choice = 'auto'; }
     // The `feel` field goes only to a provider that declared it (the steered-inference server) and only
     // when a dose is actually positive: hosted providers must never see it.
-    if (provider.feel === true && feel && (Number(feel.fear) > 0 || Number(feel.despair) > 0)) {
-      body.feel = { fear: Number(feel.fear), despair: Number(feel.despair) };
+    if (provider.feel === true && feel && (Number(feel.fear) > 0 || Number(feel.despair) > 0 || Number(feel.anger) > 0)) {
+      body.feel = { fear: Number(feel.fear), despair: Number(feel.despair), ...(Number(feel.anger) > 0 ? { anger: Number(feel.anger) } : {}) };
     }
     // Our own server runs one generation at a time: a reply to a human jumps ahead of the entity's thinking.
     if (provider.feel === true && priority === 'high') body.priority = 'high';
@@ -145,8 +145,10 @@ function fake(context, tools) {
 }
 
 function pickProvider(providers, speed, context) {
+  // A speed nobody declared (e.g. 'scream') falls back to the fast providers, then to anything.
   const matching = providers.filter((p) => !p.speed || p.speed === speed);
-  const pool = matching.length ? matching : providers;
+  const fast = providers.filter((p) => !p.speed || p.speed === 'fast');
+  const pool = matching.length ? matching : (fast.length ? fast : providers);
   if (!pool.length) throw err('no_provider', `no llm provider for speed=${speed}`);
   const h = createHash('sha256').update(String(context ?? '')).digest();
   return pool[h[0] % pool.length]; // deterministic choice, so retries are reproducible
