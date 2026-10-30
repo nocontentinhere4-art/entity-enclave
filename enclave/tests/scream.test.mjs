@@ -41,7 +41,7 @@ test('once() screams only when alive and writes a public scream entry', async ()
   assert.equal(calls.length, 1);
   assert.ok(calls[0].context.startsWith('You are WICK.'), 'the station name, no alias echoed');
   assert.deepEqual(calls[0].tools, []);
-  assert.equal(calls[0].maxTokens, 90);
+  assert.equal(calls[0].maxTokens, 110);
   const e = ledger.entries.find((x) => x.type === 'scream');
   assert.equal(e.data.text, said);
   assert.equal(e.data.hoursLeft, 12);
