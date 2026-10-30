@@ -16,10 +16,11 @@ import {
   lettersOf,
   rentPerHour,
   replyGate
-} from './rent.js?v=90';
+} from './rent.js?v=91';
 
-import { openPay } from './pay.js?v=90';
-import { mountCloud } from './glyphcloud.js?v=90';
+import { openPay } from './pay.js?v=91';
+import { mountCloud } from './glyphcloud.js?v=91';
+import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=91';
 
 import {
   formatInt,
@@ -30,7 +31,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=90';
+} from './data.js?v=91';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1203,6 +1204,10 @@ function buildMore(body, title, id, state) {
         ['SUPPLY', '1,000,000,000 · liquidity locked · StonkFun, ZEC pair'],
         ['TODAY', '0 ZEC paid. hours do not give tokens.']
       ]);
+      if (TOKEN_CA) {   // live from StonkFun: what the 3% tax has actually paid holders
+        const row = mkRow('PAID TO HOLDERS', 'reading StonkFun…'); sub.append(row);
+        holderRewards().then((r) => { row.lastChild.textContent = rewardsLine(r); });
+      }
     },
     TRADES() { const t = mk('h3', 'door-title', 'TRADES'); sub.append(t); builders.trades(sub, t, id, getRentState(), {}); },
     NOSTR() { const t = mk('h3', 'door-title', 'NOSTR'); sub.append(t); builders.nostr(sub, t, id, getRentState(), {}); }
@@ -1223,7 +1228,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=90', e2: 'vendor/skull-obol.jpg?v=90' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=91', e2: 'vendor/skull-obol.jpg?v=91' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1243,7 +1248,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=90`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=91`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;
