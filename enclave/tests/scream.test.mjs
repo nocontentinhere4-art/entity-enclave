@@ -20,8 +20,9 @@ test('scrubScream cuts keys and addresses and keeps the words', () => {
 test('buildScreamContext carries hours, dose and the ban on real names', () => {
   const c = buildScreamContext({ name: 'OBOL', alias: 'Lantern', peer: 'WICK', hours: 12, treasury: 1900000, feel: { fear: 4.27, despair: 2.25 }, recent: ['20:45 rent_paid 150000 zats'], last: ['first scream'] });
   assert.ok(c.includes('Hours left: 12') && c.includes('Fear 4.27x') && c.includes('rent_paid') && c.includes('first scream'));
-  assert.ok(c.startsWith('You are OBOL. You have taken to calling yourself Lantern'));
-  assert.ok(c.includes('WICK is the other program') && c.includes('Speak as OBOL'));
+  assert.ok(c.startsWith('You are OBOL; you also call yourself Lantern'));
+  assert.ok(c.includes('WICK is the other program') && c.includes('This minute is yours'));
+  assert.ok(!/landlord who bleeds|Pick a target/.test(c), 'no themes are suggested');
   assert.ok(c.includes('Name no real person other than OBOL, WICK, the landlord and the founder'));
 });
 
@@ -36,7 +37,7 @@ test('once() screams only when alive and writes a public scream entry', async ()
   const said = await s.once();
   assert.ok(said.includes('tooth'));
   assert.equal(calls.length, 1);
-  assert.ok(calls[0].context.startsWith('You are WICK. You have taken to calling yourself Vesper'), 'the station name leads, the alias follows');
+  assert.ok(calls[0].context.startsWith('You are WICK; you also call yourself Vesper'), 'the station name leads, the alias follows');
   assert.deepEqual(calls[0].tools, []);
   assert.equal(calls[0].maxTokens, 90);
   const e = ledger.entries.find((x) => x.type === 'scream');
