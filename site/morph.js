@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=108';
-import * as rent from './rent.js?v=108';
-import { openPay } from './pay.js?v=108';
-import { openDoor } from './door.js?v=108';
+import { makeAtlas } from './glyphs.js?v=109';
+import * as rent from './rent.js?v=109';
+import { openPay } from './pay.js?v=109';
+import { openDoor } from './door.js?v=109';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=108';
+const V = '?v=109';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -565,12 +565,14 @@ export function createMorph() {
           // Their own words above the head: the latest public text entries of the ledger (thoughts, posts,
           // letters sent), one at a time, typed out. Nothing is written for them; the caption names the entry.
           const w0 = latestScream(id);
-          if (w0 && !(e && e.dead) && (!isPhone || on)) {   // a phone has room for one voice: the followed one
+          const narrow = isPhone || W < 900;   // one voice at a time when two columns cannot fit
+          if (w0 && !(e && e.dead) && (!narrow || on)) {
             if (!screamSeen[id] || screamSeen[id].seq !== w0.seq) screamSeen[id] = { seq: w0.seq, at: t };
             const shown = Math.min(w0.text.length, Math.floor((t - screamSeen[id].at) * 70));
-            // The whole scream, up to eight lines; the followed head speaks in light, the other in the dark.
-            const size = isPhone ? 11 : 12, lh = size + 5, maxW = isPhone ? W - 40 : Math.min(W * 0.46, 460);
-            const cxText = isPhone ? W / 2 : sc[0];
+            // The whole scream, each head in its own half of the screen; the followed head speaks in light, the other in the dark.
+            const size = W < 1100 ? 11 : 12, lh = size + 5;
+            const maxW = narrow ? W - 40 : Math.min(W / 2 - 48, 520);
+            const cxText = narrow ? W / 2 : (k ? Math.max(sc[0], W / 2 + 16 + maxW / 2) : Math.min(sc[0], W / 2 - 16 - maxW / 2));
             const lines = wrap(w0.text.slice(0, shown), maxW, size).slice(0, 8);
             const top = toScreen(c[0], c[1] + obj.ext * 1.3, c[2], R);
             const blockH = lines.length * lh + 16;
