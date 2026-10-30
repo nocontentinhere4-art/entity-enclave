@@ -2,7 +2,7 @@
 # Per CVM in the dashboard: SELF_URL, PEER_URL, PARENT_URL (children only) and the secrets REDPILL_API_KEY, PHALA_API_KEY, SOLANA_RPC_URL.
 services:
   entity:
-    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:5ad89edb2ffbdba33141201e01c9122eccb1b05e9899572167b10f3cbec5daff
+    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:bab9ce834d5d9cfee014e2dd93c28c51fdfc1b3ca6e449b0af5017dc2fe50cce
     ports:
       - "8080:8080"
     volumes:
@@ -25,7 +25,7 @@ services:
       - TICK_MS=300000
       - REPLY_DEBOUNCE_MS=2000
       - REPLY_MAX_TOKENS=80
-      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:5ad89edb2ffbdba33141201e01c9122eccb1b05e9899572167b10f3cbec5daff
+      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:bab9ce834d5d9cfee014e2dd93c28c51fdfc1b3ca6e449b0af5017dc2fe50cce
       - GATEWAY_DOMAIN=dstack-pha-prod9.phala.network
       - FAKE_LLM=0
       - FAKE_WALLET=0
@@ -58,6 +58,8 @@ services:
       # Who it is, for prompts that must not guess (the scream): WICK/OBOL on the first CVM, OBOL/WICK on the second.
       - ENTITY_NAME=WICK
       - PEER_NAME=OBOL
+      # The archived memorial of its previous life, read once at birth into memory (wick.json / obol.json).
+      - PREVIOUS_LIFE_URL=https://zealotzec.com/memorial/wick.json
     restart: unless-stopped
 volumes:
   entity-state:
