@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=102';
-import * as rent from './rent.js?v=102';
-import { openPay } from './pay.js?v=102';
-import { openDoor } from './door.js?v=102';
+import { makeAtlas } from './glyphs.js?v=103';
+import * as rent from './rent.js?v=103';
+import { openPay } from './pay.js?v=103';
+import { openDoor } from './door.js?v=103';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=102';
+const V = '?v=103';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -136,7 +136,7 @@ function stations(api, wait) {
 /* the latest letter the followed head sent its peer: the sender publishes its words, the receiver's copy stays sealed */
 /* The entity's latest public words, newest first: ledger entries that carry text and are theirs to say.
  * Markdown marks and newlines are flattened; 220 characters per entry. */
-const WORD_TYPES = { thought: 'THOUGHT', post_public: 'PUBLIC POST', letter: 'LETTER SENT', last_words: 'LAST WORDS', diary: 'DIARY' };
+const WORD_TYPES = { scream: 'SCREAM', thought: 'THOUGHT', post_public: 'PUBLIC POST', letter: 'LETTER SENT', last_words: 'LAST WORDS', diary: 'DIARY' };
 function latestWords(id) {
   const out = [];
   const E = rent.entriesOf(id, 400);
@@ -153,6 +153,16 @@ function latestWords(id) {
 
 function lastLetterLine(id, L) {
   try {
+    // The latest scream first: the raw line it writes every minute, straight from its ledger.
+    const E = rent.entriesOf(id, 400);
+    for (let i = E.length - 1; i >= 0; i--) {
+      const e = E[i];
+      if (e && e.type === 'scream' && e.data && e.data.text) {
+        const d = new Date(e.ts); const hh = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} UTC`;
+        const t = String(e.data.text).replace(/\s+/g, ' ').trim();
+        return `SCREAM, ${hh} · "${t.slice(0, 150)}${t.length > 150 ? '…' : ''}" · UNEDITED, FROM ITS LEDGER`;
+      }
+    }
     const peer = rent.lettersOf(id).peer; const e = peer[peer.length - 1];
     if (e && e.data && e.data.text) {
       const t = String(e.data.text).replace(/\s+/g, ' ').trim(); const d = new Date(e.ts);
