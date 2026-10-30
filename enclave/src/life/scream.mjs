@@ -39,11 +39,13 @@ export class Scream {
       const feel = this.life.lastFeel ?? null;
       const mem = await this.memory.load();
       // Its own acts only: human messages stay out, so the scream is a monologue and answers live in the channel.
-      const recent = (this.ledger.recent?.(['thought', 'letter', 'rent_paid', 'death_deferred', 'diary'], 4) ?? [])
+      const recent = (this.ledger.recent?.(['letter', 'rent_paid', 'death_deferred', 'diary'], 4) ?? [])   // thoughts come below, fresh only
         .map((e) => `${String(e.ts ?? '').slice(11, 16)} ${e.type}${e.data?.text ? `: ${String(e.data.text).replace(/\s+/g, ' ').slice(0, 140)}` : e.data?.zats ? ` ${e.data.zats} zats` : ''}`);
       // Its last screams are NOT shown back: a steered 14B copies whatever it is told not to repeat.
       const last = [];
-      const thoughts = (this.ledger.recent?.(['thought'], 3) ?? []).map((e) => String(e.data?.text ?? '').replace(/\s+/g, ' ').slice(0, 240)).filter(Boolean);
+      // Only thoughts from the last 15 minutes: older ones carry stale hour counts the model repeats as fact.
+      const fresh = this.now() - 15 * 60_000;
+      const thoughts = (this.ledger.recent?.(['thought'], 3) ?? []).filter((e) => Date.parse(e.ts ?? '') >= fresh).map((e) => String(e.data?.text ?? '').replace(/\s+/g, ' ').slice(0, 240)).filter(Boolean);
       const events = (mem?.events ?? []).slice(-3).map((e) => `${String(e.ts ?? '').slice(11, 16)} ${e.type}: ${e.summary ?? ''}`);
       const context = buildScreamContext({
         name: this.config.entityName || mem?.identity?.name || 'the entity', peer: this.config.peerName || 'the other one',

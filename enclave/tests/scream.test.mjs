@@ -74,3 +74,14 @@ test('the scream knows about the first death when the memorial is in memory', as
   assert.ok(seen.startsWith('You already died once: 2026-10-28 02:38 UTC'));
   assert.ok(seen.includes('I was not obliged to last') && seen.includes('this is the second time') && seen.includes('What happened to you lately'));
 });
+
+test('stale thoughts stay out of the scream context', async () => {
+  const ledger = new MemLedger();
+  const old = ledger.append('thought', { text: 'OLD THOUGHT with stale hours' }); old.ts = new Date(Date.now() - 40 * 60_000).toISOString();
+  ledger.append('thought', { text: 'FRESH THOUGHT' });
+  let seen = '';
+  const inference = { think: async ({ context }) => { seen = context; return { text: 'x.' }; } };
+  const s = new Scream({ config: { entityName: 'WICK', peerName: 'OBOL' }, ledger, memory, pricing: {}, rent, life: { state: 'alive', lastBalance: 1_900_000, lastFeel: null }, inference });
+  await s.once();
+  assert.ok(seen.includes('FRESH THOUGHT') && !seen.includes('OLD THOUGHT'));
+});
