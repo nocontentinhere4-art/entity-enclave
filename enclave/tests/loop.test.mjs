@@ -246,6 +246,18 @@ test('a zero balance from a wallet that has not synced yet defers death instead 
   assert.deepEqual(deaths, ['last hour']);
 });
 
+test('an unborn entity is not born on a balance the wallet has not synced yet', async () => {
+  let synced = false;
+  const w = makeWorld({ zats: 10_000_000, born: false, walletTrusted: () => synced });
+  await ticks(w, 2);
+  assert.equal(w.life.state, 'unborn');
+  assert.equal(w.ledger.entries.filter((e) => e.type === 'birth_gift').length, 0);
+  assert.equal(w.ledger.entries.filter((e) => e.type === 'birth_deferred').length, 1);
+  synced = true;
+  await ticks(w, 1);
+  assert.equal(w.ledger.entries.filter((e) => e.type === 'birth_gift').length, 1);
+});
+
 test('last hour produces a death entry and never thinks or spends again', async () => {
   const deaths = [];
   const die = async ({ ledger, memory, reason }) => {

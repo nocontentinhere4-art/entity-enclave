@@ -116,6 +116,13 @@ export class Life {
     // 4. Unborn: no inference, no tools, no rent, no hunger, no death. Just wait for the first gift.
     if (this.state === 'unborn') {
       const needed = this.birthMinZats();
+      // A half-synced wallet can show notes the previous life already spent (OBOL, 2026-10-30 18:31 UTC: 13,048,180
+      // phantom zatoshi, real balance 75,986). No birth on a balance this process has not synced yet.
+      if (!this._walletTrusted()) {
+        const hour = Math.floor(now / HOUR_MS);
+        if (this.lastDeferredHour !== hour) { this.lastDeferredHour = hour; this.ledger.append('birth_deferred', { zatoshis: treasury, needed, reason: 'wallet not yet synced in this process' }); }
+        return;
+      }
       if (treasury < needed) {
         // Public proof of waiting, deduped by wall-clock hour so a fast tick cannot flood the ledger.
         // The hour marker lives in memory too, so a restart inside the same hour does not repeat it.
