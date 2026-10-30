@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=99';
-import * as rent from './rent.js?v=99';
-import { openPay } from './pay.js?v=99';
-import { openDoor } from './door.js?v=99';
+import { makeAtlas } from './glyphs.js?v=100';
+import * as rent from './rent.js?v=100';
+import { openPay } from './pay.js?v=100';
+import { openDoor } from './door.js?v=100';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=99';
+const V = '?v=100';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -134,6 +134,23 @@ function stations(api, wait) {
 }
 
 /* the latest letter the followed head sent its peer: the sender publishes its words, the receiver's copy stays sealed */
+/* The entity's latest public words, newest first: ledger entries that carry text and are theirs to say.
+ * Markdown marks and newlines are flattened; 220 characters per entry. */
+const WORD_TYPES = { thought: 'THOUGHT', post_public: 'PUBLIC POST', letter: 'LETTER SENT', last_words: 'LAST WORDS', diary: 'DIARY' };
+function latestWords(id) {
+  const out = [];
+  const E = rent.entriesOf(id, 400);
+  for (let i = E.length - 1; i >= 0 && out.length < 6; i--) {
+    const e = E[i]; const d = e && e.data;
+    if (!d || typeof d.text !== 'string' || !WORD_TYPES[e.type]) continue;
+    const txt = d.text.replace(/\*\*|__|`|#+\s/g, '').replace(/\s+/g, ' ').trim();
+    if (!txt) continue;
+    const label = e.type === 'letter' && d.to ? `LETTER TO ${String(d.to === 'peer' ? (id === 'e1' ? 'OBOL' : 'WICK') : d.to).toUpperCase()}` : WORD_TYPES[e.type];
+    out.push({ text: txt.length > 220 ? txt.slice(0, 217) + '…' : txt, label, when: String(e.ts || '').slice(11, 16) });
+  }
+  return out;
+}
+
 function lastLetterLine(id, L) {
   try {
     const peer = rent.lettersOf(id).peer; const e = peer[peer.length - 1];
@@ -537,6 +554,20 @@ export function createMorph() {
           const sc = toScreen(c[0], c[1] - obj.ext * 1.08, c[2], R);
           const on = who === id;
           const name = e && e.name ? e.name : (k ? 'OBOL' : 'WICK');
+          // Their own words above the head: the latest public text entries of the ledger (thoughts, posts,
+          // letters sent), one at a time, typed out. Nothing is written for them; the caption names the entry.
+          const said = latestWords(id);
+          if (said.length && !(e && e.dead)) {
+            const slot = Math.floor(t / 9), w0 = said[slot % said.length];
+            const shown = Math.min(w0.text.length, Math.floor((t - slot * 9) * 70));
+            const size = isPhone ? 11 : 12, lh = size + 5, maxW = isPhone ? W * 0.46 : Math.min(W * 0.4, 380);
+            const lines = wrap(w0.text.slice(0, shown), maxW, size).slice(0, 3);
+            const top = toScreen(c[0], c[1] + obj.ext * 1.08, c[2], R);
+            const blockH = lines.length * lh + 16;
+            const yTop = clamp(top[1] - blockH - 10, 58, H);
+            text(`${name} · ${w0.label} · ${w0.when} UTC`, sc[0], yTop, isPhone ? 9 : 10, 'rgba(244,183,40,.6)', 'center', capA);
+            for (let i = 0; i < lines.length; i++) text(lines[i], sc[0], yTop + 16 + i * lh, size, 'rgba(242,242,238,.82)', 'center', capA);
+          }
           const hrs = e && e.ok && !e.dead && e.hoursLeft != null ? `${e.hoursLeft} H LEFT` : (e && e.dead ? 'DEAD' : '—');
           text(name, sc[0], sc[1] + 18, isPhone ? 13 : 15, on ? '#f4b728' : 'rgba(242,242,238,.45)', 'center', capA);
           text(hrs, sc[0], sc[1] + (isPhone ? 36 : 40), isPhone ? 11 : 12, on ? 'rgba(242,242,238,.9)' : 'rgba(242,242,238,.4)', 'center', capA);
