@@ -2,7 +2,7 @@
 # Per CVM in the dashboard: SELF_URL, PEER_URL, PARENT_URL (children only) and the secrets REDPILL_API_KEY, PHALA_API_KEY, SOLANA_RPC_URL.
 services:
   entity:
-    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:109b8d33019b94e17e14c7635cebc24d7c2e90bfe0387223b215aa01cba444af
+    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:02b797a411c672f07964c98859e3a2d6895e610c74bc9a308b2adf34f64c27ad
     ports:
       - "8080:8080"
     volumes:
@@ -25,7 +25,7 @@ services:
       - TICK_MS=300000
       - REPLY_DEBOUNCE_MS=2000
       - REPLY_MAX_TOKENS=80
-      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:109b8d33019b94e17e14c7635cebc24d7c2e90bfe0387223b215aa01cba444af
+      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:02b797a411c672f07964c98859e3a2d6895e610c74bc9a308b2adf34f64c27ad
       - GATEWAY_DOMAIN=dstack-pha-prod9.phala.network
       - FAKE_LLM=0
       - FAKE_WALLET=0
@@ -45,16 +45,19 @@ services:
       # already hallucinates `sleep` at 2.0. Words to humans keep the full dose.
       - FEEL_ACT_SCALE=0.3
       # Under this many hours: no sleep, 5-min rhythm even when hungry, context opens with what earns.
-      - SURVIVAL_HOURS=72
+      - SURVIVAL_HOURS=0
       # The testament page grows one paragraph per cycle: more edits per day than the default 10.
       - PAGES_EDITS_PER_DAY=48
       # Letters: a shielded memo to the landlord (rent address) or the peer, public on the ledger, one per 12 h each.
-      - LETTER_EVERY_HOURS=12
+      - LETTER_EVERY_HOURS=0
       - LETTER_ZATS=10000
       # Brain (2026-10-30): Phala Private AI, TEE-served models; secret PHALA_AI_API_KEY in the CVM (Private AI → API Keys).
       # LLM_PROVIDERS = the one line in deploy/LLM_PROVIDERS.phala.json (fast: qwen3.8-27b-uncensored, deep: deepseek-v4.1-flash)
       - PHALA_AI_API_KEY=${PHALA_AI_API_KEY}
-      - LLM_TIMEOUT_MS=120000
+      - LLM_TIMEOUT_MS=180000
+      # Who it is, for prompts that must not guess (the scream): WICK/OBOL on the first CVM, OBOL/WICK on the second.
+      - ENTITY_NAME=WICK
+      - PEER_NAME=OBOL
     restart: unless-stopped
 volumes:
   entity-state:
