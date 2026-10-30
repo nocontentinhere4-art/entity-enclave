@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { config } from './config.mjs';
 import { Ledger } from './ledger.mjs';
+import { transferTime } from './inbox.mjs';
 import { loadKeys } from './keys.mjs';
 import { connectDstack, attest } from './attestation.mjs';
 import { ZcashWallet } from './zcash.mjs';
@@ -156,11 +157,6 @@ async function readLetters() {
   }
   if (inherited.transfers) ledger.append('inherited', { ...inherited, note: 'received before this life began: the estate of the previous life, not mail' });
   if (changed) { mem.seenTxids = [...seen].slice(-500); await memory.save(mem); }
-}
-/** zingo prints `2026-10-20 02:47:30 UTC`; tests pass ISO strings. Unknown shapes return null and are treated as new. */
-export function transferTime(dt) {
-  const n = Date.parse(String(dt ?? '').trim().replace(/ UTC$/, 'Z').replace(' ', 'T'));
-  return Number.isFinite(n) ? n : null;
 }
 config.letters = () => inbox.slice(-10).map((l) => ({ ...l, text: redactMemo(l.text) }));
 async function syncWallet() {

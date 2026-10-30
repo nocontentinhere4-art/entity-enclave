@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { transferTime } from '../src/index.mjs';
+import { transferTime } from '../src/inbox.mjs';
 
 test('transferTime parses zingo and ISO datetimes, null for garbage', () => {
   assert.equal(new Date(transferTime('2026-10-20 02:47:30 UTC')).toISOString(), '2026-10-20T02:47:30.000Z');
