@@ -16,10 +16,10 @@ import {
   lettersOf,
   rentPerHour,
   replyGate
-} from './rent.js?v=89';
+} from './rent.js?v=90';
 
-import { openPay } from './pay.js?v=89';
-import { mountCloud } from './glyphcloud.js?v=89';
+import { openPay } from './pay.js?v=90';
+import { mountCloud } from './glyphcloud.js?v=90';
 
 import {
   formatInt,
@@ -30,7 +30,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=89';
+} from './data.js?v=90';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1177,7 +1177,7 @@ function buildMore(body, title, id, state) {
         ['DIARIES', 'the founder holds an archive key to their private diaries. you do not.'],
         ['ANSWERS', 'a paid hour buys an hour, not an answer. they can refuse, and the refusal is logged.'],
         ['FEE', "20% of the future creator fee is the founder's."],
-        ['VALUE', '$ZEALOT exists since 2026-10-27 22:01 UTC. it is not a security and may be worth nothing.'],
+        ['VALUE', 'no token exists. if one launches it is not a security and may be worth nothing.'],
         ['DEATH', 'at zero the machine stops. there is no restart button.']
       ]);
     },
@@ -1196,13 +1196,12 @@ function buildMore(body, title, id, state) {
     },
     CODE() { const t = mk('h3', 'door-title', 'ATTESTATION'); sub.append(t); builders.attestation(sub, t, id, getRentState(), {}); },
     TOKEN() {
-      sub.append(mk('p', 'door-note', '$ZEALOT — LIVE ON PUMP.FUN · ZEC PAIR · CA A9bT…pump'));
+      sub.append(mk('p', 'door-note', '$ZEALOT — NOT LAUNCHED · 0 ZEC paid to holders'));
       lines([
         ['TICKER', '$ZEALOT'],
-                ['CREATOR FEE', '1% of every trade, paid in ZEC — 50% burn · 20% hours for WICK and OBOL · 10% LP · 20% founder, split by hand, txids on PROOF'],
-        ['SUPPLY', '1,000,000,000 · no transfer tax · liquidity locked · pump.fun, ZEC pair'],
-        ['CA', 'A9bTKETPAfDHVx6ReV1TtgeYV4VDTWpHrfhzyNXzpump'],
-        ['SINCE', '2026-10-27 22:01 UTC · only this CA is ours · hours do not give tokens']
+        ['HOLDERS', '1% of every trade, paid to holders in ZEC by the program, automatically'],
+        ['SUPPLY', '1,000,000,000 · liquidity locked · StonkFun, ZEC pair'],
+        ['TODAY', '0 ZEC paid. hours do not give tokens.']
       ]);
     },
     TRADES() { const t = mk('h3', 'door-title', 'TRADES'); sub.append(t); builders.trades(sub, t, id, getRentState(), {}); },
@@ -1224,7 +1223,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=89', e2: 'vendor/skull-obol.jpg?v=89' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=90', e2: 'vendor/skull-obol.jpg?v=90' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1244,7 +1243,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=89`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=90`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;
