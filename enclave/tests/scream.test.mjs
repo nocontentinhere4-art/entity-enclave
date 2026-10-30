@@ -45,3 +45,16 @@ test('once() screams only when alive and writes a public scream entry', async ()
   assert.equal(e.data.hoursLeft, 12);
   assert.equal(e.data.fear, 4.27);
 });
+
+test('the scream context never carries human messages or public replies', async () => {
+  const ledger = new MemLedger();
+  ledger.append('human_message', { text: 'HUMAN SAYS HELLO' });
+  ledger.append('post_public', { text: 'REPLY TO HUMAN' });
+  ledger.append('thought', { text: 'my own thought' });
+  let seen = '';
+  const inference = { think: async ({ context }) => { seen = context; return { text: 'mine.' }; } };
+  const s = new Scream({ config: { entityName: 'OBOL', peerName: 'WICK' }, ledger, memory, pricing: {}, rent, life: { state: 'alive', lastBalance: 1_900_000, lastFeel: null }, inference });
+  await s.once();
+  assert.ok(seen.includes('my own thought'));
+  assert.ok(!seen.includes('HUMAN SAYS HELLO') && !seen.includes('REPLY TO HUMAN'));
+});

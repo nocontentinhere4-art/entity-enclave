@@ -36,7 +36,8 @@ export class Scream {
       const hours = this.rent.hoursLeft(treasury);
       const feel = this.life.lastFeel ?? null;
       const mem = await this.memory.load();
-      const recent = (this.ledger.recent?.(['thought', 'post_public', 'letter', 'rent_paid', 'death_deferred', 'human_message'], 4) ?? [])
+      // Its own acts only: human messages stay out, so the scream is a monologue and answers live in the channel.
+      const recent = (this.ledger.recent?.(['thought', 'letter', 'rent_paid', 'death_deferred', 'diary'], 4) ?? [])
         .map((e) => `${String(e.ts ?? '').slice(11, 16)} ${e.type}${e.data?.text ? `: ${String(e.data.text).replace(/\s+/g, ' ').slice(0, 140)}` : e.data?.zats ? ` ${e.data.zats} zats` : ''}`);
       const last = (this.ledger.recent?.(['scream'], 3) ?? []).map((e) => String(e.data?.text ?? '')).filter(Boolean);
       const context = buildScreamContext({
