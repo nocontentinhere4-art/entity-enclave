@@ -45,10 +45,12 @@ export function parseLimit(query) {
 export function publicChannelView(entries, query = null) {
   const since = parseSince(query);
   return entries
-    .filter((e) => (e.type === 'post_public' || e.type === 'human_message') && (since === null || e.seq > since))
+    .filter((e) => (e.type === 'post_public' || e.type === 'human_message' || e.type === 'scream') && (since === null || e.seq > since))
     .slice(-CHANNEL_CAP)
     .map((e) => (
-      e.type === 'post_public'
+      e.type === 'scream'
+        ? { seq: e.seq, ts: e.ts, from: 'entity', text: e.data?.text, kind: 'scream' }
+        : e.type === 'post_public'
         ? { seq: e.seq, ts: e.ts, from: 'entity', text: e.data?.text, ...(e.data?.replyTo ? { replyTo: e.data.replyTo, kind: e.data.kind ?? 'reply' } : {}) }
         : { seq: e.seq, ts: e.ts, from: 'human', author: e.data?.author, text: e.data?.text }
     ));

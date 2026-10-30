@@ -24,6 +24,7 @@ import { Inference } from './llm/infer.mjs';
 import { Tools } from './tools/registry.mjs';
 import { Life } from './life/loop.mjs';
 import { Replier } from './life/reply.mjs';
+import { Scream } from './life/scream.mjs';
 import { Jobs } from './life/jobs.mjs';
 import { Market } from './economy/market.mjs';
 import { Forecasts } from './economy/forecasts.mjs';
@@ -291,6 +292,9 @@ const life = new Life({ config, ledger, wallet, memory, pricing, rent, inference
 const replier = new Replier({ config, ledger, memory, pricing, rent, charter, treasury: () => life.lastBalance, now: Date.now });
 life.replier = replier;
 life.start();
+// The scream: a raw public line every minute while alive (SCREAM_ENABLED / SCREAM_EVERY_MS).
+const scream = new Scream({ config, ledger, memory, pricing, rent, life, inference });
+scream.start();
 void syncWallet();
 void probeProviders();
 

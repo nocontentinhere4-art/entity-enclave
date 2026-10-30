@@ -146,6 +146,9 @@ export const config = {
     paidMaxTokens: num(process.env.REPLY_PAID_MAX_TOKENS, 300),
     paidMaxChars: num(process.env.REPLY_PAID_MAX_CHARS, 1200),
   },
+  // The scream: once a minute while alive, one short uncensored public line (life/scream.mjs). SCREAM_ENABLED=0 silences it.
+  screamEnabled: bool(process.env.SCREAM_ENABLED, true),
+  screamEveryMs: num(process.env.SCREAM_EVERY_MS, 60_000),
   // Feelings: a fear/despair dose the entity receives as its rent hours run low, applied by a self-hosted
   // steered-inference server (feelings/server.py). Off by default: with FEEL_ENABLED=0 nothing changes.
   feel: {
