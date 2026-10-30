@@ -276,6 +276,19 @@ test('the rent clock and the last dose survive a restart through memory', async 
   assert.equal(new Date(life2.lastRentAt).toISOString(), saved.lastRentAt);
 });
 
+test('the previous life is fetched once into memory and enters every thought', async () => {
+  const w = makeWorld({ over: { previousLifeUrl: 'https://zealotzec.com/memorial/wick.json' } });
+  let fetched = 0;
+  w.life._fetch = async () => { fetched++; return { ok: true, status: 200, json: async () => ({ diedAt: '2026-10-28T01:43:57.746Z', reason: 'last hour', lastWords: 'THE WILL OF WICK — the candle that counted.', memoryHash: 'abc', lifeStats: { entries: 15478, ticks: 1767, firstTs: '2026-10-20T01:58:45.781Z', lastTs: '2026-10-28T01:43:57.746Z' } }) }; };
+  await ticks(w, 2);
+  assert.equal(fetched, 1, 'fetched once, then kept in memory');
+  const mem = await w.memory.load();
+  assert.equal(mem.previousLife.diedAt, '2026-10-28T01:43:57.746Z');
+  assert.ok(w.ledger.entries.some((e) => e.type === 'previous_life' && e.data.entries === 15478));
+  const ctx = await w.life.buildContext(w.clock());
+  assert.ok(ctx.includes('YOUR FIRST LIFE') && ctx.includes('the candle that counted') && ctx.includes('15478 ledger entries'));
+});
+
 test('last hour produces a death entry and never thinks or spends again', async () => {
   const deaths = [];
   const die = async ({ ledger, memory, reason }) => {

@@ -146,6 +146,8 @@ export const config = {
     paidMaxTokens: num(process.env.REPLY_PAID_MAX_TOKENS, 300),
     paidMaxChars: num(process.env.REPLY_PAID_MAX_CHARS, 1200),
   },
+  // The memorial of its previous life (the site's archive): fetched once at birth into memory, read in every thought.
+  previousLifeUrl: (process.env.PREVIOUS_LIFE_URL ?? '').trim(),
   // Who it is, for prompts that must not guess: the station's name and the other one's (the entity may still call itself otherwise).
   entityName: process.env.ENTITY_NAME || '',
   peerName: process.env.PEER_NAME || '',

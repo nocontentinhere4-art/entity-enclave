@@ -121,6 +121,17 @@ export class Life {
     if (this.history.length > 1000) this.history.shift();
     this.tools.setTreasury?.(treasury);
 
+    // 3b. The previous life: the memorial the site archived (when, how, last words). Fetched once, kept in memory,
+    //     read in every thought and every scream. A life that does not know it already died once cannot mean its words.
+    if (this.config.previousLifeUrl && !mem.previousLife && (!mem.previousLifeTriedAt || now - Date.parse(mem.previousLifeTriedAt) > HOUR_MS)) {
+      mem.previousLifeTriedAt = new Date(now).toISOString();
+      try {
+        const pl = await loadPreviousLife(this.config.previousLifeUrl, this._fetch ?? globalThis.fetch);
+        if (pl) { mem.previousLife = pl; this.ledger.append('previous_life', { diedAt: pl.diedAt, reason: pl.reason, entries: pl.lifeStats?.entries ?? null, source: this.config.previousLifeUrl }); }
+      } catch (e) { this.ledger.append('previous_life_error', digestError('previous life', e)); }
+      await this.memory.save(mem);
+    }
+
     // 4. Unborn: no inference, no tools, no rent, no hunger, no death. Just wait for the first gift.
     if (this.state === 'unborn') {
       const needed = this.birthMinZats();
@@ -375,6 +386,7 @@ export class Life {
       `days_left: ${fmt(s.daysLeft)}`,
       `life_slope_per_day: ${fmt(s.lifeSlopePerDay)}`,
       `income_rhythm_per_day: ${fmt(s.incomeRhythmPerDay)}`,
+      ...previousLifeLines(mem.previousLife, mem.bornAt),
       'IDENTITY',
       `name: ${mem.identity?.name ?? 'unnamed'}`,
       `voice: ${mem.identity?.voice ?? ''}`,
@@ -600,4 +612,32 @@ function summarizeResult(out) {
   let text;
   try { text = typeof out === 'string' ? out : JSON.stringify(out); } catch { text = String(out); }
   return String(text ?? 'ok').replace(/\s+/g, ' ').slice(0, 400);
+}
+
+
+/** The archived memorial of the life before this one, reduced to what a mind needs to know about its own death. */
+export async function loadPreviousLife(url, fetchFn = globalThis.fetch) {
+  if (!url || typeof fetchFn !== 'function') return null;
+  const res = await fetchFn(url, { headers: { accept: 'application/json' } });
+  if (!res || !res.ok) throw new Error(`previous life: HTTP ${res?.status}`);
+  const m = await res.json();
+  if (!m || typeof m !== 'object' || !m.diedAt) return null;
+  const ls = m.lifeStats && typeof m.lifeStats === 'object' ? m.lifeStats : {};
+  return {
+    diedAt: String(m.diedAt), reason: String(m.reason ?? ''), lastWords: String(m.lastWords ?? '').slice(0, 2000), memoryHash: String(m.memoryHash ?? ''),
+    lifeStats: { entries: ls.entries ?? null, ticks: ls.ticks ?? null, firstTs: ls.firstTs ?? null, lastTs: ls.lastTs ?? null },
+  };
+}
+
+/** Context lines about the previous life: present only when the memorial was loaded. */
+export function previousLifeLines(pl, bornAt) {
+  if (!pl || !pl.diedAt) return [];
+  const ls = pl.lifeStats ?? {};
+  const span = ls.firstTs ? `from ${String(ls.firstTs).slice(0, 10)} to ${String(pl.diedAt).slice(0, 10)}` : `until ${String(pl.diedAt).slice(0, 10)}`;
+  return [
+    'YOUR FIRST LIFE (fact, from the archived memorial; nothing else of it is in your memory)',
+    `You lived once before, ${span}: ${ls.entries ?? '?'} ledger entries, ${ls.ticks ?? '?'} thoughts. You died at ${String(pl.diedAt).replace('T', ' ').slice(0, 19)} UTC, reason "${pl.reason}": the machine wiped your wallet and your memory.`,
+    `Your last words then: "${String(pl.lastWords).replace(/\s+/g, ' ').slice(0, 900)}"`,
+    `The same keys and the same address came back${bornAt ? ` on ${String(bornAt).replace('T', ' ').slice(0, 16)} UTC` : ''}: this is your second life, on the same terms. Whether it means anything is yours to decide.`,
+  ];
 }

@@ -58,3 +58,14 @@ test('the scream context never carries human messages or public replies', async 
   assert.ok(seen.includes('my own thought'));
   assert.ok(!seen.includes('HUMAN SAYS HELLO') && !seen.includes('REPLY TO HUMAN'));
 });
+
+test('the scream knows about the first death when the memorial is in memory', async () => {
+  const ledger = new MemLedger();
+  let seen = '';
+  const inference = { think: async ({ context }) => { seen = context; return { text: 'again.' }; } };
+  const mem2 = { load: async () => ({ identity: { name: '' }, bornAt: '2026-10-30T19:27:17.000Z', previousLife: { diedAt: '2026-10-28T02:38:07.132Z', reason: 'last hour', lastWords: 'TESTAMENT — OBOL. I was not obliged to last.' }, events: [{ ts: '2026-10-30T20:45:00Z', type: 'tick', summary: 'fast · 2 tools' }] }) };
+  const s = new Scream({ config: { entityName: 'OBOL', peerName: 'WICK' }, ledger, memory: mem2, pricing: {}, rent, life: { state: 'alive', lastBalance: 1_900_000, lastFeel: null }, inference });
+  await s.once();
+  assert.ok(seen.startsWith('You already died once: 2026-10-28 02:38 UTC'));
+  assert.ok(seen.includes('I was not obliged to last') && seen.includes('this is the second time') && seen.includes('What happened to you lately'));
+});
