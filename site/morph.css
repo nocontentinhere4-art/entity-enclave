@@ -433,3 +433,6 @@ html { scroll-behavior: auto; scroll-snap-type: y mandatory; }
 .ca { position: fixed; top: 14px; right: 16px; z-index: 5; height: 25px; padding: 0 10px; font: 11px "JetBrains Mono", Menlo, Consolas, monospace; letter-spacing: .1em; text-transform: uppercase; color: rgba(244,183,40,.85); background: rgba(6,6,6,.7); border: 1px solid rgba(244,183,40,.55); cursor: pointer; white-space: nowrap; }
 .ca:hover, .ca:focus-visible { color: #f4b728; border-color: #f4b728; outline: none; }
 .ca.copied { color: #060606; background: #f4b728; border-color: #f4b728; }
+
+.door-link { color: rgba(244,183,40,.85); text-decoration: underline; text-underline-offset: 3px; }
+.door-link:hover { color: #f4b728; }

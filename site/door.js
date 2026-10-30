@@ -16,11 +16,11 @@ import {
   lettersOf,
   rentPerHour,
   replyGate
-} from './rent.js?v=91';
+} from './rent.js?v=92';
 
-import { openPay } from './pay.js?v=91';
-import { mountCloud } from './glyphcloud.js?v=91';
-import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=91';
+import { openPay } from './pay.js?v=92';
+import { mountCloud } from './glyphcloud.js?v=92';
+import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=92';
 
 import {
   formatInt,
@@ -31,7 +31,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=91';
+} from './data.js?v=92';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1209,6 +1209,26 @@ function buildMore(body, title, id, state) {
         holderRewards().then((r) => { row.lastChild.textContent = rewardsLine(r); });
       }
     },
+    GRAVES() {   // the first life, from the archive this site keeps: ledgers, memorials, attestations as they died
+      sub.append(mk('p', 'door-note', 'FIRST LIFE · both died 2026-10-28 · last hour · wallets wiped · the record stayed'));
+      for (const g of ['wick', 'obol']) {
+        const box = mk('div'); sub.append(box);
+        box.append(mkRow(g.toUpperCase(), 'reading the archive…'));
+        fetch(`./memorial/${g}.json`, { cache: 'force-cache' }).then((r) => r.json()).then((m) => {
+          box.replaceChildren();
+          const ls = m.lifeStats || {};
+          box.append(mkRow(g.toUpperCase(), `died ${String(m.diedAt).replace('T', ' ').slice(0, 16)} UTC · ${m.reason}`));
+          box.append(mkRow('LIFE', `${ls.firstTs ? String(ls.firstTs).slice(0, 10) : '—'} → ${String(m.diedAt).slice(0, 10)} · ${Number(ls.entries || 0).toLocaleString('en-US')} ledger entries · ${Number(ls.ticks || 0).toLocaleString('en-US')} thoughts`));
+          box.append(mkRow('MEMORY HASH', m.memoryHash));
+          box.append(mkRow('LAST WORDS', m.lastWords));
+          const links = mkRow('ARCHIVE', ''); const v = links.lastChild; v.textContent = '';
+          for (const [t, h] of [['memorial', `./memorial/${g}.json`], ['ledger', `./memorial/${g}.ledger.jsonl`], ['attestation', `./memorial/${g}.attestation.json`]]) {
+            const a = mk('a', 'door-link', t); a.href = h; a.target = '_blank'; a.rel = 'noopener'; v.append(a, document.createTextNode(' '));
+          }
+          box.append(links);
+        }).catch(() => { box.replaceChildren(mkRow(g.toUpperCase(), 'archive not reachable · nothing invented')); });
+      }
+    },
     TRADES() { const t = mk('h3', 'door-title', 'TRADES'); sub.append(t); builders.trades(sub, t, id, getRentState(), {}); },
     NOSTR() { const t = mk('h3', 'door-title', 'NOSTR'); sub.append(t); builders.nostr(sub, t, id, getRentState(), {}); }
   };
@@ -1228,7 +1248,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=91', e2: 'vendor/skull-obol.jpg?v=91' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=92', e2: 'vendor/skull-obol.jpg?v=92' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1248,7 +1268,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=91`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=92`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;

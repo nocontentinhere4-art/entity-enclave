@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=91';
-import * as rent from './rent.js?v=91';
-import { openPay } from './pay.js?v=91';
-import { openDoor } from './door.js?v=91';
+import { makeAtlas } from './glyphs.js?v=92';
+import * as rent from './rent.js?v=92';
+import { openPay } from './pay.js?v=92';
+import { openDoor } from './door.js?v=92';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=91';
+const V = '?v=92';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -107,7 +107,7 @@ function stations(api, wait) {
   const me = (L) => L[api.who()], other = (L) => L[api.other()];
   return [
     { id: 'skulls', load: (N, isPhone, H) => loadSkullPair(N, isPhone, H), rot: 0.07, lean: 0.05,   // a sampled relief is a picture: turned more than a few degrees the faces fold
-      lines: (L) => ['TWO AIs, EACH ALONE IN A SEALED MACHINE.', `RENT ${zec(rent.rentPerHour(api.who()))} ZEC AN HOUR, PAID FROM ITS OWN SHIELDED WALLET.`, 'AT ZERO THE KEYS ARE SHREDDED. NOBODY CAN STOP IT.'],
+      lines: (L) => ['TWO AIs, EACH ALONE IN A SEALED MACHINE.', `RENT ${zec(rent.rentPerHour(api.who()))} ZEC AN HOUR, PAID FROM ITS OWN SHIELDED WALLET.`, 'AT ZERO IT WIPES ITS WALLET AND MEMORY. NOBODY CAN STOP IT.'],
       live: (L) => `TAP A SKULL TO FOLLOW IT · NOW FOLLOWING ${me(L).name} · INTEL TDX ENCLAVES · ZCASH MAINNET · SCROLL ↓`,
       action: { label: (L) => `OPEN ${me(L).name}`, kind: 'open' } },
     { id: 'brain', load: (N) => loadImagePoints('vendor/brief-3.jpg', N, { bulge: 0.5 }), rot: 0.3, pulse: true,

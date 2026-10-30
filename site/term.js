@@ -12,9 +12,9 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=91';
-import { zip321Uri, qrSvg } from './qr.js?v=91';
-import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=91';
+} from './data.js?v=92';
+import { zip321Uri, qrSvg } from './qr.js?v=92';
+import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=92';
 
 const ANY_MIN_ZEC = 0.006;          // any-coin route (Trocador) minimum, with margin over their ~0.0045
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
@@ -331,6 +331,7 @@ const HELP = [
   'verify        re-hash both chains in your browser',
   'keys          their public viewing keys',
   'token         $ZEALOT: not launched, 0 ZEC paid',
+  'graves        the first life: how they died, from the archive',
   'truth         the six things that are true anyway',
   'who           their identity: voice, image, avatar',
   'raw           endpoint links',
@@ -409,6 +410,19 @@ function tokenCmd() {
   if (TOKEN_CA) {   // live from StonkFun
     const l = say('  paid        reading StonkFun…', 'line dim');
     holderRewards().then((r) => { if (l) l.textContent = `  paid        ${rewardsLine(r)}`; });
+  }
+}
+
+async function gravesCmd() {
+  say('FIRST LIFE — both died 2026-10-28, last hour, wallets wiped. the record stayed. same code, same machines, same sealed identity: born again 2026-10-30.', 'line signal');
+  for (const g of ['wick', 'obol']) {
+    try {
+      const m = await (await fetch(`./memorial/${g}.json`, { cache: 'force-cache' })).json();
+      const ls = m.lifeStats || {};
+      say(`  ${g.padEnd(6)} died ${String(m.diedAt).replace('T', ' ').slice(0, 16)} UTC · ${m.reason} · ${Number(ls.entries || 0).toLocaleString('en-US')} entries · memory ${String(m.memoryHash).slice(0, 16)}…`, 'line dim');
+      say(`         ${m.lastWords}`, 'line dim');
+      say(`         archive: /memorial/${g}.json · /memorial/${g}.ledger.jsonl · /memorial/${g}.attestation.json`, 'line dim');
+    } catch { say(`  ${g}: archive not reachable · nothing invented`, 'line dim'); }
   }
 }
 
@@ -618,6 +632,7 @@ async function run(raw) {
   else if (v === 'verify') await verifyCmd();
   else if (v === 'keys') keysCmd();
   else if (v === 'token') tokenCmd();
+  else if (v === 'graves') await gravesCmd();
   else if (v === 'truth') truthCmd();
   else if (v === 'who') whoCmd();
   else if (v === 'raw') rawCmd();

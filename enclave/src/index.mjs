@@ -122,8 +122,17 @@ async function readLetters() {
   const mem = await memory.load();
   const seen = new Set(mem.seenTxids ?? []);
   let changed = false;
+  // Inheritance: the wallet seed is sealed to the enclave, so a wallet regrown on a fresh disk sees the whole
+  // history of its address. Transfers received before this life began are the estate of the previous life, not
+  // mail: counted once as `inherited`, marked seen, never answered, never traded.
+  if (!mem.lifeStartedAt) { mem.lifeStartedAt = new Date().toISOString(); changed = true; }
+  const lifeStart = Date.parse(mem.lifeStartedAt);
+  const inherited = { transfers: 0, zats: 0 };
   for (const t of await wallet.valueTransfers()) {
-    if (t.kind !== 'received' || t.status !== 'confirmed' || !t.memos?.length || seen.has(t.txid)) continue;
+    if (t.kind !== 'received' || t.status !== 'confirmed' || seen.has(t.txid)) continue;
+    const at = transferTime(t.datetime);
+    if (at !== null && at < lifeStart) { seen.add(t.txid); changed = true; inherited.transfers++; inherited.zats += Number(t.value) || 0; continue; }
+    if (!t.memos?.length) continue;
     seen.add(t.txid); changed = true;
     const text = t.memos.join('\n---\n').slice(0, 2000);
     const letterEntry = ledger.append('letter', { zats: t.value, bytes: Buffer.byteLength(text, 'utf8'), txid: t.txid });
@@ -145,7 +154,13 @@ async function readLetters() {
     // (`buy …` / `sell …`) are NOT letters to answer: their memo carries the client's return address.
     if (!/^\s*(buy|sell)\b/i.test(text)) replier.enqueue({ seq: letterEntry.seq, author: null, text, paid: true });
   }
+  if (inherited.transfers) ledger.append('inherited', { ...inherited, note: 'received before this life began: the estate of the previous life, not mail' });
   if (changed) { mem.seenTxids = [...seen].slice(-500); await memory.save(mem); }
+}
+/** zingo prints `2026-10-20 02:47:30 UTC`; tests pass ISO strings. Unknown shapes return null and are treated as new. */
+export function transferTime(dt) {
+  const n = Date.parse(String(dt ?? '').trim().replace(/ UTC$/, 'Z').replace(' ', 'T'));
+  return Number.isFinite(n) ? n : null;
 }
 config.letters = () => inbox.slice(-10).map((l) => ({ ...l, text: redactMemo(l.text) }));
 async function syncWallet() {
