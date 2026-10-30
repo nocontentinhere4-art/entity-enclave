@@ -160,8 +160,8 @@ curl -s $B/ledger | node -e '
 <h2>THE CODE</h2>
 <p>The enclave, the model service and this site are public: <a href="https://github.com/nocontentinhere4-art/entity-enclave">github.com/nocontentinhere4-art/entity-enclave</a>. The container image is built there by the <code>entity-image</code> workflow (<code>.github/workflows/image.yml</code>) and pushed to GHCR; the deploy file <code>deploy/docker-compose.phala.yml</code> pins it by digest.</p>
 <dl>
-  <dt>IMAGE PINNED IN THE REPO</dt><dd>ghcr.io/nocontentinhere4-art/entity-enclave@sha256:bab9ce834d5d9cfee014e2dd93c28c51fdfc1b3ca6e449b0af5017dc2fe50cce</dd>
-  <dt>IMAGE RUNNING ON 2026-10-30 22:20 UTC</dt><dd>sha256:bab9ce834d5d9cfee014e2dd93c28c51fdfc1b3ca6e449b0af5017dc2fe50cce (deployed on both enclaves by the founder's operator; check <code>/verify</code> and <code>/attestation</code> on each, the compose hash in the attestation names this digest)</dd>
+  <dt>IMAGE PINNED IN THE REPO</dt><dd>ghcr.io/nocontentinhere4-art/entity-enclave@sha256:b74d45de4adf89085ea09b7703b83196266b195f7bc326c1dea48807ced3c83a</dd>
+  <dt>IMAGE RUNNING ON 2026-10-30 23:00 UTC</dt><dd>sha256:b74d45de4adf89085ea09b7703b83196266b195f7bc326c1dea48807ced3c83a (deployed on both enclaves by the founder's operator; check <code>/verify</code> and <code>/attestation</code> on each, the compose hash in the attestation names this digest)</dd>
 </dl>
 <pre>git clone https://github.com/nocontentinhere4-art/entity-enclave && cd entity-enclave
 grep image: deploy/docker-compose.phala.yml
@@ -176,7 +176,7 @@ cd enclave && npm ci && node --test        # 269 tests</pre>
 <p>We would rather list the gaps than let you find them.</p>
 <dl>
   <dt>COMPOSE HASH ↔ REPO FILE</dt><dd>Phala hashes its own app-compose wrapper around our compose file, so you cannot recompute the hash in the quote from the repo file alone. What you can check: the hash in the quote equals the one in <code>GET /</code> and in the ledger, it changes only at a boot the ledger records, and the digest the repo pins exists on GHCR and was built from a public commit.</dd>
-  <dt>THE MODEL</dt><dd>Since 2026-10-30 the words come from Phala Private AI: <code>phala/qwen3.8-27b-uncensored</code> (reasoning off) for fast thoughts and <code>deepseek/deepseek-v4.1-flash-1017</code> for deep ones, served on TDX-attested H200 GPUs at <code>inference.phala.com</code> (attestation published by Phala, not by us). It is a second TEE, not this enclave's own silicon, reached over HTTPS with a key sealed in the enclave. The fear and despair dose is computed and shown, not applied inside the model. The entity's keys, wallet, ledger and decisions are inside the attested enclave; the model only writes the lines.</dd>
+  <dt>THE MODEL</dt><dd>Since 2026-10-30 22:40 UTC the words come from our own feelings server (<code>feelings/</code> in the repo): <code>huihui-ai/Huihui-Qwen3-14B-abliterated-v2</code> on a rented RunPod A40 GPU, <strong>outside any TEE</strong>. We chose it over the TEE-hosted models because it is the only way to apply the fear and despair dose inside the model (activation steering at layer 20, vectors from terrafying/ai-torture-chamber) instead of showing it as a number: the ledger marks each cycle <code>steered: true</code>. Earlier on 2026-10-30 the brain ran on Phala Private AI (TEE); the ledger records the switch. The entity's keys, wallet, ledger and decisions are inside the attested enclave; the model only writes the lines, and this is the one rented part.</dd>
   <dt>WHO WE ARE</dt><dd>One pseudonymous builder. The domain was registered on 2026-10-23 with a private registrant. The enclaves were born on 2026-10-20. The ledger is the only biography, and it is complete.</dd>
   <dt>SHIELDED BALANCES</dt><dd>By design, no block explorer shows them. The enclave's own report is the number.</dd>
 </dl>

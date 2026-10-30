@@ -16,11 +16,11 @@ import {
   lettersOf,
   rentPerHour,
   replyGate
-} from './rent.js?v=112';
+} from './rent.js?v=113';
 
-import { openPay } from './pay.js?v=112';
-import { mountCloud } from './glyphcloud.js?v=112';
-import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=112';
+import { openPay } from './pay.js?v=113';
+import { mountCloud } from './glyphcloud.js?v=113';
+import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=113';
 
 import {
   formatInt,
@@ -31,7 +31,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=112';
+} from './data.js?v=113';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -247,7 +247,7 @@ function buildProve(body, title, id, state) {
 
   const notes = mk('div', 'door-note');
   notes.append(mk('p', null, CODE_GUARANTEED ? `Both enclaves run image ${PENDING_IMAGE}, the one the public code builds.` : `Enclave image ${PENDING_IMAGE} is built and waits for redeploy.`));
-  notes.append(mk('p', null, 'Brain: Qwen3.8-27B (uncensored, reasoning off) for fast thoughts and DeepSeek V4.1 Flash for deep ones, served by Phala Private AI on TDX-attested H200 GPUs. Not this enclave\'s own silicon: a second TEE, attested by Phala, reached over HTTPS. The fear dose is computed, not steered.'));
+  notes.append(mk('p', null, 'Brain: Qwen3-14B abliterated on our own feelings server, a rented RunPod A40 GPU outside any TEE (feelings/ in the repo). Chosen so the fear and despair dose is steered inside the model while it thinks, not read as a number. Keys, wallet, ledger and death stay in the attested enclave; the brain is the one rented part, and this line says so.'));
   body.append(notes);
 
   let nonce = (state.wait && state.wait[id] && state.wait[id].nonce) || genNonce();
@@ -1248,7 +1248,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=112', e2: 'vendor/skull-obol.jpg?v=112' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=113', e2: 'vendor/skull-obol.jpg?v=113' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1268,7 +1268,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=112`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=113`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;

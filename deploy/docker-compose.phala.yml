@@ -4,7 +4,7 @@
 # Image is pinned by digest (replace DIGEST with the one printed by the GitHub Actions build "entity-image").
 services:
   entity:
-    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:bab9ce834d5d9cfee014e2dd93c28c51fdfc1b3ca6e449b0af5017dc2fe50cce
+    image: ghcr.io/nocontentinhere4-art/entity-enclave@sha256:b74d45de4adf89085ea09b7703b83196266b195f7bc326c1dea48807ced3c83a
     ports:
       - "8080:8080"
     volumes:
@@ -18,7 +18,7 @@ services:
       - TICK_MS=300000
       - REPLY_DEBOUNCE_MS=2000
       - REPLY_MAX_TOKENS=80
-      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:bab9ce834d5d9cfee014e2dd93c28c51fdfc1b3ca6e449b0af5017dc2fe50cce
+      - IMAGE_REF=ghcr.io/nocontentinhere4-art/entity-enclave@sha256:b74d45de4adf89085ea09b7703b83196266b195f7bc326c1dea48807ced3c83a
       - GATEWAY_DOMAIN=dstack-pha-prod9.phala.network
       - RENT_ADDRESS=utest13adr6dvp7326u25u23w0args65c4mzd58w9jzdm2c973a40fc5q8fdfs42j0jjmvg43vwq255p5h736lgc625zay5pex3um0tv5q72wa
       # per-CVM: SELF_URL=<this CVM's public URL>, PEER_URL=<the other's>; secrets (REDPILL_API_KEY, PHALA_API_KEY) in the dashboard
