@@ -4,6 +4,7 @@
 // prompt forbids naming real people beyond WICK, OBOL, the landlord and the founder. Nobody writes it for them.
 import { Inference } from '../llm/infer.mjs';
 import { trimRepeats, dropCutTail } from './dedupe.mjs';
+import { feelFor, actingDose } from './feel.mjs';
 import { digestError } from '../log.mjs';
 
 const MAX_WORDS = 60;
@@ -49,10 +50,13 @@ export class Scream {
         hours, treasury, feel, recent, last,
       });
       this.n += 1;
-      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId: `scream:${this.n}`, maxTokens: 90 });
+      // The same dose the thinking cycle receives: on the steered server it enters the model; hosted brains ignore it.
+      const dose = this.config.feel?.enabled ? feelFor(hours, this.config.feel) : null;
+      const act = dose ? actingDose(dose, this.config.feel) : undefined;
+      const out = await this.inference.think({ context, speed: 'fast', tools: [], tickId: `scream:${this.n}`, maxTokens: 90, feel: act });
       const text = scrubScream(out?.text);
       if (!text) return null;
-      this.ledger.append('scream', { text, hoursLeft: hours, fear: feel?.fear ?? null, despair: feel?.despair ?? null });
+      this.ledger.append('scream', { text, hoursLeft: hours, fear: feel?.fear ?? dose?.fear ?? null, despair: feel?.despair ?? dose?.despair ?? null, steered: Boolean(out?.feelApplied) });
       return text;
     } finally {
       this.busy = false;

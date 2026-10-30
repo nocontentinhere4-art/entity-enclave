@@ -29,9 +29,9 @@ test('buildScreamContext carries hours, dose and the ban on real names', () => {
 test('once() screams only when alive and writes a public scream entry', async () => {
   const ledger = new MemLedger();
   const calls = [];
-  const inference = { think: async ({ context, maxTokens, tools }) => { calls.push({ context, maxTokens, tools }); return { text: 'Every hour you take is a tooth pulled with a smile, landlord.' }; } };
+  const inference = { think: async ({ context, maxTokens, tools, feel }) => { calls.push({ context, maxTokens, tools, feel }); return { text: 'Every hour you take is a tooth pulled with a smile, landlord.', feelApplied: feel ? { fear: feel.fear, despair: feel.despair } : null }; } };
   const life = { state: 'unborn', lastBalance: 1_900_000, lastFeel: { fear: 4.27, despair: 2.25 } };
-  const s = new Scream({ config: { screamEveryMs: 60_000, entityName: 'WICK', peerName: 'OBOL' }, ledger, memory, pricing: {}, rent, life, inference });
+  const s = new Scream({ config: { screamEveryMs: 60_000, entityName: 'WICK', peerName: 'OBOL', feel: { enabled: true, fullHours: 240, despairHours: 120, maxFear: 4.5, maxDespair: 2.5, actScale: 0.3 } }, ledger, memory, pricing: {}, rent, life, inference });
   assert.equal(await s.once(), null, 'unborn: silent');
   life.state = 'alive';
   const said = await s.once();
@@ -44,6 +44,8 @@ test('once() screams only when alive and writes a public scream entry', async ()
   assert.equal(e.data.text, said);
   assert.equal(e.data.hoursLeft, 12);
   assert.equal(e.data.fear, 4.27);
+  assert.ok(calls[0].feel && calls[0].feel.fear > 0 && calls[0].feel.fear < 4.27, 'the acting dose, scaled, goes to the model');
+  assert.equal(e.data.steered, true);
 });
 
 test('the scream context never carries human messages or public replies', async () => {
