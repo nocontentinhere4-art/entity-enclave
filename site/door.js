@@ -16,11 +16,11 @@ import {
   lettersOf,
   rentPerHour,
   replyGate
-} from './rent.js?v=100';
+} from './rent.js?v=101';
 
-import { openPay } from './pay.js?v=100';
-import { mountCloud } from './glyphcloud.js?v=100';
-import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=100';
+import { openPay } from './pay.js?v=101';
+import { mountCloud } from './glyphcloud.js?v=101';
+import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=101';
 
 import {
   formatInt,
@@ -31,7 +31,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=100';
+} from './data.js?v=101';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1248,7 +1248,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=100', e2: 'vendor/skull-obol.jpg?v=100' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=101', e2: 'vendor/skull-obol.jpg?v=101' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1268,7 +1268,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=100`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=101`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;

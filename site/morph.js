@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=100';
-import * as rent from './rent.js?v=100';
-import { openPay } from './pay.js?v=100';
-import { openDoor } from './door.js?v=100';
+import { makeAtlas } from './glyphs.js?v=101';
+import * as rent from './rent.js?v=101';
+import { openPay } from './pay.js?v=101';
+import { openDoor } from './door.js?v=101';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=100';
+const V = '?v=101';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -562,9 +562,10 @@ export function createMorph() {
             const shown = Math.min(w0.text.length, Math.floor((t - slot * 9) * 70));
             const size = isPhone ? 11 : 12, lh = size + 5, maxW = isPhone ? W * 0.46 : Math.min(W * 0.4, 380);
             const lines = wrap(w0.text.slice(0, shown), maxW, size).slice(0, 3);
-            const top = toScreen(c[0], c[1] + obj.ext * 1.08, c[2], R);
+            const top = toScreen(c[0], c[1] + obj.ext * 1.3, c[2], R);
             const blockH = lines.length * lh + 16;
-            const yTop = clamp(top[1] - blockH - 10, 58, H);
+            const yTop = clamp(top[1] - blockH - 8, 56, H);
+            band(yTop - 6, blockH + 10, 0.7 * capA);
             text(`${name} · ${w0.label} · ${w0.when} UTC`, sc[0], yTop, isPhone ? 9 : 10, 'rgba(244,183,40,.6)', 'center', capA);
             for (let i = 0; i < lines.length; i++) text(lines[i], sc[0], yTop + 16 + i * lh, size, 'rgba(242,242,238,.82)', 'center', capA);
           }
