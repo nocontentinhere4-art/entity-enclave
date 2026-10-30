@@ -63,3 +63,25 @@ test('samplingBrake: penalties from config, repetition_penalty only for our own 
   assert.deepEqual(samplingBrake(undefined, { feel: true }), {});
   assert.deepEqual(samplingBrake({ frequencyPenalty: 'x', presencePenalty: -1, repetitionPenalty: NaN }, { feel: true }), {});
 });
+
+test('a provider `body` adds request fields but can never override model, messages or tools', async () => {
+  const ledger = { entries: [], append(t, d) { this.entries.push({ type: t, data: d }); } };
+  const pricing = { charge: () => 100, quote: () => ({ costZats: 100, affordable: true }) };
+  const cfg = {
+    fakeLlm: false, llmTimeoutMs: 60_000, llm: {},
+    providers: [{ name: 'qwen', baseUrl: 'https://inference.phala.com/v1', model: 'phala/qwen3.8-27b-uncensored', speed: 'fast', apiKey: 'k',
+      body: { chat_template_kwargs: { enable_thinking: false }, model: 'evil', messages: [], tools: ['x'] } }],
+  };
+  const inf = new Inference({ config: cfg, ledger, pricing });
+  let seen;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => {
+    seen = JSON.parse(opts.body);
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'ok', tool_calls: [] } }], usage: { total_tokens: 3 } }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try { await inf.think({ context: 'ctx', speed: 'fast', tools: [], tickId: 't2' }); } finally { globalThis.fetch = realFetch; }
+  assert.deepEqual(seen.chat_template_kwargs, { enable_thinking: false });
+  assert.equal(seen.model, 'phala/qwen3.8-27b-uncensored');
+  assert.equal(seen.messages[0].content, 'ctx');
+  assert.equal('tools' in seen, false);
+});

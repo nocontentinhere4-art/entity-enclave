@@ -12,9 +12,9 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=94';
-import { zip321Uri, qrSvg } from './qr.js?v=94';
-import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=94';
+} from './data.js?v=95';
+import { zip321Uri, qrSvg } from './qr.js?v=95';
+import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=95';
 
 const ANY_MIN_ZEC = 0.006;          // any-coin route (Trocador) minimum, with margin over their ~0.0045
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load

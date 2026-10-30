@@ -56,6 +56,12 @@ export class Inference {
     const body = { model: provider.model, messages };
     if (Number.isFinite(Number(maxTokens)) && Number(maxTokens) > 0) body.max_tokens = Math.floor(Number(maxTokens));
     Object.assign(body, samplingBrake(this.config.llm, provider));
+    // Provider-specific request fields, declared in LLM_PROVIDERS as `body` (e.g. Qwen3 on SGLang/vLLM:
+    // {"chat_template_kwargs":{"enable_thinking":false}} turns the 700-token reasoning preamble off, 30 s → 2 s).
+    // They never override the model, the messages or the tools.
+    if (provider.body && typeof provider.body === 'object') {
+      for (const [k, v] of Object.entries(provider.body)) if (!['model', 'messages', 'tools', 'tool_choice', 'feel'].includes(k)) body[k] = v;
+    }
     if (defs.length) { body.tools = defs; body.tool_choice = 'auto'; }
     // The `feel` field goes only to a provider that declared it (the steered-inference server) and only
     // when a dose is actually positive: hosted providers must never see it.

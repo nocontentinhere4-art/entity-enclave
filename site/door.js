@@ -16,11 +16,11 @@ import {
   lettersOf,
   rentPerHour,
   replyGate
-} from './rent.js?v=94';
+} from './rent.js?v=95';
 
-import { openPay } from './pay.js?v=94';
-import { mountCloud } from './glyphcloud.js?v=94';
-import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=94';
+import { openPay } from './pay.js?v=95';
+import { mountCloud } from './glyphcloud.js?v=95';
+import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=95';
 
 import {
   formatInt,
@@ -31,7 +31,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=94';
+} from './data.js?v=95';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -247,7 +247,7 @@ function buildProve(body, title, id, state) {
 
   const notes = mk('div', 'door-note');
   notes.append(mk('p', null, CODE_GUARANTEED ? `Both enclaves run image ${PENDING_IMAGE}, the one the public code builds.` : `Enclave image ${PENDING_IMAGE} is built and waits for redeploy.`));
-  notes.append(mk('p', null, 'Brain: Qwen3.8-27B (uncensored) for fast thoughts and DeepSeek V4.1 Flash for deep ones, served by Phala Private AI on TDX-attested H200 GPUs. Not this enclave\'s own silicon: a second TEE, attested by Phala, reached over HTTPS. The fear dose is computed, not steered.'));
+  notes.append(mk('p', null, 'Brain: DeepSeek V4.1 Flash, served by Phala Private AI on TDX-attested H200 GPUs. Not this enclave\'s own silicon: a second TEE, attested by Phala, reached over HTTPS. The fear dose is computed, not steered.'));
   body.append(notes);
 
   let nonce = (state.wait && state.wait[id] && state.wait[id].nonce) || genNonce();
@@ -1248,7 +1248,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=94', e2: 'vendor/skull-obol.jpg?v=94' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=95', e2: 'vendor/skull-obol.jpg?v=95' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1268,7 +1268,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=94`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=95`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;
