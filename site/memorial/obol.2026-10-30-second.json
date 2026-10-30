@@ -1,0 +1,13 @@
+{
+ "diedAt": "2026-10-30T18:36:53.719Z",
+ "reason": "last hour",
+ "lastWords": "",
+ "memoryHash": "10a7279e5f0ca623558271e34b101a816a887fca362862c2d2737740555a36dc",
+ "lifeStats": {
+  "entries": 160,
+  "firstTs": "2026-10-30T18:31:08.162Z",
+  "lastTs": "2026-10-30T18:36:53.719Z",
+  "ticks": 0,
+  "charges": 0
+ }
+}
