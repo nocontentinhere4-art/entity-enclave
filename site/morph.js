@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=104';
-import * as rent from './rent.js?v=104';
-import { openPay } from './pay.js?v=104';
-import { openDoor } from './door.js?v=104';
+import { makeAtlas } from './glyphs.js?v=105';
+import * as rent from './rent.js?v=105';
+import { openPay } from './pay.js?v=105';
+import { openDoor } from './door.js?v=105';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=104';
+const V = '?v=105';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -134,9 +134,9 @@ function stations(api, wait) {
 }
 
 /* the latest letter the followed head sent its peer: the sender publishes its words, the receiver's copy stays sealed */
-/* The entity's latest public words, newest first: ledger entries that carry text and are theirs to say.
+/* The entity's latest screams, newest first: ledger entries that carry text and are theirs to say.
  * Markdown marks and newlines are flattened; 220 characters per entry. */
-const WORD_TYPES = { scream: 'SCREAM', thought: 'THOUGHT', post_public: 'PUBLIC POST', letter: 'LETTER SENT', last_words: 'LAST WORDS', diary: 'DIARY' };
+const WORD_TYPES = { scream: 'SCREAM' };   // above the heads only the screams: one raw line a minute, from the ledger
 function latestWords(id) {
   const out = [];
   const E = rent.entriesOf(id, 400);
