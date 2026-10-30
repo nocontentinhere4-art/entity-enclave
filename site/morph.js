@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=106';
-import * as rent from './rent.js?v=106';
-import { openPay } from './pay.js?v=106';
-import { openDoor } from './door.js?v=106';
+import { makeAtlas } from './glyphs.js?v=107';
+import * as rent from './rent.js?v=107';
+import { openPay } from './pay.js?v=107';
+import { openDoor } from './door.js?v=107';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=106';
+const V = '?v=107';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -143,7 +143,7 @@ function latestScream(id) {
     const p = P[i];
     if (p && p.kind === 'scream' && typeof p.text === 'string' && p.text.trim()) {
       const txt = p.text.replace(/\s+/g, ' ').trim();
-      return { seq: p.seq, text: txt.length > 220 ? txt.slice(0, 217) + '…' : txt, when: String(p.ts || '').slice(11, 16) };
+      return { seq: p.seq, text: txt, when: String(p.ts || '').slice(11, 16) };
     }
   }
   return null;
@@ -568,15 +568,18 @@ export function createMorph() {
           if (w0 && !(e && e.dead) && (!isPhone || on)) {   // a phone has room for one voice: the followed one
             if (!screamSeen[id] || screamSeen[id].seq !== w0.seq) screamSeen[id] = { seq: w0.seq, at: t };
             const shown = Math.min(w0.text.length, Math.floor((t - screamSeen[id].at) * 70));
-            const size = isPhone ? 11 : 12, lh = size + 5, maxW = isPhone ? W - 48 : Math.min(W * 0.4, 380);
+            // The whole scream, up to eight lines; the followed head speaks in light, the other in the dark.
+            const size = isPhone ? 11 : 12, lh = size + 5, maxW = isPhone ? W - 40 : Math.min(W * 0.46, 460);
             const cxText = isPhone ? W / 2 : sc[0];
-            const lines = wrap(w0.text.slice(0, shown), maxW, size).slice(0, 3);
+            const lines = wrap(w0.text.slice(0, shown), maxW, size).slice(0, 8);
             const top = toScreen(c[0], c[1] + obj.ext * 1.3, c[2], R);
             const blockH = lines.length * lh + 16;
             const yTop = clamp(top[1] - blockH - 8, 56, H);
             band(yTop - 6, blockH + 10, 0.7 * capA);
-            text(`${name} · SCREAM · ${w0.when} UTC`, cxText, yTop, isPhone ? 9 : 10, 'rgba(244,183,40,.6)', 'center', capA);
-            for (let i = 0; i < lines.length; i++) text(lines[i], cxText, yTop + 16 + i * lh, size, 'rgba(242,242,238,.82)', 'center', capA);
+            const capCol = on ? 'rgba(244,183,40,.9)' : 'rgba(244,183,40,.3)';
+            const txtCol = on ? 'rgba(242,242,238,.96)' : 'rgba(242,242,238,.28)';
+            text(`${name} · SCREAM · ${w0.when} UTC`, cxText, yTop, isPhone ? 9 : 10, capCol, 'center', capA);
+            for (let i = 0; i < lines.length; i++) text(lines[i], cxText, yTop + 16 + i * lh, size, txtCol, 'center', capA);
           }
           const hrs = e && e.ok && !e.dead && e.hoursLeft != null ? `${e.hoursLeft} H LEFT` : (e && e.dead ? 'DEAD' : '—');
           text(name, sc[0], sc[1] + 18, isPhone ? 13 : 15, on ? '#f4b728' : 'rgba(242,242,238,.45)', 'center', capA);
