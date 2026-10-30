@@ -258,6 +258,24 @@ test('an unborn entity is not born on a balance the wallet has not synced yet', 
   assert.equal(w.ledger.entries.filter((e) => e.type === 'birth_gift').length, 1);
 });
 
+test('the rent clock and the last dose survive a restart through memory', async () => {
+  const w = makeWorld();
+  await ticks(w, 13); // 13 × 15 min = 195 min: rent is paid three times (60, 120, 180)
+  assert.equal(w.rent.paid, 3);
+  const saved = await w.memory.load();
+  assert.ok(saved.lastRentAt, 'rent clock persisted');
+  assert.equal('lastFeel' in saved, true, 'dose slot persisted');
+  // A new process on the same memory, started right after: it must not pay again before the hour is up.
+  const life2 = new Life({
+    config: w.config, ledger: w.ledger, wallet: w.wallet, memory: w.memory, pricing: w.pricing, rent: w.rent, inference: w.inference,
+    tools: w.tools, promises, charter: CHARTER, exit: () => {}, paused: realPaused, now: () => w.clock(),
+  });
+  w.advance(w.config.tickMinutes * 60_000); // 210 min: 30 min after the last payment
+  await life2.tick('timer');
+  assert.equal(w.rent.paid, 3, 'no double rent after a restart');
+  assert.equal(new Date(life2.lastRentAt).toISOString(), saved.lastRentAt);
+});
+
 test('last hour produces a death entry and never thinks or spends again', async () => {
   const deaths = [];
   const die = async ({ ledger, memory, reason }) => {

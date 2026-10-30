@@ -101,6 +101,14 @@ export class Life {
     // 2. Born flag first: an entity that has never lived cannot die, pay rent, hunger or think.
     let mem = await this.memory.load();
     this.state = mem.bornAt ? 'alive' : 'unborn';
+    // Restarts must not reset the clocks: the rent hour and the last dose live in memory too, so a redeploy
+    // neither postpones rent (lastRentAt restarted at process start before) nor blanks the FEAR door.
+    if (!this._clocksRestored) {
+      this._clocksRestored = true;
+      const t = Date.parse(mem.lastRentAt ?? mem.bornAt ?? ''); // older memories: the hour counts from birth
+      if (Number.isFinite(t) && t < this.lastRentAt) this.lastRentAt = t;
+      if (!this.lastFeel && mem.lastFeel && typeof mem.lastFeel === 'object') this.lastFeel = mem.lastFeel;
+    }
 
     // 3. Vital numbers.
     const bal = await this.wallet.balance();
@@ -138,6 +146,7 @@ export class Life {
       // First time over the threshold: remember it permanently, then live from the next tick on.
       mem.bornAt = new Date(now).toISOString();
       mem.initialTreasuryZats = treasury; // hunger is measured against the gift that started this life
+      mem.lastRentAt = mem.bornAt;
       await this.memory.save(mem);
       this.ledger.append('birth_gift', { zatoshis: treasury });
       this.state = 'alive';
@@ -190,6 +199,8 @@ export class Life {
         this.ledger.append('rent_error', digestError('rent', e));
       }
       this.lastRentAt = now;
+      try { const m = await this.memory.load(); m.lastRentAt = new Date(now).toISOString(); await this.memory.save(m); }
+      catch (e) { this.ledger.append('memory_error', digestError('rent clock', e)); }
     }
 
     // Scheduled jobs (forecast settlement, order expiry, …) run after rent is paid and before the
@@ -301,7 +312,6 @@ export class Life {
     mem = await this.memory.load();
     const summary = `${speed} · ${executed} tools · ${treasury} zats`;
     mem.events = [...(mem.events ?? []), { ts: new Date(now).toISOString(), type: 'tick', summary }].slice(-50);
-    await this.memory.save(mem);
 
     const tickData = { trigger, zatoshis: treasury, hunger, speed, tools: executed, costZats: thought.costZats ?? 0 };
     if (feel) {
@@ -316,6 +326,9 @@ export class Life {
     } else {
       this.lastFeel = null;
     }
+    mem.lastFeel = this.lastFeel;
+    mem.lastRentAt = new Date(this.lastRentAt).toISOString();
+    await this.memory.save(mem);
     if (jobState.wake) tickData.wokenBy = jobState.wakeReason;
     else if (orderWake) tickData.wokenBy = 'order';
     this.ledger.append('tick', tickData);
