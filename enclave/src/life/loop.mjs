@@ -31,9 +31,12 @@ const MAX_TOOL_CALLS = 8; // a single thought cannot spend the whole treasury
 const MAX_ROUNDS = 3; // think → act → think with the results, at most three times per cycle
 
 export class Life {
-  constructor({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused, exit, now, jobs, orders, trades, replier }) {
+  constructor({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused, exit, now, jobs, orders, trades, replier, walletTrusted }) {
     Object.assign(this, { config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, jobs, orders, trades, replier });
     this._die = die ?? null;
+    // A balance is only evidence once the wallet has synced in this process: before that, 0 means "not read yet".
+    this._walletTrusted = walletTrusted ?? (() => true);
+    this.lastDeferredHour = null;
     this.lastJobs = null; // { wake, wakeReason, context, events } from the last Jobs.run
     // Death is terminal: the loop stops and hands control to this injection point (process.exit in production).
     this._exit = exit ?? ((code) => process.exit(code));
@@ -137,6 +140,14 @@ export class Life {
 
     // 5. Death: fewer than one hour of rent left. Only a born entity can die (die() asserts it too).
     if (this.rent.isLastHour(treasury)) {
+      // Fail-safe: a wallet that has not synced once in this process can read 0 while it rescans, or right after a
+      // restart before zingo saved its notes. That 0 is ignorance, not poverty: no death on it (OBOL, 2026-10-30
+      // 18:36 UTC, died with 86 hours in the wallet this way). Recorded once per hour; the tick ends here.
+      if (!this._walletTrusted()) {
+        const hour = Math.floor(now / HOUR_MS);
+        if (this.lastDeferredHour !== hour) { this.lastDeferredHour = hour; this.ledger.append('death_deferred', { zatoshis: treasury, reason: 'wallet not yet synced in this process' }); }
+        return;
+      }
       const dieFn = this._die ?? await loads.die();
       try {
         // Open trades get one last, bounded attempt to settle before the wallet + trade store are shredded.

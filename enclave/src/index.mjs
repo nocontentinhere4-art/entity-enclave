@@ -286,7 +286,7 @@ config.peerFeed = async () => {
 };
 const tools = new Tools({ ledger, wallet, memory, pricing, keys, config, channels: { public: 'public' }, promises, nostr, forecasts, market, pages, orders, trades });
 
-const life = new Life({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused, jobs, orders, trades });
+const life = new Life({ config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter, keys, die, paused, jobs, orders, trades, walletTrusted: () => config.fakeWallet || syncState.ok === true });
 // Instant replies answer the public channel and paid letters within seconds, independent of the think/act loop.
 const replier = new Replier({ config, ledger, memory, pricing, rent, charter, treasury: () => life.lastBalance, now: Date.now });
 life.replier = replier;

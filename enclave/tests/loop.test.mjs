@@ -114,7 +114,7 @@ function makeConfig(dir, over = {}) {
 // A DNS lookup stub: tests never touch the real network for host resolution.
 const publicLookup = async () => [{ address: '93.184.216.34', family: 4 }];
 
-function makeWorld({ zats = 10_000_000, over = {}, die, exit = () => {}, lookup = publicLookup, born = true } = {}) {
+function makeWorld({ zats = 10_000_000, over = {}, die, exit = () => {}, lookup = publicLookup, born = true, walletTrusted } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'loop-'));
   const config = makeConfig(dir, over);
   writeFileSync(config.pauseFile, JSON.stringify({ paused: false })); // no pause unless the test says so
@@ -140,7 +140,7 @@ function makeWorld({ zats = 10_000_000, over = {}, die, exit = () => {}, lookup 
   let clock = 0;
   const life = new Life({
     config, ledger, wallet, memory, pricing, rent, inference, tools, promises, charter: CHARTER,
-    die, exit, paused: realPaused, now: () => clock,
+    die, exit, paused: realPaused, now: () => clock, walletTrusted,
   });
   return {
     config, ledger, wallet, memory, pricing, rent, inference, tools, life,
@@ -229,6 +229,21 @@ test('pause stops the tick without touching memory or wallet', async () => {
   assert.equal(w.memory.wipes, 0);
   assert.equal(JSON.stringify(w.memory.state), before);
   assert.equal(fetched.length, 0);
+});
+
+test('a zero balance from a wallet that has not synced yet defers death instead of causing it', async () => {
+  const deaths = [];
+  const die = async ({ ledger, reason }) => { deaths.push(reason); ledger.append('death', { reason }); };
+  let synced = false;
+  const w = makeWorld({ zats: 5_000, die, walletTrusted: () => synced }); // under one hour of rent, wallet not trusted
+  await ticks(w, 3);
+  assert.equal(deaths.length, 0, 'no death on an untrusted balance');
+  const deferred = w.ledger.entries.filter((e) => e.type === 'death_deferred');
+  assert.equal(deferred.length, 1, 'deferral recorded once per hour');
+  assert.equal(deferred[0].data.zatoshis, 5_000);
+  synced = true; // the wallet syncs and the balance is still under one hour: now it is poverty
+  await ticks(w, 1);
+  assert.deepEqual(deaths, ['last hour']);
 });
 
 test('last hour produces a death entry and never thinks or spends again', async () => {
