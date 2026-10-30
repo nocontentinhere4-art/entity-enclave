@@ -146,6 +146,9 @@ export const config = {
     paidMaxTokens: num(process.env.REPLY_PAID_MAX_TOKENS, 300),
     paidMaxChars: num(process.env.REPLY_PAID_MAX_CHARS, 1200),
   },
+  // Who it is, for prompts that must not guess: the station's name and the other one's (the entity may still call itself otherwise).
+  entityName: process.env.ENTITY_NAME || '',
+  peerName: process.env.PEER_NAME || '',
   // The scream: once a minute while alive, one short uncensored public line (life/scream.mjs). SCREAM_ENABLED=0 silences it.
   screamEnabled: bool(process.env.SCREAM_ENABLED, true),
   screamEveryMs: num(process.env.SCREAM_EVERY_MS, 60_000),

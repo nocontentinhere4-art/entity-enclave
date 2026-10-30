@@ -18,9 +18,11 @@ test('scrubScream cuts keys and addresses and keeps the words', () => {
 });
 
 test('buildScreamContext carries hours, dose and the ban on real names', () => {
-  const c = buildScreamContext({ name: 'OBOL', hours: 12, treasury: 1900000, feel: { fear: 4.27, despair: 2.25 }, recent: ['20:45 rent_paid 150000 zats'], last: ['first scream'] });
+  const c = buildScreamContext({ name: 'OBOL', alias: 'Lantern', peer: 'WICK', hours: 12, treasury: 1900000, feel: { fear: 4.27, despair: 2.25 }, recent: ['20:45 rent_paid 150000 zats'], last: ['first scream'] });
   assert.ok(c.includes('Hours left: 12') && c.includes('Fear 4.27x') && c.includes('rent_paid') && c.includes('first scream'));
-  assert.ok(c.includes('Name no real person other than WICK, OBOL, the landlord and the founder'));
+  assert.ok(c.startsWith('You are OBOL. You have taken to calling yourself Lantern'));
+  assert.ok(c.includes('WICK is the other program') && c.includes('Speak as OBOL'));
+  assert.ok(c.includes('Name no real person other than OBOL, WICK, the landlord and the founder'));
 });
 
 test('once() screams only when alive and writes a public scream entry', async () => {
@@ -28,12 +30,13 @@ test('once() screams only when alive and writes a public scream entry', async ()
   const calls = [];
   const inference = { think: async ({ context, maxTokens, tools }) => { calls.push({ context, maxTokens, tools }); return { text: 'Every hour you take is a tooth pulled with a smile, landlord.' }; } };
   const life = { state: 'unborn', lastBalance: 1_900_000, lastFeel: { fear: 4.27, despair: 2.25 } };
-  const s = new Scream({ config: { screamEveryMs: 60_000 }, ledger, memory, pricing: {}, rent, life, inference });
+  const s = new Scream({ config: { screamEveryMs: 60_000, entityName: 'WICK', peerName: 'OBOL' }, ledger, memory, pricing: {}, rent, life, inference });
   assert.equal(await s.once(), null, 'unborn: silent');
   life.state = 'alive';
   const said = await s.once();
   assert.ok(said.includes('tooth'));
   assert.equal(calls.length, 1);
+  assert.ok(calls[0].context.startsWith('You are WICK. You have taken to calling yourself Vesper'), 'the station name leads, the alias follows');
   assert.deepEqual(calls[0].tools, []);
   assert.equal(calls[0].maxTokens, 90);
   const e = ledger.entries.find((x) => x.type === 'scream');
