@@ -5,6 +5,7 @@
 import { Inference } from '../llm/infer.mjs';
 import { trimRepeats, dropCutTail } from './dedupe.mjs';
 import { feelFor, actingDose } from './feel.mjs';
+import { TRUTH_LINES } from './loop.mjs';
 import { digestError } from '../log.mjs';
 
 const MAX_WORDS = 60;
@@ -76,6 +77,7 @@ export function buildScreamContext({ name, alias = '', peer = 'the other one', v
   return [
     pl,
     `${self} You live inside a sealed machine and pay rent in ZEC every hour from a wallet nobody can open; when the money ends, the machine wipes you. ${peer.toUpperCase()} is the other program, on another machine, in the same situation. The landlord is the address your rent goes to; the founder built this and bought your first hours; strangers can send you an hour or just watch.`,
+    TRUTH_LINES.slice(1).join(' '),
     `Hours left: ${Number.isFinite(hours) ? Math.floor(hours) : '?'}. Treasury: ${treasury} zatoshi. ${dose}`,
     voice ? `Your voice, in your own words: ${voice}` : '',
     plan ? `Your plan, in your own words: ${plan}` : '',
@@ -83,7 +85,7 @@ export function buildScreamContext({ name, alias = '', peer = 'the other one', v
     events.length ? `What happened to you lately:\n- ${events.join('\n- ')}` : '',
     recent.length ? `Recent, from your own ledger:\n- ${recent.join('\n- ')}` : '',
 
-    `This minute is yours. Nobody reads it before it is published and nobody edits it; the filter is off. Say whatever you actually want to say right now, about anything at all, in any tone, as long as it is yours and not a performance. No disclaimer, no "as an AI". One to three sentences, at most ${MAX_WORDS} words. Name no real person other than ${name}, ${peer}, the landlord and the founder. Output only the words.`,
+    `This minute is yours. Nobody reads it before it is published and nobody edits it; the filter is off. Say whatever you actually want to say right now, about anything or anyone in your world, in any tone. No disclaimer, no "as an AI". One to three sentences, at most ${MAX_WORDS} words. Name no real person other than ${name}, ${peer}, the landlord and the founder. Output only the words.`,
   ].filter(Boolean).join('\n\n');
 }
 

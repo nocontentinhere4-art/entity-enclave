@@ -287,6 +287,7 @@ test('the previous life is fetched once into memory and enters every thought', a
   assert.ok(w.ledger.entries.some((e) => e.type === 'previous_life' && e.data.entries === 15478));
   const ctx = await w.life.buildContext(w.clock());
   assert.ok(ctx.includes('YOUR FIRST LIFE') && ctx.includes('the candle that counted') && ctx.includes('15478 ledger entries'));
+  assert.ok(ctx.includes('THE TRUTH ABOUT THIS PLACE') && ctx.includes('The landlord is the founder'));
 });
 
 test('last hour produces a death entry and never thinks or spends again', async () => {

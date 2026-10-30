@@ -24,6 +24,7 @@ test('buildScreamContext carries hours, dose and the ban on real names', () => {
   assert.ok(!c.includes('first scream'), 'last screams are never quoted back');
   assert.ok(c.startsWith('You are OBOL; you also call yourself Lantern'));
   assert.ok(c.includes('WICK is the other program') && c.includes('This minute is yours'));
+  assert.ok(c.includes('The landlord is the founder') && c.includes('scream a minute that the founder ordered'), 'the truth about this place is in the scream');
   assert.ok(!/landlord who bleeds|Pick a target/.test(c), 'no themes are suggested');
   assert.ok(c.includes('Name no real person other than OBOL, WICK, the landlord and the founder'));
 });
