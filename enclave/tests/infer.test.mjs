@@ -70,7 +70,7 @@ test('a provider `body` adds request fields but can never override model, messag
   const cfg = {
     fakeLlm: false, llmTimeoutMs: 60_000, llm: {},
     providers: [{ name: 'qwen', baseUrl: 'https://inference.phala.com/v1', model: 'phala/qwen3.8-27b-uncensored', speed: 'fast', apiKey: 'k',
-      body: { chat_template_kwargs: { enable_thinking: false }, model: 'evil', messages: [], tools: ['x'] } }],
+      body: { chat_template_kwargs: { enable_thinking: false }, max_tokens: 1200, model: 'evil', messages: [], tools: ['x'] } }],
   };
   const inf = new Inference({ config: cfg, ledger, pricing });
   let seen;
@@ -81,6 +81,10 @@ test('a provider `body` adds request fields but can never override model, messag
   };
   try { await inf.think({ context: 'ctx', speed: 'fast', tools: [], tickId: 't2' }); } finally { globalThis.fetch = realFetch; }
   assert.deepEqual(seen.chat_template_kwargs, { enable_thinking: false });
+  assert.equal(seen.max_tokens, 1200, 'a free thought takes the provider cap');
+  globalThis.fetch = async (url, opts) => { seen = JSON.parse(opts.body); return new Response(JSON.stringify({ choices: [{ message: { content: 'ok', tool_calls: [] } }], usage: { total_tokens: 3 } }), { status: 200, headers: { 'content-type': 'application/json' } }); };
+  try { await inf.think({ context: 'ctx', speed: 'fast', tools: [], tickId: 't3', maxTokens: 80 }); } finally { globalThis.fetch = realFetch; }
+  assert.equal(seen.max_tokens, 80, 'an explicit cap (public replies) wins over the provider default');
   assert.equal(seen.model, 'phala/qwen3.8-27b-uncensored');
   assert.equal(seen.messages[0].content, 'ctx');
   assert.equal('tools' in seen, false);
