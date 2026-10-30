@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=109';
-import * as rent from './rent.js?v=109';
-import { openPay } from './pay.js?v=109';
-import { openDoor } from './door.js?v=109';
+import { makeAtlas } from './glyphs.js?v=110';
+import * as rent from './rent.js?v=110';
+import { openPay } from './pay.js?v=110';
+import { openDoor } from './door.js?v=110';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=109';
+const V = '?v=110';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -577,7 +577,8 @@ export function createMorph() {
             const top = toScreen(c[0], c[1] + obj.ext * 1.3, c[2], R);
             const blockH = lines.length * lh + 16;
             const yTop = clamp(top[1] - blockH - 8, 56, H);
-            band(yTop - 6, blockH + 10, 0.7 * capA);
+            // A dark panel only as wide as this block: a full-width band would darken the other head's words too.
+            ctx.save(); ctx.globalAlpha = 0.7 * capA; ctx.fillStyle = '#060606'; ctx.fillRect(cxText - maxW / 2 - 12, yTop - 6, maxW + 24, blockH + 10); ctx.restore();
             const capCol = on ? 'rgba(244,183,40,.9)' : 'rgba(244,183,40,.3)';
             const txtCol = on ? 'rgba(242,242,238,.96)' : 'rgba(242,242,238,.28)';
             text(`${name} · SCREAM · ${w0.when} UTC`, cxText, yTop, isPhone ? 9 : 10, capCol, 'center', capA);
