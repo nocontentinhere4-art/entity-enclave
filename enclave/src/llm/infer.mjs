@@ -23,7 +23,8 @@ export class Inference {
     if (this.config.fakeLlm) {
       out = fake(context, tools);
     } else {
-      const provider = pickProvider(this.config.providers ?? [], fast ? 'fast' : 'deep', context);
+      // The speed reaches the picker as given: 'scream' finds its own provider, or falls back to fast inside pickProvider.
+      const provider = pickProvider(this.config.providers ?? [], speed === 'deep' ? 'deep' : (speed === 'fast' ? 'fast' : speed), context);
       out = await this.#http(provider, { context, tools, feel, priority, maxTokens });
     }
 

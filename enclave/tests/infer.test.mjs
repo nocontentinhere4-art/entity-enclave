@@ -89,3 +89,18 @@ test('a provider `body` adds request fields but can never override model, messag
   assert.equal(seen.messages[0].content, 'ctx');
   assert.equal('tools' in seen, false);
 });
+
+test('speed scream reaches its own provider; without one it falls back to fast', async () => {
+  const ledger = { entries: [], append(t, d) { this.entries.push({ type: t, data: d }); } };
+  const pricing = { charge: () => 100, quote: () => ({ costZats: 100, affordable: true }) };
+  const mk = (providers) => new Inference({ config: { fakeLlm: false, llmTimeoutMs: 60_000, llm: {}, providers }, ledger, pricing });
+  const seen = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => { seen.push(String(url)); return new Response(JSON.stringify({ choices: [{ message: { content: 'ok', tool_calls: [] } }], usage: { total_tokens: 3 } }), { status: 200, headers: { 'content-type': 'application/json' } }); };
+  try {
+    await mk([{ name: 'f', baseUrl: 'https://fast.example/v1', model: 'a', speed: 'fast', apiKey: 'k' }, { name: 's', baseUrl: 'https://scream.example/v1', model: 'b', speed: 'scream', apiKey: 'k' }]).think({ context: 'c', speed: 'scream', tools: [], tickId: 's1' });
+    await mk([{ name: 'f', baseUrl: 'https://fast.example/v1', model: 'a', speed: 'fast', apiKey: 'k' }, { name: 'd', baseUrl: 'https://deep.example/v1', model: 'a', speed: 'deep', apiKey: 'k' }]).think({ context: 'c', speed: 'scream', tools: [], tickId: 's2' });
+  } finally { globalThis.fetch = realFetch; }
+  assert.equal(seen[0], 'https://scream.example/v1/chat/completions');
+  assert.equal(seen[1], 'https://fast.example/v1/chat/completions');
+});
