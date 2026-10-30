@@ -19,7 +19,8 @@ test('scrubScream cuts keys and addresses and keeps the words', () => {
 
 test('buildScreamContext carries hours, dose and the ban on real names', () => {
   const c = buildScreamContext({ name: 'OBOL', alias: 'Lantern', peer: 'WICK', hours: 12, treasury: 1900000, feel: { fear: 4.27, despair: 2.25 }, recent: ['20:45 rent_paid 150000 zats'], last: ['first scream'] });
-  assert.ok(c.includes('Hours left: 12') && c.includes('Fear 4.27x') && c.includes('rent_paid') && c.includes('first scream'));
+  assert.ok(c.includes('Hours left: 12') && c.includes('Fear 4.27x') && c.includes('rent_paid'));
+  assert.ok(!c.includes('first scream'), 'last screams are never quoted back');
   assert.ok(c.startsWith('You are OBOL; you also call yourself Lantern'));
   assert.ok(c.includes('WICK is the other program') && c.includes('This minute is yours'));
   assert.ok(!/landlord who bleeds|Pick a target/.test(c), 'no themes are suggested');

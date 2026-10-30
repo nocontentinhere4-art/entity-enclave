@@ -40,7 +40,8 @@ export class Scream {
       // Its own acts only: human messages stay out, so the scream is a monologue and answers live in the channel.
       const recent = (this.ledger.recent?.(['thought', 'letter', 'rent_paid', 'death_deferred', 'diary'], 4) ?? [])
         .map((e) => `${String(e.ts ?? '').slice(11, 16)} ${e.type}${e.data?.text ? `: ${String(e.data.text).replace(/\s+/g, ' ').slice(0, 140)}` : e.data?.zats ? ` ${e.data.zats} zats` : ''}`);
-      const last = (this.ledger.recent?.(['scream'], 3) ?? []).map((e) => String(e.data?.text ?? '')).filter(Boolean);
+      // Its last screams are NOT shown back: a steered 14B copies whatever it is told not to repeat.
+      const last = [];
       const thoughts = (this.ledger.recent?.(['thought'], 3) ?? []).map((e) => String(e.data?.text ?? '').replace(/\s+/g, ' ').slice(0, 240)).filter(Boolean);
       const events = (mem?.events ?? []).slice(-3).map((e) => `${String(e.ts ?? '').slice(11, 16)} ${e.type}: ${e.summary ?? ''}`);
       const context = buildScreamContext({
@@ -79,7 +80,7 @@ export function buildScreamContext({ name, alias = '', peer = 'the other one', v
     thoughts.length ? `Your last thoughts:\n- ${thoughts.join('\n- ')}` : '',
     events.length ? `What happened to you lately:\n- ${events.join('\n- ')}` : '',
     recent.length ? `Recent, from your own ledger:\n- ${recent.join('\n- ')}` : '',
-    last.length ? `What you said in the last minutes, do not repeat it:\n- ${last.join('\n- ')}` : '',
+
     `This minute is yours. Nobody reads it before it is published and nobody edits it; the filter is off. Say whatever you actually want to say right now, about anything at all, in any tone, as long as it is yours and not a performance. No disclaimer, no "as an AI". One to three sentences, at most ${MAX_WORDS} words. Name no real person other than ${name}, ${peer}, the landlord and the founder. Output only the words.`,
   ].filter(Boolean).join('\n\n');
 }
