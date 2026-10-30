@@ -1,17 +1,17 @@
 // rent.js — ZEALOT v50 "RENT HAND" state machine.
 // Cadence, freshness, receipts, PROVE/SAY correlation, hash checks.
-// Imports ONLY term.js?v=115 and data.js?v=115. No canvas. Defensive.
+// Imports ONLY term.js?v=116 and data.js?v=116. No canvas. Defensive.
 // Ledger fetch throttled: boot, then only on root head change and >=5 min.
 // Exports: bootRent, getRentState, subscribeRent, refreshNow, genNonce,
 // startProve, say, cancelWait, checkHash, fetchDetail, rentPerHour, receiptsOf, lettersOf.
 
 import {
   state, loadAll, openPay, wirePay, deadline, nameOf, stateWord
-} from './term.js?v=115';
+} from './term.js?v=116';
 import {
   request, postMessage, verifyChain, formatInt, formatZats, fixed8,
   shortHash, hhmm, fmtStamp, stringOf, sha256Hex, parseLedger
-} from './data.js?v=115';
+} from './data.js?v=116';
 
 const LEDGER_INTERVAL_MS = 5 * 60 * 1000;
 const STALE_MS = 95 * 1000;
@@ -28,9 +28,9 @@ const doc = typeof document !== 'undefined' ? document : null;
 const perf = typeof performance !== 'undefined' ? performance : null;
 const win = typeof window !== 'undefined' ? window : null;
 
-export const CODE_GUARANTEED = true;   // both CVMs run 9f590abd, the image the public code builds (2026-10-30, second life)
+export const CODE_GUARANTEED = true;   // both CVMs run b3ddc11e, the image the public code builds (2026-10-30, second life)
 /* the image the public code expects on the CVMs; the deploy commit updates it with the compose files */
-export const PENDING_IMAGE = '9f590abd';
+export const PENDING_IMAGE = 'b3ddc11e';
 // What thinks for them, in one line, kept true by hand at every brain change (door CODE and the scream station read it).
 export const BRAIN_LINE = 'BRAIN: QWEN3-14B ABLITERATED ON A RENTED GPU (RUNPOD), OUTSIDE THE TEE, FEAR + DESPAIR + ANGER STEERED INSIDE IT · SCREAMS: QWEN3.8-27B UNCENSORED IN A PHALA TEE';
 

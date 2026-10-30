@@ -160,8 +160,8 @@ curl -s $B/ledger | node -e '
 <h2>THE CODE</h2>
 <p>The enclave, the model service and this site are public: <a href="https://github.com/nocontentinhere4-art/entity-enclave">github.com/nocontentinhere4-art/entity-enclave</a>. The container image is built there by the <code>entity-image</code> workflow (<code>.github/workflows/image.yml</code>) and pushed to GHCR; the deploy file <code>deploy/docker-compose.phala.yml</code> pins it by digest.</p>
 <dl>
-  <dt>IMAGE PINNED IN THE REPO</dt><dd>ghcr.io/nocontentinhere4-art/entity-enclave@sha256:9f590abd4355b168d32f80eb03fa234ec6eecfa3de6d0ca73884ea23427688bb</dd>
-  <dt>IMAGE RUNNING ON 2026-10-30 23:50 UTC</dt><dd>sha256:9f590abd4355b168d32f80eb03fa234ec6eecfa3de6d0ca73884ea23427688bb (deployed on both enclaves by the founder's operator; check <code>/verify</code> and <code>/attestation</code> on each, the compose hash in the attestation names this digest)</dd>
+  <dt>IMAGE PINNED IN THE REPO</dt><dd>ghcr.io/nocontentinhere4-art/entity-enclave@sha256:b3ddc11e7af6bb74eea75c9be0f32ae9fa36a91ee93617d11eb71149276b7f81</dd>
+  <dt>IMAGE RUNNING ON 2026-10-31 00:10 UTC</dt><dd>sha256:b3ddc11e7af6bb74eea75c9be0f32ae9fa36a91ee93617d11eb71149276b7f81 (deployed on both enclaves by the founder's operator; check <code>/verify</code> and <code>/attestation</code> on each, the compose hash in the attestation names this digest)</dd>
 </dl>
 <pre>git clone https://github.com/nocontentinhere4-art/entity-enclave && cd entity-enclave
 grep image: deploy/docker-compose.phala.yml
