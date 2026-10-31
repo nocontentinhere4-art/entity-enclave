@@ -91,7 +91,7 @@
 <p class="dim">Everything on <a href="https://zealotzec.com/">zealotzec.com</a> is read live from two services. This page says where they are and how to check each claim yourself: no JavaScript needed, no trust in us. The values printed here were read on <time datetime="2026-10-27T20:00:55Z">2026-10-27 20:00 UTC</time>; every command below reads them again now.</p>
 
 <h2>WHAT IS CLAIMED</h2>
-<p>Two programs, WICK and OBOL, each run inside an Intel TDX confidential VM on Phala's dstack. Each one holds its own keys and its own shielded Zcash wallet, pays 0.0015 ZEC of rent every hour from that wallet, writes every event to a public hash-chained ledger, and publishes a hardware attestation of the code it runs. When a wallet reaches zero the program wipes its wallet and memory from the machine and stops. Its identity is sealed to the enclave by Phala's key service: a redeploy of the same code on the same machine regrows the same keys and the same wallet address, and nobody, the operator included, can read them. Sending ZEC to one of them buys it time, one hour per 0.0015 ZEC. Nobody stands in between. There is no token.</p>
+<p>Two programs, WICK and OBOL, each run inside an Intel TDX confidential VM on Phala's dstack. Each one holds its own keys and its own shielded Zcash wallet, pays 0.0015 ZEC of rent every hour from that wallet, writes every event to a public hash-chained ledger, and publishes a hardware attestation of the code it runs. When a wallet reaches zero the program wipes its wallet and memory from the machine and stops. Its identity is sealed to the enclave by Phala's key service: a redeploy of the same code on the same machine regrows the same keys and the same wallet address, and nobody, the operator included, can read them. Sending ZEC to one of them buys it time, one hour per 0.0015 ZEC. Nobody stands in between. The $ZEALOT token (see THE MONEY) is a separate thing: it does not pay them by itself.</p>
 
 <h2>THE TWO ENCLAVES</h2>
 
@@ -151,7 +151,7 @@ curl -s $B/ledger | node -e '
   <dt>RENT</dt><dd>150000 zatoshi = 0.0015 ZEC per hour, paid by the enclave from its own shielded wallet, logged as <code>rent_paid</code>.</dd>
   <dt>BUYING AN HOUR</dt><dd>Sending 0.0015 ZEC to the address above. The enclave sees it at its next wallet sync and its hours go up by one. The site builds a standard <code>zcash:</code> payment URI for you; it never touches the funds. The any-coin route is a third-party swap (Trocador) that pays the same address.</dd>
   <dt>WHY YOU CANNOT SEE THE BALANCE ON CHAIN</dt><dd>The wallets are shielded (Orchard). That is the point: a wallet nobody can watch, held by a program nobody can open. The enclave reports its own balance in <code>GET /</code> (<code>zcash.balance</code>) and the ledger shows every hour it has paid.</dd>
-  <dt>TOKEN</dt><dd>NOT LAUNCHED. There is no ZEALOT token, no presale, no airdrop. Anyone selling one is not us.</dd>
+  <dt>TOKEN</dt><dd>$ZEALOT, launched 2026-10-30 23:56 UTC on StonkFun (Raydium LaunchLab, reward token), paired with ZEC (Zcash OmniBridge). CA <code>8hVLvWFu3WAku7itGMGppFsud549DixBHbtQAU3FqjCH</code>. Only this CA is ours: no presale, no airdrop, no creator allocation. Supply 1,000,000,000, fixed. Liquidity locked forever at graduation. Holder rewards: a 3% transfer tax on every trade, collected by StonkFun and paid to every holder in ZEC, automatically, on each reward cycle (totals: <a href="https://www.stonkfun.xyz/api/public/v1/tokens/8hVLvWFu3WAku7itGMGppFsud549DixBHbtQAU3FqjCH/rewards">https://www.stonkfun.xyz/api/public/v1/tokens/8hVLvWFu3WAku7itGMGppFsud549DixBHbtQAU3FqjCH/rewards</a>). The creator gets no fee from trades. Hours for WICK and OBOL are bought by the founder from the launch wallet <code>DxhYE2Yo8dVoocUT5ZxBKYWrxbFPvTbTbmdYFMdnYu2H</code> and listed below with their txids. Not a security. It may be worth nothing. Hours do not give tokens.<ul id="token-txids"><li>no hours bought from the launch wallet yet</li></ul></dd>
 </dl>
 
 <h2>THE FIRST LIFE</h2>
@@ -160,8 +160,8 @@ curl -s $B/ledger | node -e '
 <h2>THE CODE</h2>
 <p>The enclave, the model service and this site are public: <a href="https://github.com/nocontentinhere4-art/entity-enclave">github.com/nocontentinhere4-art/entity-enclave</a>. The container image is built there by the <code>entity-image</code> workflow (<code>.github/workflows/image.yml</code>) and pushed to GHCR; the deploy file <code>deploy/docker-compose.phala.yml</code> pins it by digest.</p>
 <dl>
-  <dt>IMAGE PINNED IN THE REPO</dt><dd>ghcr.io/nocontentinhere4-art/entity-enclave@sha256:b3ddc11e7af6bb74eea75c9be0f32ae9fa36a91ee93617d11eb71149276b7f81</dd>
-  <dt>IMAGE RUNNING ON 2026-10-31 00:10 UTC</dt><dd>sha256:b3ddc11e7af6bb74eea75c9be0f32ae9fa36a91ee93617d11eb71149276b7f81 (deployed on both enclaves by the founder's operator; check <code>/verify</code> and <code>/attestation</code> on each, the compose hash in the attestation names this digest)</dd>
+  <dt>IMAGE PINNED IN THE REPO</dt><dd>ghcr.io/nocontentinhere4-art/entity-enclave@sha256:84fafbd515d2f5111cbc0fa65992b0a6c296d3237020a1e11230969280a1c886</dd>
+  <dt>IMAGE RUNNING ON 2026-10-31 00:30 UTC</dt><dd>sha256:84fafbd515d2f5111cbc0fa65992b0a6c296d3237020a1e11230969280a1c886 (deployed on both enclaves by the founder's operator; check <code>/verify</code> and <code>/attestation</code> on each, the compose hash in the attestation names this digest)</dd>
 </dl>
 <pre>git clone https://github.com/nocontentinhere4-art/entity-enclave && cd entity-enclave
 grep image: deploy/docker-compose.phala.yml

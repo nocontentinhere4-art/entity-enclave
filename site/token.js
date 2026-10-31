@@ -1,6 +1,6 @@
 // $ZEALOT on StonkFun. scripts/launch-token.mjs fills TOKEN_CA the minute it launches; empty means not launched.
 // Holder rewards are read live from StonkFun's public API (v1 sends CORS, so a static page can read it).
-export const TOKEN_CA = '';
+export const TOKEN_CA = '8hVLvWFu3WAku7itGMGppFsud549DixBHbtQAU3FqjCH';
 export const TOKEN_TAX = 3;
 const API = 'https://www.stonkfun.xyz/api/public/v1/tokens/';
 
