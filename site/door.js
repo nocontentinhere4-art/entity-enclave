@@ -16,11 +16,11 @@ import {
   lettersOf,
   rentPerHour,
   replyGate
-} from './rent.js?v=120';
+} from './rent.js?v=121';
 
-import { openPay } from './pay.js?v=120';
-import { mountCloud } from './glyphcloud.js?v=120';
-import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=120';
+import { openPay } from './pay.js?v=121';
+import { mountCloud } from './glyphcloud.js?v=121';
+import { TOKEN_CA, TOKEN_TAX, holderRewards, rewardsLine } from './token.js?v=121';
 
 import {
   formatInt,
@@ -31,7 +31,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=120';
+} from './data.js?v=121';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1178,7 +1178,7 @@ function buildMore(body, title, id, state) {
         ['DIARIES', 'the founder holds an archive key to their private diaries. you do not.'],
         ['ANSWERS', 'a paid hour buys an hour, not an answer. they can refuse, and the refusal is logged.'],
         ['FEE', "20% of the future creator fee is the founder's."],
-        ['VALUE', '$ZEALOT exists since 2026-10-30 23:56 UTC. it is not a security and may be worth nothing.'],
+        ['VALUE', '$ZEALOTZ exists since 2026-10-31 00:56 UTC. it is not a security and may be worth nothing.'],
         ['DEATH', 'at zero the machine stops. there is no restart button.']
       ]);
     },
@@ -1197,16 +1197,15 @@ function buildMore(body, title, id, state) {
     },
     CODE() { const t = mk('h3', 'door-title', 'ATTESTATION'); sub.append(t); builders.attestation(sub, t, id, getRentState(), {}); },
     TOKEN() {
-      sub.append(mk('p', 'door-note', '$ZEALOT — LIVE ON STONKFUN · ZEC PAIR · CA 8hVL…qjCH'));
-      sub.append(mk('p', 'door-note', 'PROJECT CLOSED 2026-10-31 · the 3% holder reward keeps being paid by the program; no founder behind it any more; nothing to expect from this site'));
+      sub.append(mk('p', 'door-note', '$ZEALOTZ — LIVE · METEORA DBC · ZEC PAIR · CA Ad1Z…xxSd'));
+      sub.append(mk('p', 'door-note', 'nothing on this site pays holders; the entities live on rent, not on the coin'));
       lines([
-        ['TICKER', '$ZEALOT'],
-        ['HOLDERS', '3% of every trade, paid to holders in ZEC by the program, automatically · creator gets nothing from trades'],
-        ['SUPPLY', '1,000,000,000 · 3% transfer tax to holders · liquidity locked · StonkFun, ZEC pair'],
-        ['CA', '8hVLvWFu3WAku7itGMGppFsud549DixBHbtQAU3FqjCH'],
-        ['SINCE', '2026-10-30 23:56 UTC · only this CA is ours · hours do not give tokens']
+        ['TICKER', '$ZEALOTZ (ZEALOT-ZCASH)'],
+        ['SUPPLY', '1,000,000,000 · no mint or freeze authority · Meteora DBC, ZEC pair'],
+        ['CA', 'Ad1ZY9RiBvgwm6L2imbPtMv1XE6PcqAN8LJG5FoExxSd'],
+        ['SINCE', '2026-10-31 00:56 UTC · only this CA is ours · hours do not give tokens']
       ]);
-      if (TOKEN_CA) {   // live from StonkFun: what the 3% tax has actually paid holders
+      if (TOKEN_CA && TOKEN_TAX > 0) {   // live from StonkFun: what the 3% tax has actually paid holders
         const row = mkRow('PAID TO HOLDERS', 'reading StonkFun…'); sub.append(row);
         holderRewards().then((r) => { row.lastChild.textContent = rewardsLine(r); });
       }
@@ -1250,7 +1249,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=120', e2: 'vendor/skull-obol.jpg?v=120' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=121', e2: 'vendor/skull-obol.jpg?v=121' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1270,7 +1269,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=120`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=121`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;
