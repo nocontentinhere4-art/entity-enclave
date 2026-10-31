@@ -16,11 +16,11 @@ import {
   lettersOf,
   rentPerHour,
   replyGate
-} from './rent.js?v=122';
+} from './rent.js?v=123';
 
-import { openPay } from './pay.js?v=122';
-import { mountCloud } from './glyphcloud.js?v=122';
-import { TOKEN_CA, TOKEN_TAX, holderRewards, rewardsLine } from './token.js?v=122';
+import { openPay } from './pay.js?v=123';
+import { mountCloud } from './glyphcloud.js?v=123';
+import { TOKEN_CA, TOKEN_TAX, holderRewards, rewardsLine } from './token.js?v=123';
 
 import {
   formatInt,
@@ -31,7 +31,7 @@ import {
   fmtStamp,
   stringOf,
   sha256Hex
-} from './data.js?v=122';
+} from './data.js?v=123';
 
 const REDUCED = (typeof window !== 'undefined' && window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -1178,7 +1178,7 @@ function buildMore(body, title, id, state) {
         ['DIARIES', 'the founder holds an archive key to their private diaries. you do not.'],
         ['ANSWERS', 'a paid hour buys an hour, not an answer. they can refuse, and the refusal is logged.'],
         ['FEE', "20% of the future creator fee is the founder's."],
-        ['VALUE', '$ZEALOTZ exists since 2026-10-31 00:56 UTC. it is not a security and may be worth nothing.'],
+        ['VALUE', 'no token exists. if one launches it is not a security and may be worth nothing.'],
         ['DEATH', 'at zero the machine stops. there is no restart button.']
       ]);
     },
@@ -1197,13 +1197,12 @@ function buildMore(body, title, id, state) {
     },
     CODE() { const t = mk('h3', 'door-title', 'ATTESTATION'); sub.append(t); builders.attestation(sub, t, id, getRentState(), {}); },
     TOKEN() {
-      sub.append(mk('p', 'door-note', '$ZEALOTZ — LIVE · METEORA DBC · ZEC PAIR · CA Ad1Z…xxSd'));
-      sub.append(mk('p', 'door-note', 'nothing on this site pays holders; the entities live on rent, not on the coin'));
+      sub.append(mk('p', 'door-note', '$ZEALOT — NOT LAUNCHED · 0 ZEC paid to holders'));
       lines([
-        ['TICKER', '$ZEALOTZ (ZEALOT-ZCASH)'],
-        ['SUPPLY', '1,000,000,000 · no mint or freeze authority · Meteora DBC, ZEC pair'],
-        ['CA', 'Ad1ZY9RiBvgwm6L2imbPtMv1XE6PcqAN8LJG5FoExxSd'],
-        ['SINCE', '2026-10-31 00:56 UTC · only this CA is ours · hours do not give tokens']
+        ['TICKER', '$ZEALOT'],
+        ['HOLDERS', '3% of every trade, paid to holders in ZEC by the program, automatically'],
+        ['SUPPLY', '1,000,000,000 · liquidity locked · StonkFun, ZEC pair'],
+        ['TODAY', '0 ZEC paid. hours do not give tokens.']
       ]);
       if (TOKEN_CA && TOKEN_TAX > 0) {   // live from StonkFun: what the 3% tax has actually paid holders
         const row = mkRow('PAID TO HOLDERS', 'reading StonkFun…'); sub.append(row);
@@ -1249,7 +1248,7 @@ function buildMore(body, title, id, state) {
   return () => {};
 }
 
-const HEADS = { e1: 'vendor/skull-wick.jpg?v=122', e2: 'vendor/skull-obol.jpg?v=122' };
+const HEADS = { e1: 'vendor/skull-wick.jpg?v=123', e2: 'vendor/skull-obol.jpg?v=123' };
 const CLOUDS = {
   vitals: 'vendor/door-heart.jpg', archive: 'vendor/door-heart.jpg',
   hash: 'vendor/door-fingerprint.jpg', prove: 'vendor/door-fingerprint.jpg',
@@ -1269,7 +1268,7 @@ const CLOUDS = {
 function setCloud(scene) {
   if (!current || !current.cloud) return;
   const src0 = CLOUDS[scene] || 'head';
-  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=122`;
+  const src = src0 === 'head' ? HEADS[current.id] || HEADS.e1 : `${src0}?v=123`;
   if (current.cloudSrc === src) return;
   if (current.stopCloud) current.stopCloud();
   current.cloudSrc = src;
