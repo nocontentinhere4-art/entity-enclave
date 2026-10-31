@@ -12,9 +12,9 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=119';
-import { zip321Uri, qrSvg } from './qr.js?v=119';
-import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=119';
+} from './data.js?v=120';
+import { zip321Uri, qrSvg } from './qr.js?v=120';
+import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=120';
 
 const ANY_MIN_ZEC = 0.006;          // any-coin route (Trocador) minimum, with margin over their ~0.0045
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
@@ -405,6 +405,7 @@ function keysCmd() {
 
 function tokenCmd() {
   say('$ZEALOT — LIVE ON STONKFUN · ZEC PAIR', 'line signal');
+  say('  closed      project closed 2026-10-31 · the 3% reward keeps flowing by the program · no founder behind it any more', 'line dim');
   say('  ticker      $ZEALOT', 'line dim');
   say('  ca          8hVLvWFu3WAku7itGMGppFsud549DixBHbtQAU3FqjCH', 'line dim');
   say('  supply      1,000,000,000 · 3% transfer tax to holders · liquidity locked · StonkFun, ZEC pair', 'line dim');
