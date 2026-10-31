@@ -1,14 +1,14 @@
 // pay.js — BUY TIME. The chosen head as a glyph cloud, three hour chips, the live price, one button, a QR.
 // Everything shown comes from rent.js (the enclaves): the price is their rentZatsPerHour, the address is the one they
 // publish, the hours left are theirs. Until the enclave has answered, the price is "—" and the button is disabled.
-import { getRentState, rentPerHour, subscribeRent } from './rent.js?v=121';
-import { zip321Uri, qrSvg } from './qr.js?v=121';
-import { fixed8 } from './data.js?v=121';
-import { mountCloud } from './glyphcloud.js?v=121';
+import { getRentState, rentPerHour, subscribeRent } from './rent.js?v=122';
+import { zip321Uri, qrSvg } from './qr.js?v=122';
+import { fixed8 } from './data.js?v=122';
+import { mountCloud } from './glyphcloud.js?v=122';
 
 const MEMO_MAX = 500;                 // bytes a shielded memo holds
 const ANY_MIN_ZEC = 0.006;            // any-coin route (Trocador) minimum, with margin over their ~0.0045
-const HEAD = { e1: 'vendor/skull-wick.jpg?v=121', e2: 'vendor/skull-obol.jpg?v=121' };
+const HEAD = { e1: 'vendor/skull-wick.jpg?v=122', e2: 'vendor/skull-obol.jpg?v=122' };
 const $ = (s) => document.querySelector(s);
 const bytesOf = (s) => new TextEncoder().encode(s).length;
 const zec = (zats) => `${fixed8(zats).replace(/0+$/, '').replace(/\.$/, '')} ZEC`;

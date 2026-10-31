@@ -7,15 +7,15 @@
  * station so a passage always completes. One sentence and one live line per object; every number from rent.js, '—'
  * while unknown. Written by the integrator.
  */
-import { makeAtlas } from './glyphs.js?v=121';
-import * as rent from './rent.js?v=121';
-import { openPay } from './pay.js?v=121';
-import { openDoor } from './door.js?v=121';
+import { makeAtlas } from './glyphs.js?v=122';
+import * as rent from './rent.js?v=122';
+import { openPay } from './pay.js?v=122';
+import { openDoor } from './door.js?v=122';
 
 const RAMP = ' .-~:;=!*+^%$#&@';
 const FONT = '"JetBrains Mono", "SF Mono", Menlo, monospace';
 const COLORS = ['#f4b728', 'rgba(242,242,238,.92)', 'rgba(242,242,238,.5)', '#ffd76a', '#555'];
-const V = '?v=121';
+const V = '?v=122';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const LIGHT = (() => { const l = [0.35, 0.55, 0.76]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
@@ -641,7 +641,7 @@ export function createMorph() {
         else { caEl.style.left = '16px'; caEl.style.right = 'auto'; }
       }
     }
-    if (cs === S - 1 && mdist === 0) { text('$ZEALOT · STONKFUN · ZEC PAIR', W - 16, chromeY, 11, 'rgba(244,183,40,.5)', 'right'); }
+    if (cs === S - 1 && mdist === 0) { text('$ZEALOTZ · METEORA DBC · ZEC PAIR', W - 16, chromeY, 11, 'rgba(244,183,40,.5)', 'right'); }
     setTimeout(() => safeFrame(performance.now()), 33);
   }
 

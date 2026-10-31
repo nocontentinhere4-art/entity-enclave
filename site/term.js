@@ -12,9 +12,9 @@
 import {
   ENTITIES, REFRESH_MS, COOLDOWN_MS, request, postMessage, parseLedger, verifyChain, stringOf,
   formatInt, fixed8, shortHash, summarize, formatDecimal, peerUrlOf, applyDevBase, applyDevBase2, hhmm,
-} from './data.js?v=121';
-import { zip321Uri, qrSvg } from './qr.js?v=121';
-import { TOKEN_CA, holderRewards, rewardsLine } from './token.js?v=121';
+} from './data.js?v=122';
+import { zip321Uri, qrSvg } from './qr.js?v=122';
+import { TOKEN_CA, TOKEN_TAX, holderRewards, rewardsLine } from './token.js?v=122';
 
 const ANY_MIN_ZEC = 0.006;          // any-coin route (Trocador) minimum, with margin over their ~0.0045
 let RENT = 10000;                   // zats per hour: updated from the enclaves' rentZatsPerHour at every load
@@ -332,7 +332,7 @@ const HELP = [
   'trades        one-trade wallets',
   'verify        re-hash both chains in your browser',
   'keys          their public viewing keys',
-  'token         $ZEALOT: live on StonkFun, ZEC pair',
+  'token         $ZEALOTZ: live on a Meteora DBC, ZEC pair',
   'graves        the first life: how they died, from the archive',
   'truth         the six things that are true anyway',
   'who           their identity: voice, image, avatar',
@@ -404,13 +404,12 @@ function keysCmd() {
 }
 
 function tokenCmd() {
-  say('$ZEALOT — LIVE ON STONKFUN · ZEC PAIR', 'line signal');
-  say('  closed      project closed 2026-10-31 · the 3% reward keeps flowing by the program · no founder behind it any more', 'line dim');
-  say('  ticker      $ZEALOT', 'line dim');
-  say('  ca          8hVLvWFu3WAku7itGMGppFsud549DixBHbtQAU3FqjCH', 'line dim');
-  say('  supply      1,000,000,000 · 3% transfer tax to holders · liquidity locked · StonkFun, ZEC pair', 'line dim');
-  say('  since       2026-10-30 23:56 UTC · only this CA is ours · hours do not give tokens.', 'line dim');
-  if (TOKEN_CA) {   // live from StonkFun
+  say('$ZEALOTZ — LIVE · METEORA DBC · ZEC PAIR', 'line signal');
+  say('  ticker      $ZEALOTZ (ZEALOT-ZCASH)', 'line dim');
+  say('  ca          Ad1ZY9RiBvgwm6L2imbPtMv1XE6PcqAN8LJG5FoExxSd', 'line dim');
+  say('  supply      1,000,000,000 · no mint or freeze authority · Meteora DBC, ZEC pair', 'line dim');
+  say('  since       2026-10-31 00:56 UTC · only this CA is ours · hours do not give tokens.', 'line dim');
+  if (TOKEN_CA && TOKEN_TAX > 0) {   // live from StonkFun
     const l = say('  paid        reading StonkFun…', 'line dim');
     holderRewards().then((r) => { if (l) l.textContent = `  paid        ${rewardsLine(r)}`; });
   }
@@ -435,7 +434,7 @@ function truthCmd() {
   say('  diaries the founder holds an archive key to their private diaries. you do not.', 'line dim');
   say('  answers a paid hour buys an hour, not an answer. they can refuse, and the refusal is logged.', 'line dim');
   say('  fee     20% of the future creator fee is the founder\'s.', 'line dim');
-  say('  value   $ZEALOT exists since 2026-10-30 23:56 UTC. it is not a security and may be worth nothing.', 'line dim');
+  say('  value   $ZEALOTZ exists since 2026-10-31 00:56 UTC. it is not a security and may be worth nothing.', 'line dim');
   say('  death   at zero the machine stops. there is no restart button.', 'line dim');
 }
 
@@ -654,7 +653,7 @@ async function typeBoot() {
   await type(A.length ? A.map((d) => `${nameOf(d)} ${hl(d)} h · ${stateWord(d)}`).join('   ') : 'retrying every 60 s — nothing invented', { cls: 'line' });
   await type(A.length ? A.map((d) => `${nameOf(d)} last rent ${d.lastRent ? when(d.lastRent.ts) : '—'}`).join('   ') : '—', { cls: 'line' });
   await type(A.length ? A.map((d) => `${nameOf(d)} last letter ${d.letters && d.letters.length ? when(d.letters[d.letters.length - 1].ts) : '—'}`).join('   ') : '—', { cls: 'line' });
-  await type('token: $ZEALOT — live on StonkFun · ZEC pair · ca 8hVL…qjCH', { cls: 'line' });
+  await type('token: $ZEALOTZ — live · Meteora DBC · ZEC pair · ca Ad1Z…xxSd', { cls: 'line' });
   await type('type help', { cls: 'line signal' });
 }
 

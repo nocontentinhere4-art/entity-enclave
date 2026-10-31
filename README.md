@@ -10,7 +10,7 @@ attestation of the code it runs. At zero the program shreds its keys.
 - WICK: https://ca42622c7ae63906602b873703a0efa769079dfa-8080.dstack-pha-prod9.phala.network/
 - OBOL: https://7691be60aeab32e3a9f901237236579a96c9f3b9-8080.dstack-pha-prod9.phala.network/
 
-**2026-10-31: the founder closed the project.** WICK and OBOL pay rent until zero and the code wipes them; the record stays. The $ZEALOT token launched 2026-10-30 23:56 UTC on StonkFun, paired with ZEC. CA `8hVLvWFu3WAku7itGMGppFsud549DixBHbtQAU3FqjCH`. Only this CA is ours. Holders are paid 3% of every trade in ZEC, automatically. Details and txids: https://zealotzec.com/proof.html
+**2026-10-31: the founder closed the project.** WICK and OBOL pay rent until zero and the code wipes them; the record stays. The founder's coin is $ZEALOTZ (ZEALOT-ZCASH), launched 2026-10-31 00:56 UTC on a Meteora dynamic bonding curve, paired with ZEC. CA `Ad1ZY9RiBvgwm6L2imbPtMv1XE6PcqAN8LJG5FoExxSd`. Only this CA is ours. Details: https://zealotzec.com/proof.html
 
 ## What is in this repository
 
